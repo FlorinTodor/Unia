@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habla con tu dinero · Reto Unicaja-UGR</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">💬💶</div>
+      <div class="titulos">
+        <h1>Habla con tu dinero</h1>
+        <p id="info-proveedor">Asistente financiero conversacional</p>
+      </div>
+      <label class="tts-toggle" title="Leer las respuestas en voz alta">
+        <input type="checkbox" id="tts-check">
+        <span>🔊 Voz</span>
+      </label>
+    </header>
+
+    <main id="chat">
+      <div class="mensaje asistente">
+        <div class="burbuja">
+          ¡Hola, Alex! 👋 Soy tu asistente financiero. Puedes <b>escribirme o hablarme</b>:
+          consulta tu saldo, tus gastos («¿cuánto gasté en restaurantes en junio?»),
+          envía un Bizum o pídeme un gráfico de tus finanzas.
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <form id="formulario">
+        <button type="button" id="btn-mic" title="Hablar (pulsa para grabar, pulsa de nuevo para enviar)">🎤</button>
+        <input id="entrada" type="text" placeholder="Escribe o pulsa el micrófono…" autocomplete="off" autofocus>
+        <button type="submit" id="btn-enviar" title="Enviar">➤</button>
+      </form>
+    </footer>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
