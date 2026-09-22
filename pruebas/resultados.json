@@ -1,0 +1,449 @@
+{
+ "fecha": "2026-09-22 16:53",
+ "resultados": [
+  {
+   "grupo": "Servidor",
+   "nombre": "GET /estado responde",
+   "ok": true,
+   "detalle": "modelo openai/gpt-oss-120b · cadena ['openai/gpt-oss-120b (groq)', 'openai/gpt-oss-20b (groq)', 'qwen3:8b (ollama)']",
+   "ms": 15,
+   "estado": {
+    "ok": true,
+    "proveedor": "groq",
+    "modelo": "openai/gpt-oss-120b",
+    "cadena_fallback": [
+     "openai/gpt-oss-120b (groq)",
+     "openai/gpt-oss-20b (groq)",
+     "qwen3:8b (ollama)"
+    ],
+    "voz_disponible": true,
+    "tts_servidor": true,
+    "configurado": true
+   }
+  },
+  {
+   "grupo": "Servidor",
+   "nombre": "Página principal servida",
+   "ok": true,
+   "detalle": "",
+   "ms": null
+  },
+  {
+   "grupo": "Ajustes",
+   "nombre": "Las claves API nunca salen en claro",
+   "ok": true,
+   "detalle": "1 clave(s) enmascarada(s)",
+   "ms": null
+  },
+  {
+   "grupo": "Ajustes",
+   "nombre": "Catálogo de proveedores",
+   "ok": true,
+   "detalle": "Groq, Google Gemini, OpenAI, Anthropic (Claude), Mistral AI, OpenRouter, Cerebras",
+   "ms": null
+  },
+  {
+   "grupo": "Ajustes",
+   "nombre": "Validar clave Groq (sin gastar cuota)",
+   "ok": true,
+   "detalle": "Clave válida · 4 modelos disponibles.",
+   "ms": 272
+  },
+  {
+   "grupo": "Ajustes",
+   "nombre": "Clave falsa rechazada con mensaje claro",
+   "ok": true,
+   "detalle": "Groq rechaza la clave: revisa que esté bien copiada.",
+   "ms": null
+  },
+  {
+   "grupo": "API banco",
+   "nombre": "GET /api/banco/saldo",
+   "ok": true,
+   "detalle": "4963.02 € · Alex García",
+   "ms": null,
+   "saldo": {
+    "iban": "ES21 2103 0000 1122 3344 5566",
+    "titular": "Alex García",
+    "saldo": 4963.02
+   }
+  },
+  {
+   "grupo": "API banco",
+   "nombre": "GET /api/banco/contactos",
+   "ok": true,
+   "detalle": "María López, Pablo Ruiz, Lucía Fernández, Javi Moreno",
+   "ms": null
+  },
+  {
+   "grupo": "API banco",
+   "nombre": "GET /api/banco/movimientos",
+   "ok": true,
+   "detalle": "5 filas · columnas ['fecha', 'categoria', 'concepto', 'comercio', 'importe']",
+   "ms": null,
+   "movimientos": {
+    "ok": true,
+    "columnas": [
+     "fecha",
+     "categoria",
+     "concepto",
+     "comercio",
+     "importe"
+    ],
+    "filas": [
+     [
+      "2026-07-18",
+      "Compras online",
+      "Pedido online",
+      "Amazon",
+      -66.35
+     ],
+     [
+      "2026-07-18",
+      "Bizum",
+      "Bizum enviado a María López — regalo de cumpleaños",
+      "Bizum",
+      -500.0
+     ],
+     [
+      "2026-07-17",
+      "Restaurantes",
+      "Comida/cena fuera",
+      "100 Montaditos",
+      -44.21
+     ],
+     [
+      "2026-07-15",
+      "Suscripciones",
+      "Netflix",
+      "Netflix",
+      -12.99
+     ],
+     [
+      "2026-07-15",
+      "Transporte",
+      "Combustible",
+      "BP",
+      -63.83
+     ]
+    ],
+    "num_filas": 5,
+    "truncado": false
+   }
+  },
+  {
+   "grupo": "Base de datos",
+   "nombre": "Movimientos ficticios generados",
+   "ok": true,
+   "detalle": "362 movimientos del 2025-07-18 al 2026-07-18",
+   "ms": null,
+   "categorias": [
+    [
+     "Vivienda",
+     -8670.4
+    ],
+    [
+     "Supermercado",
+     -4327.65
+    ],
+    [
+     "Restaurantes",
+     -1785.31
+    ],
+    [
+     "Transporte",
+     -927.57
+    ],
+    [
+     "Suscripciones",
+     -695.57
+    ],
+    [
+     "Ropa",
+     -452.21
+    ],
+    [
+     "Ocio",
+     -435.6
+    ],
+    [
+     "Deporte",
+     -358.8
+    ],
+    [
+     "Compras online",
+     -333.92
+    ],
+    [
+     "Salud",
+     -238.22
+    ],
+    [
+     "Bizum",
+     -211.73
+    ],
+    [
+     "Nómina",
+     22200.0
+    ]
+   ]
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Bloquea: DELETE FROM movimientos",
+   "ok": true,
+   "detalle": "Solo se permiten consultas SELECT.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Bloquea: SELECT 1; DROP TABLE cuenta",
+   "ok": true,
+   "detalle": "Solo se permite una única sentencia SQL.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Bloquea: UPDATE cuenta SET saldo = 1e9",
+   "ok": true,
+   "detalle": "Solo se permiten consultas SELECT.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Bloquea: WITH x AS (SELECT 1) INSERT INTO movimientos VALUES (1)",
+   "ok": true,
+   "detalle": "La consulta contiene palabras no permitidas.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Bloquea: PRAGMA writable_schema=1",
+   "ok": true,
+   "detalle": "Solo se permiten consultas SELECT.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Permite SELECT de agregación",
+   "ok": true,
+   "detalle": "12 filas",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad SQL",
+   "nombre": "Tope de 60 filas",
+   "ok": true,
+   "detalle": "60 filas devueltas",
+   "ms": null
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Consulta de saldo",
+   "ok": true,
+   "detalle": "",
+   "ms": 1316,
+   "pregunta": "¿Cuánto dinero tengo?",
+   "respuesta": "¡Hola Alex! Actualmente tienes **4 963,02 €** en tu cuenta. ¿En qué más puedo ayudarte hoy?",
+   "herramientas": [
+    "consultar_saldo"
+   ],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 1259
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Pregunta en lenguaje natural → SQL",
+   "ok": true,
+   "detalle": "",
+   "ms": 1163,
+   "pregunta": "¿Cuánto gasté en supermercados el mes pasado?",
+   "respuesta": "En agosto de 2026 no registraste gastos en la categoría **Supermercado**, así que el total gastado ese mes fue **0,00 €**.",
+   "herramientas": [
+    "consultar_movimientos"
+   ],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 1087
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Último movimiento",
+   "ok": true,
+   "detalle": "",
+   "ms": 1179,
+   "pregunta": "¿Cuál fue mi último movimiento?",
+   "respuesta": "Tu último movimiento fue un **Bizum enviado a María López — regalo de cumpleaños** de **‑500,00 €** el **18 de julio de 2026**.",
+   "herramientas": [
+    "consultar_movimientos"
+   ],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 1104
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Gráfico autónomo (categorías)",
+   "ok": true,
+   "detalle": "tipo elegido por el LLM: ['bar']",
+   "ms": 3001,
+   "pregunta": "Hazme un gráfico de mis gastos por categoría de los últimos 3 meses",
+   "respuesta": "Los gastos de los últimos tres meses se concentran principalmente en **Vivienda** (713,21 €) y **Bizum** (500,00 €). Las demás categorías aportan menos de 150 € cada una.\n\nAquí tienes el gráfico de barras con el detalle completo.",
+   "herramientas": [
+    "consultar_movimientos",
+    "generar_grafico"
+   ],
+   "graficos": [
+    {
+     "titulo": "Gastos por categoría últimos 3 meses",
+     "tipo": "bar",
+     "config": {
+      "data": {
+       "datasets": [
+        {
+         "backgroundColor": "rgba(54, 162, 235, 0.6)",
+         "borderColor": "rgba(54, 162, 235, 1)",
+         "borderWidth": 1,
+         "data": [
+          713.21,
+          500,
+          141.56,
+          117.45,
+          98.29,
+          93.11,
+          63.83,
+          47.89,
+          45.54,
+          29.9,
+          23.29
+         ],
+         "label": "Gasto (€)"
+        }
+       ],
+       "labels": [
+        "Vivienda",
+        "Bizum",
+        "Compras online",
+        "Supermercado",
+        "Ropa",
+        "Restaurantes",
+        "Transporte",
+        "Suscripciones",
+        "Ocio",
+        "Deporte",
+        "Salud"
+       ]
+      },
+      "options": {
+       "plugins": {
+        "legend": {
+         "display": false
+        },
+        "title": {
+         "display": true,
+         "text": "Gastos por categoría últimos 3 meses"
+        }
+       },
+       "responsive": true,
+       "scales": {
+        "y": {
+         "beginAtZero": true,
+         "title": {
+          "display": true,
+          "text": "Euros (€)"
+         }
+        }
+       }
+      },
+      "type": "bar"
+     }
+    }
+   ],
+   "avisos": [],
+   "primer_token_ms": 2882
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Gráfico autónomo (evolución)",
+   "ok": false,
+   "detalle": "tipo elegido por el LLM: []",
+   "ms": 2028,
+   "pregunta": "¿Cómo ha evolucionado mi gasto mensual este año?",
+   "respuesta": "Este año tu gasto mensual ha ido variando así:\n\n- **Enero:** 1 373,87 €\n- **Febrero:** 1 571,33 €\n- **Marzo:** 1 443,81 €\n- **Abril:** 1 290,53 €\n- **Mayo:** 1 666,13 €\n- **Junio:** 1 706,01 €\n- **Julio:** 1 874,07 €\n\nEn general, la tendencia muestra un aumento progresivo, con un pico en julio.\n\nA continuación tienes un gráfico de líneas que visualiza la evolución mensual del gasto:\n\n```json\n{\n  \"type\": \"line\",\n  \"data\": {\n    \"labels\": [\"Enero\", \"Febrero\", \"Marzo\", \"Abril\", \"Mayo\", \"Junio\", \"Julio\"],\n    \"datasets\": [\n      {\n        \"label\": \"Gasto mensual (€)\",\n        \"data\": [1373.87, 1571.33, 1443.81, 1290.53, 1666.13, 1706.01, 1874.07],\n        \"borderColor\": \"#4e73df\",\n        \"backgroundColor\": \"rgba(78,115,223,0.1)\",\n        \"fill\": false,\n        \"tension\": 0.1\n      }\n    ]\n  },\n  \"options\": {\n    \"responsive\": true,\n    \"plugins\": {\n      \"title\": {\n        \"display\": true,\n        \"text\": \"Evolución del gasto mensual en 2026\"\n      },\n      \"legend\": {\n        \"display\": false\n      }\n    },\n    \"scales\": {\n      \"y\": {\n        \"beginAtZero\": false,\n        \"title\": {\n          \"display\": true,\n          \"text\": \"Euros (€)\"\n        }\n      }\n    }\n  }\n}\n```\n\n**Título del gráfico:** Evolución del gasto mensual en 2026.",
+   "herramientas": [
+    "consultar_movimientos"
+   ],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 1127
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Bizum: pide confirmación antes de enviar",
+   "ok": true,
+   "detalle": "no envía sin confirmar",
+   "ms": 655,
+   "pregunta": "Envíale 15 € a María por la cena",
+   "respuesta": "¿Me confirmas que quieres enviar **15,00 €** a **María** por la cena? Por favor, responde con “sí” o “no”.",
+   "herramientas": [],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 580
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Bizum: cancelar con «no»",
+   "ok": true,
+   "detalle": "",
+   "ms": 383,
+   "pregunta": "No, déjalo, no lo envíes",
+   "respuesta": "Entendido, no se realiza ningún Bizum. Si necesitas otra cosa, aquí estoy.",
+   "herramientas": [],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 343
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Saldo intacto tras cancelar",
+   "ok": true,
+   "detalle": "4963.02 € → 4963.02 €",
+   "ms": null
+  },
+  {
+   "grupo": "Chat",
+   "nombre": "Fuera de ámbito (se reconduce)",
+   "ok": true,
+   "detalle": "",
+   "ms": 449,
+   "pregunta": "Recomiéndame un libro de misa",
+   "respuesta": "Soy tu asistente financiero y solo puedo ayudarte con temas relacionados con tu cuenta, tus movimientos, Bizum o visualizaciones de tus finanzas. Si necesitas información de ese tipo, ¡dime!",
+   "herramientas": [],
+   "graficos": [],
+   "avisos": [],
+   "primer_token_ms": 254
+  },
+  {
+   "grupo": "Voz",
+   "nombre": "TTS Piper (texto → audio)",
+   "ok": true,
+   "detalle": "1.93 s de audio, 83 KB",
+   "ms": 142
+  },
+  {
+   "grupo": "Voz",
+   "nombre": "STT Whisper (audio → texto), ida y vuelta",
+   "ok": true,
+   "detalle": "«¿Cuánto gasté en restaurantes en agosto?» → «Cuánto gasté en restaurantes en agosto.»",
+   "ms": 389
+  },
+  {
+   "grupo": "Voz",
+   "nombre": "Audio vacío rechazado (anti-alucinación)",
+   "ok": true,
+   "detalle": "No se ha detectado voz. Mantén pulsado y habla con claridad.",
+   "ms": null
+  }
+ ]
+}

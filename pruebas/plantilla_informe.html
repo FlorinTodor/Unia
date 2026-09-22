@@ -1,0 +1,314 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Habla con tu dinero · Estado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --fondo: #f3f6f8;
+    --panel: #ffffff;
+    --panel-2: #e8eef2;
+    --borde: #d3dde3;
+    --texto: #0f1e2b;
+    --suave: #56697a;
+    --acento: #0f8f82;
+    --acento-suave: #d5f0ec;
+    --usuario: #0e7490;
+    --ok: #16794a;
+    --ok-fondo: #dcf2e5;
+    --mal: #b3261e;
+    --mal-fondo: #fbe2df;
+    --aviso: #8a5a00;
+    --aviso-fondo: #fbefd4;
+    --sans: "Manrope", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #0f172a; --panel: #172136; --panel-2: #1e293b; --borde: #2c3a52;
+      --texto: #e2e8f0; --suave: #94a3b8; --acento: #2dd4bf; --acento-suave: #123a3a;
+      --usuario: #0e7490; --ok: #4ade80; --ok-fondo: #12301f; --mal: #f87171; --mal-fondo: #3a1818;
+      --aviso: #fbbf24; --aviso-fondo: #3a2d0e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #0f172a; --panel: #172136; --panel-2: #1e293b; --borde: #2c3a52;
+    --texto: #e2e8f0; --suave: #94a3b8; --acento: #2dd4bf; --acento-suave: #123a3a;
+    --usuario: #0e7490; --ok: #4ade80; --ok-fondo: #12301f; --mal: #f87171; --mal-fondo: #3a1818;
+    --aviso: #fbbf24; --aviso-fondo: #3a2d0e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.6 var(--sans); padding-inline: 16px; }
+  .hoja { max-width: 980px; margin: 0 auto; padding-block: 40px 64px; display: grid; gap: 48px; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; }
+  h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; font-weight: 800; }
+  h3 { font-size: 15px; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  .etiqueta { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--suave); font-weight: 600; }
+  section { display: grid; gap: 16px; }
+  .cabecera-seccion { display: grid; gap: 4px; }
+
+  /* cabecera */
+  header.portada { display: grid; gap: 20px; }
+  .resumen { display: flex; flex-wrap: wrap; gap: 12px; }
+  .dato { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 12px 16px; display: grid; gap: 2px; min-width: 150px; flex: 1; }
+  .dato b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .dato.destacado { background: var(--acento-suave); border-color: transparent; }
+  .dato.destacado b { color: var(--acento); }
+
+  /* rúbrica */
+  .rubrica { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .criterio { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+  .criterio .fila { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .pts { font-family: var(--mono); font-size: 13px; color: var(--suave); white-space: nowrap; }
+  .criterio p { font-size: 14px; color: var(--suave); }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-fondo); color: var(--ok); }
+  .chip.mal { background: var(--mal-fondo); color: var(--mal); }
+  .chip.aviso { background: var(--aviso-fondo); color: var(--aviso); }
+
+  /* demo tipo chat */
+  .chat { background: var(--panel-2); border-radius: 14px; padding: 20px; display: grid; gap: 18px; }
+  .turno { display: grid; gap: 8px; }
+  .burbuja { padding: 10px 14px; border-radius: 12px; max-width: 85%; }
+  .usuario { background: var(--usuario); color: #fff; justify-self: end; border-bottom-right-radius: 4px; }
+  .asistente { background: var(--panel); border: 1px solid var(--borde); border-bottom-left-radius: 4px; }
+  .asistente p + p { margin-top: 6px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--suave); font-family: var(--mono); }
+  .meta .herr { color: var(--acento); }
+  .aviso-llm { font-size: 12px; color: var(--aviso); }
+  .grafico { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 14px; max-width: 620px; }
+  .grafico canvas { max-width: 100%; }
+  .voz { display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 16px; }
+  .voz audio { width: 100%; max-width: 420px; }
+  .flecha { font-family: var(--mono); font-size: 13px; }
+
+  /* tabla de pruebas */
+  .tabla { overflow-x: auto; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); font-weight: 600; }
+  tr.grupo td { background: var(--panel-2); font-weight: 600; font-size: 13px; }
+  tr:last-child td { border-bottom: 0; }
+  td.ms { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--suave); text-align: right; }
+  td.detalle { color: var(--suave); font-size: 13px; }
+
+  /* hallazgos */
+  .hallazgos { display: grid; gap: 10px; }
+  .hallazgo { background: var(--panel); border: 1px solid var(--borde); border-left: 3px solid var(--aviso); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; }
+  .hallazgo.grave { border-left-color: var(--mal); }
+  .hallazgo.info { border-left-color: var(--suave); }
+  .hallazgo p { font-size: 14px; color: var(--suave); }
+  pre { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0; font: 13px/1.6 var(--mono); }
+  footer { color: var(--suave); font-size: 13px; }
+  @media (max-width: 560px) { .burbuja { max-width: 100%; } .chat { padding: 14px; } }
+</style>
+
+<div class="hoja">
+  <header class="portada">
+    <div class="etiqueta">Reto Unicaja · UGR — informe de estado</div>
+    <h1>Habla con tu dinero</h1>
+    <p>Asistente bancario por voz y texto con IA generativa. Qué hay construido, una demo
+      reproducida con respuestas reales del agente y el resultado de la batería de pruebas
+      ejecutada contra la app en marcha.</p>
+    <div class="resumen" id="resumen"></div>
+  </header>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Qué tenemos</div>
+      <h2>Cobertura de la rúbrica (100 pts)</h2>
+    </div>
+    <div class="rubrica" id="rubrica"></div>
+  </section>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Demo</div>
+      <h2>Conversación real con el agente</h2>
+      <p>Cada turno es una sesión real contra <code>POST /chat</code>. Debajo de cada respuesta:
+        herramientas que el agente decidió usar y tiempo total del turno.</p>
+    </div>
+    <div class="chat" id="chat"></div>
+  </section>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Demo · voz</div>
+      <h2>Ida y vuelta: Piper habla, Whisper escucha</h2>
+    </div>
+    <div class="voz" id="voz"></div>
+  </section>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Pruebas</div>
+      <h2 id="titulo-pruebas">Batería de pruebas</h2>
+      <p>Script: <code>pruebas/demo_pruebas.py</code>. No modifica la base de datos (el Bizum se cancela).</p>
+    </div>
+    <div class="tabla"><table>
+      <thead><tr><th>Prueba</th><th>Resultado</th><th>Detalle</th><th style="text-align:right">Tiempo</th></tr></thead>
+      <tbody id="pruebas"></tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Pendiente</div>
+      <h2>Hallazgos y lo que falta antes del 16 de octubre</h2>
+    </div>
+    <div class="hallazgos">
+      <div class="hallazgo grave">
+        <h3>Los datos de la BD terminan el 18 de julio de 2026</h3>
+        <p>Hoy es 22 de septiembre: «¿cuánto gasté el mes pasado?» responde 0 € y «últimos 3 meses»
+          solo ve julio. En el vídeo quedaría mal. Solución: regenerar <code>data/banco.db</code> justo
+          antes de grabar (<code>db.inicializar(forzar=True)</code>, a propósito).</p>
+      </div>
+      <div class="hallazgo grave">
+        <h3>A veces el gráfico sale como texto JSON en vez de dibujarse</h3>
+        <p>En «¿Cómo ha evolucionado mi gasto mensual este año?» el modelo escribió la configuración
+          Chart.js dentro de la respuesta en lugar de llamar a <code>generar_grafico</code>. Arreglos
+          posibles: norma de prompt («nunca escribas JSON de gráfico, usa la herramienta») y/o que el
+          backend detecte un bloque <code>```json</code> con <code>type</code>+<code>data</code> y lo convierta en evento
+          <code>grafico</code>.</p>
+      </div>
+      <div class="hallazgo">
+        <h3>El límite por minuto de Groq agota la cadena en 4 mensajes seguidos</h3>
+        <p>Sin pausas, gpt-oss-120b y gpt-oss-20b dieron 429 y el tercer eslabón (Ollama) no estaba
+          arrancado, así que los turnos fallaron. Con 20 s entre mensajes pasa todo. Para la demo:
+          tener <code>ollama serve</code> arrancado o no encadenar preguntas muy rápido. El aviso dice
+          «ha agotado su cuota gratuita» aunque sea el límite por minuto: se podría matizar.</p>
+      </div>
+      <div class="hallazgo">
+        <h3>Panel ⚙️ Ajustes sin commitear y docs desfasados</h3>
+        <p>El panel de claves/proveedores (<code>ajustes.py</code>, <code>ajustes_api.py</code>, <code>ajustes.js</code>)
+          funciona pero no está en git. README, ARQUITECTURA y CLAUDE.md aún dicen que el principal es
+          Llama 3.3 70B; ahora es gpt-oss-120b (Llama se retiró de Groq).</p>
+      </div>
+      <div class="hallazgo info">
+        <h3>Entregables del reto</h3>
+        <p>Vídeo demo (≤ 5 min) y memoria técnica, en una carpeta de Google Drive enlazada desde el formulario del reto. Después habrá cita para enseñarlo en directo. La base de la memoria ya existe en
+          <code>docs/DECISIONES.md</code> e <code>docs/INCIDENCIAS.md</code>; esta página sirve de guion para el vídeo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="cabecera-seccion">
+      <div class="etiqueta">Repetir</div>
+      <h2>Volver a ejecutar las pruebas</h2>
+    </div>
+<pre>source .venv/bin/activate
+uvicorn backend.main:app                 # terminal 1
+python pruebas/demo_pruebas.py           # terminal 2 → pruebas/resultados.json
+python pruebas/generar_informe.py        # → docs/estado.html</pre>
+  </section>
+
+  <footer id="pie"></footer>
+</div>
+
+<script>
+const DATOS = /*__DATOS__*/null;
+const R = DATOS.resultados;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const seg = (ms) => ms == null ? "" : ms >= 1000 ? (ms / 1000).toFixed(1).replace(".", ",") + " s" : ms + " ms";
+const buscar = (nombre) => R.find((r) => r.nombre === nombre);
+
+// markdown mínimo: negritas, listas y cortar bloques de código
+function md(texto) {
+  const partes = texto.split("```");
+  let html = partes[0].trim().split(/\n{1,}/).filter(Boolean).map((l) => {
+    const t = esc(l).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    return l.trim().startsWith("- ") ? `<p>• ${t.replace(/^\s*- /, "")}</p>` : `<p>${t}</p>`;
+  }).join("");
+  if (partes.length > 1) html += `<p class="aviso-llm">[… aquí el modelo escribió el JSON del gráfico como texto: ver «Pendiente»]</p>`;
+  return html;
+}
+
+// ── resumen ──
+const ok = R.filter((r) => r.ok).length;
+const chats = R.filter((r) => r.pregunta && r.ok);
+const media = Math.round(chats.reduce((a, r) => a + r.ms, 0) / chats.length);
+const est = R[0].estado || {};
+const diasPlazo = Math.ceil((new Date("2026-10-16") - new Date(DATOS.fecha.slice(0, 10))) / 864e5);
+$("resumen").innerHTML = `
+  <div class="dato destacado"><span class="etiqueta">Pruebas</span><b>${ok}/${R.length}</b></div>
+  <div class="dato"><span class="etiqueta">Turno de chat medio</span><b>${seg(media)}</b></div>
+  <div class="dato"><span class="etiqueta">Modelo principal</span><b style="font-size:16px">${esc(est.modelo)}</b></div>
+  <div class="dato"><span class="etiqueta">Días hasta el plazo</span><b>${diasPlazo}</b></div>`;
+
+// ── rúbrica ──
+const estado = (s) => ({ ok: "Cubierto", aviso: "Con matices", mal: "Pendiente" })[s];
+const rubrica = [
+  ["Consultas en lenguaje natural", 30, "ok", "NL→SQL con 5 herramientas de function calling. SQL validado: solo SELECT, una sentencia, lista negra, conexión de solo lectura, tope de 60 filas."],
+  ["Gráficos autónomos", 20, "aviso", "El LLM elige tipo y emite la config Chart.js completa, sin plantillas. Falla a veces: escribe el JSON como texto."],
+  ["Latencia", 15, "ok", `Streaming SSE token a token sobre Groq. Turno medio en las pruebas: ${seg(media)}. Compactación de historial (~90 % menos tokens).`],
+  ["Calidad conversacional", 15, "ok", "10 normas de prompt nacidas de 17 incidencias reales. Pide confirmación antes de un Bizum y reconduce lo que no es de finanzas."],
+  ["Operaciones vía API", 10, "ok", "API bancaria ficticia REST: saldo, contactos, movimientos y Bizum (valida contacto, saldo y tope de 1.000 €)."],
+  ["Entregables", 10, "mal", "Falta el vídeo (≤ 5 min) y la memoria técnica. Docs de arquitectura, decisiones e incidencias ya escritos."],
+];
+$("rubrica").innerHTML = rubrica.map(([t, p, s, d]) => `
+  <div class="criterio">
+    <div class="fila"><h3>${t}</h3><span class="pts">${p} pts</span></div>
+    <span class="chip ${s}" style="justify-self:start">${estado(s)}</span>
+    <p>${d}</p>
+  </div>`).join("") + `
+  <div class="criterio">
+    <div class="fila"><h3>Extras</h3><span class="pts">+</span></div>
+    <span class="chip ok" style="justify-self:start">Cubierto</span>
+    <p>Voz de entrada (Whisper) y salida (Piper local), todo usable también por escrito. Panel ⚙️ para cambiar
+      de proveedor (7 en catálogo) sin reiniciar. Cadena de respaldo automática con IA local.</p>
+  </div>`;
+
+// ── demo chat ──
+const guion = [["Consulta de saldo"], ["Pregunta en lenguaje natural → SQL"], ["Último movimiento"],
+  ["Gráfico autónomo (categorías)"], ["Gráfico autónomo (evolución)"],
+  ["Bizum: pide confirmación antes de enviar", "Bizum: cancelar con «no»"], ["Fuera de ámbito (se reconduce)"]];
+const graficos = [];
+$("chat").innerHTML = guion.map((nombres) => nombres.map(buscar).filter(Boolean).map((r) => {
+  const g = (r.graficos || []).map((gr) => { graficos.push(gr.config); return `<div class="grafico"><canvas id="g${graficos.length - 1}" height="230"></canvas></div>`; }).join("");
+  const herr = r.herramientas.length ? r.herramientas.map((h) => `<span class="herr">⚙ ${h}</span>`).join("") : "<span>sin herramientas</span>";
+  const avisos = (r.avisos || []).map((a) => `<div class="aviso-llm">ℹ ${esc(a)}</div>`).join("");
+  return `<div class="turno">
+    <div class="burbuja usuario">${esc(r.pregunta)}</div>
+    ${avisos}
+    <div class="burbuja asistente">${md(r.respuesta || "(sin respuesta)")}</div>
+    ${g}
+    <div class="meta">${herr}<span>${seg(r.ms)}</span><span class="chip ${r.ok ? "ok" : "mal"}">${r.ok ? "correcto" : "falla"}</span></div>
+  </div>`;
+}).join("")).join("");
+
+const css = getComputedStyle(document.documentElement);
+if (window.Chart) {
+  Chart.defaults.color = css.getPropertyValue("--suave").trim();
+  Chart.defaults.borderColor = css.getPropertyValue("--borde").trim();
+  Chart.defaults.font.family = css.getPropertyValue("--sans").trim();
+  graficos.forEach((cfg, i) => new Chart($("g" + i), cfg));
+}
+
+// ── voz ──
+const tts = buscar("TTS Piper (texto → audio)"), stt = buscar("STT Whisper (audio → texto), ida y vuelta");
+$("voz").innerHTML = `
+  <p>El servidor sintetiza una pregunta con Piper (<code>POST /tts</code>) y ese mismo audio se manda a Whisper
+    (<code>POST /stt</code>) para ver si lo entiende.</p>
+  ${DATOS.audio ? `<audio controls src="${DATOS.audio}"></audio>` : ""}
+  <div class="flecha">texto → Piper ${seg(tts?.ms)} · ${esc(tts?.detalle)}</div>
+  <div class="flecha">audio → Whisper ${seg(stt?.ms)} · ${esc(stt?.detalle)}</div>`;
+
+// ── tabla ──
+$("titulo-pruebas").textContent = `Batería de pruebas: ${ok} de ${R.length} correctas`;
+let grupo = "";
+$("pruebas").innerHTML = R.map((r) => {
+  const cab = r.grupo !== grupo ? `<tr class="grupo"><td colspan="4">${esc((grupo = r.grupo))}</td></tr>` : "";
+  return cab + `<tr><td>${esc(r.nombre)}</td>
+    <td><span class="chip ${r.ok ? "ok" : "mal"}">${r.ok ? "OK" : "Falla"}</span></td>
+    <td class="detalle">${esc(r.detalle)}</td><td class="ms">${seg(r.ms)}</td></tr>`;
+}).join("");
+
+$("pie").textContent = `Pruebas ejecutadas el ${DATOS.fecha} contra http://localhost:8000 · cadena de modelos: ${(est.cadena_fallback || []).join(" → ")}`;
+</script>
