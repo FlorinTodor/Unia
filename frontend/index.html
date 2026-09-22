@@ -21,6 +21,7 @@
         <input type="checkbox" id="tts-check">
         <span>🔊 Voz</span>
       </label>
+      <button type="button" id="btn-ajustes" class="btn-ajustes" title="Ajustes: claves API, modelos e IA local" aria-label="Ajustes">⚙️</button>
     </header>
 
     <main id="chat">
@@ -41,6 +42,82 @@
       </form>
     </footer>
   </div>
+  <dialog id="panel-ajustes" aria-labelledby="titulo-ajustes">
+    <div class="ajustes-cabecera">
+      <h2 id="titulo-ajustes">⚙️ Ajustes</h2>
+      <button type="button" class="btn-cerrar" id="btn-cerrar-ajustes" aria-label="Cerrar">✕</button>
+    </div>
+
+    <div id="bienvenida" class="aviso-bienvenida" hidden>
+      <b>👋 ¡Bienvenido!</b> Para empezar, conecta un motor de IA: pega una clave API
+      (Groq es <b>gratis</b> y el más rápido) o usa una IA <b>local</b> con Ollama, sin internet.
+      Las claves se guardan solo en este equipo.
+    </div>
+
+    <section class="tarjeta">
+      <h3>Motor en uso</h3>
+      <p id="resumen-cadena" class="texto-suave">—</p>
+    </section>
+
+    <section class="tarjeta">
+      <h3>Añadir / reemplazar clave</h3>
+      <div class="rejilla-3">
+        <label>Proveedor<select id="nueva-proveedor"></select></label>
+        <label>Modelo principal<select id="nueva-modelo"></select></label>
+        <label>Modelo de respaldo<select id="nueva-respaldo"></select></label>
+      </div>
+      <p class="nota-proveedor"><span id="nota-proveedor"></span>
+        <a id="enlace-claves" target="_blank" rel="noopener">Consigue tu clave →</a></p>
+      <label for="nueva-clave">API Key</label>
+      <div class="fila-clave">
+        <input id="nueva-clave" type="password" autocomplete="off" spellcheck="false">
+        <button type="button" id="btn-guardar-clave" class="btn-primario">＋ Guardar</button>
+      </div>
+      <p id="mensaje-clave" class="mensaje-estado" role="status"></p>
+    </section>
+
+    <section class="tarjeta">
+      <h3>Claves configuradas</h3>
+      <div id="lista-claves" class="lista-claves"></div>
+    </section>
+
+    <section class="tarjeta">
+      <h3>IA local (Ollama)</h3>
+      <div class="fila-proveedor" id="fila-ollama">
+        <div class="icono-proveedor">💻</div>
+        <div class="datos-proveedor">
+          <div class="nombre-proveedor">Ollama <span id="badge-ollama"></span></div>
+          <div id="estado-ollama" class="texto-mini">Comprobando…</div>
+        </div>
+        <div class="controles-proveedor">
+          <label class="mini">Modelo<select id="ollama-modelo"></select></label>
+          <button type="button" id="btn-activar-ollama" class="btn-secundario">Activar</button>
+        </div>
+      </div>
+      <div class="fila-clave">
+        <input id="ollama-url" type="text" spellcheck="false" aria-label="Dirección de Ollama">
+        <button type="button" id="btn-comprobar-ollama" class="btn-secundario">↻ Comprobar</button>
+      </div>
+      <label class="casilla"><input type="checkbox" id="ollama-fallback">
+        Usar la IA local como último respaldo si fallan las claves</label>
+      <p class="texto-mini">Privado y sin límites, pero más lento (depende de tu GPU). Con Ollama activo
+        no se envía nada a la nube.</p>
+    </section>
+
+    <section class="tarjeta">
+      <h3>Voz</h3>
+      <p class="texto-suave">🎤 Entrada: <span id="estado-voz-entrada">—</span></p>
+      <label>🔊 Lectura en voz alta
+        <select id="motor-voz">
+          <option value="auto">Automática (navegador y, si no tiene voces, servidor)</option>
+          <option value="navegador">Voces del navegador</option>
+          <option value="servidor">Voz neuronal del servidor (Piper)</option>
+        </select>
+      </label>
+    </section>
+  </dialog>
+
   <script src="/static/app.js"></script>
+  <script src="/static/ajustes.js"></script>
 </body>
 </html>

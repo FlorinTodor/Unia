@@ -104,8 +104,15 @@ async function leerEnVozAlta(texto) {
     .trim();
   if (!limpio) return;
 
+  // motor elegido en ⚙️ Ajustes: auto | navegador | servidor
+  let motor = "auto";
+  try {
+    motor = localStorage.getItem("motorVoz") || "auto";
+  } catch {}
+
   // 1º voces del propio navegador (Windows/Mac/Android las traen de serie)
   const vozEs =
+    motor !== "servidor" &&
     "speechSynthesis" in window &&
     speechSynthesis.getVoices().find((v) => v.lang.startsWith("es"));
   if (vozEs) {
@@ -116,8 +123,9 @@ async function leerEnVozAlta(texto) {
     speechSynthesis.speak(locucion);
     return;
   }
+  if (motor === "navegador") return;
 
-  // 2º TTS del servidor (Piper) — Chrome en Linux no trae voces
+  // 2º TTS del servidor (Piper) — Brave/Chromium en Linux no trae voces
   try {
     const r = await fetch("/tts", {
       method: "POST",
@@ -272,13 +280,22 @@ btnMic.addEventListener("click", alternarGrabacion);
 
 // ------------------------------------------------------------------ estado inicial
 
-fetch("/estado")
-  .then((r) => r.json())
-  .then((e) => {
-    infoProveedor.textContent = `LLM: ${e.proveedor} · ${e.modelo}` + (e.voz_disponible ? " · 🎤 voz activa" : " · 🎤 voz no disponible (falta GROQ_API_KEY)");
-    if (!e.voz_disponible) btnMic.disabled = true;
-  })
-  .catch(() => {});
+// se llama también desde ajustes.js tras cada cambio de configuración
+async function actualizarEstado() {
+  try {
+    const e = await (await fetch("/estado")).json();
+    infoProveedor.textContent = e.modelo
+      ? `IA: ${e.modelo} (${e.proveedor})` + (e.voz_disponible ? " · 🎤 voz activa" : " · 🎤 solo texto")
+      : "⚠️ Sin motor de IA: abre ⚙️ Ajustes";
+    btnMic.disabled = !e.voz_disponible;
+    btnMic.title = e.voz_disponible
+      ? "Hablar (pulsa para grabar, pulsa de nuevo para enviar)"
+      : "La voz necesita una clave de Groq u OpenAI (⚙️ Ajustes)";
+    return e;
+  } catch {
+    return null;
+  }
+}
 
 // Cargar voces de síntesis (algunos navegadores las cargan en diferido)
 if ("speechSynthesis" in window) speechSynthesis.getVoices();
