@@ -9,10 +9,17 @@
 import json
 from datetime import date
 
-from openai import APIConnectionError, APIError, InternalServerError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIError,
+    AuthenticationError,
+    InternalServerError,
+    NotFoundError,
+    RateLimitError,
+)
 
 from . import herramientas
-from .config import PROVEEDOR_ACTIVO, cadena_llm, cliente_para, get_cliente_llm
+from .config import CATALOGO, cadena_llm, cliente_para
 
 MAX_RONDAS = 6
 
@@ -77,14 +84,35 @@ NORMAS:
     consulta"): da directamente el resultado y su conclusión."""
 
 
+class ErrorConfiguracion(Exception):
+    """Fallo que el usuario puede arreglar desde ⚙️ Ajustes (mensaje ya legible)."""
+
+
+def _explicar_fallo(proveedor: str, modelo: str, e: Exception) -> str:
+    """Traduce el error de un proveedor a un mensaje comprensible para el usuario."""
+    nombre = CATALOGO[proveedor]["nombre"] if proveedor in CATALOGO else "local"
+    if isinstance(e, AuthenticationError):
+        return f"La clave API de {nombre} no es válida (revísala en ⚙️ Ajustes)."
+    if isinstance(e, NotFoundError):
+        return f"El modelo {modelo} ya no existe en {nombre} (elige otro en ⚙️ Ajustes)."
+    if isinstance(e, RateLimitError):
+        return f"{modelo} ha agotado su cuota gratuita por ahora."
+    if isinstance(e, APIConnectionError) and proveedor == "ollama":
+        return "La IA local no responde: ¿está Ollama en marcha (`ollama serve`)?"
+    return f"{modelo} ({nombre}) no está disponible."
+
+
 def _extra_params(proveedor: str, modelo: str) -> dict:
     """Parámetros específicos por modelo para minimizar latencia."""
     if proveedor == "ollama":
         # desactiva el modo "thinking" de qwen3: reduce la latencia a la mitad
-        return {"extra_body": {"reasoning_effort": "none"}}
-    if "gpt-oss" in modelo:
+        return {"temperature": 0.3, "extra_body": {"reasoning_effort": "none"}}
+    if proveedor == "openai" and modelo.startswith(("gpt-5", "o1", "o3", "o4")):
+        # los razonadores de OpenAI rechazan cualquier temperatura distinta de 1
         return {"reasoning_effort": "low"}
-    return {}
+    if "gpt-oss" in modelo and proveedor in ("groq", "cerebras"):
+        return {"temperature": 0.3, "reasoning_effort": "low"}
+    return {"temperature": 0.3}
 
 
 def responder(mensajes: list[dict]):
@@ -94,6 +122,11 @@ def responder(mensajes: list[dict]):
     siguiente eslabón de la cadena de fallback y la conversación continúa.
     """
     cadena = cadena_llm()
+    if not cadena:
+        raise ErrorConfiguracion(
+            "No hay ningún motor de IA disponible. Abre ⚙️ Ajustes y añade tu clave de Groq "
+            "o activa la IA local (Ollama)."
+        )
     posicion = 0
     proveedor, modelo = cadena[posicion]
     cliente = cliente_para(proveedor)
@@ -113,7 +146,6 @@ def responder(mensajes: list[dict]):
                 messages=mensajes,
                 tools=herramientas.ESQUEMAS,
                 tool_choice="auto",
-                temperature=0.3,
                 stream=True,
                 **_extra_params(proveedor, modelo),
             )
@@ -132,13 +164,16 @@ def responder(mensajes: list[dict]):
                         acum["name"] = tc.function.name
                     if tc.function and tc.function.arguments:
                         acum["args"] += tc.function.arguments
-        except (RateLimitError, APIConnectionError, InternalServerError):
+        except (RateLimitError, APIConnectionError, InternalServerError,
+                AuthenticationError, NotFoundError) as e:
+            motivo = _explicar_fallo(proveedor, modelo, e)
             posicion += 1
             if posicion >= len(cadena):
-                raise
+                raise ErrorConfiguracion(motivo) from e
             proveedor, modelo = cadena[posicion]
             cliente = cliente_para(proveedor)
-            yield ("aviso", f"Proveedor no disponible — cambiando a {modelo} ({proveedor}).")
+            destino = CATALOGO[proveedor]["nombre"] if proveedor in CATALOGO else "IA local"
+            yield ("aviso", f"{motivo} Cambiando a {modelo} ({destino}).")
             continue
         except APIError:
             # generación fallida (p. ej. "Failed to parse tool call arguments"):
@@ -190,7 +225,6 @@ def responder(mensajes: list[dict]):
         stream = cliente.chat.completions.create(
             model=modelo,
             messages=mensajes,
-            temperature=0.3,
             stream=True,
             **_extra_params(proveedor, modelo),
         )
@@ -209,9 +243,10 @@ def responder(mensajes: list[dict]):
 
 
 def info_proveedor() -> dict:
-    _, modelo = get_cliente_llm()
+    cadena = cadena_llm()
+    proveedor, modelo = cadena[0] if cadena else (None, None)
     return {
-        "proveedor": PROVEEDOR_ACTIVO,
+        "proveedor": proveedor,
         "modelo": modelo,
-        "cadena_fallback": [f"{m} ({p})" for p, m in cadena_llm()],
+        "cadena_fallback": [f"{m} ({p})" for p, m in cadena],
     }

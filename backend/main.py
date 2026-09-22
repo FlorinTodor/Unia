@@ -14,8 +14,8 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agente, banco_api, db
-from .config import MODELO_STT, get_cliente_stt
+from . import agente, ajustes, ajustes_api, banco_api, db
+from .config import get_cliente_stt
 
 RUTA_VOZ_PIPER = Path(__file__).resolve().parent.parent / "data" / "voces" / "es_ES-sharvard-medium.onnx"
 # escala de duración de Piper: menor = habla más rápido (0.78 ≈ 1.2x)
@@ -62,6 +62,7 @@ def _voz_piper():
 
 app = FastAPI(title="Habla con tu dinero — Reto Unicaja/UGR")
 app.include_router(banco_api.router)
+app.include_router(ajustes_api.router)
 
 RUTA_FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -136,15 +137,18 @@ def chat(peticion: PeticionChat):
 @app.post("/stt")
 async def stt(audio: UploadFile):
     """Transcribe audio a texto con Whisper (Groq)."""
-    cliente = get_cliente_stt()
-    if cliente is None:
-        raise HTTPException(503, "Falta GROQ_API_KEY: la transcripción de voz no está disponible.")
+    stt_cfg = get_cliente_stt()
+    if stt_cfg is None:
+        raise HTTPException(
+            503, "La voz necesita una clave de Groq u OpenAI (añádela en ⚙️ Ajustes). Mientras, puedes escribir."
+        )
+    cliente, modelo_stt = stt_cfg
     contenido = await audio.read()
     # audios de menos de ~0,5 s son silencio/ruido: Whisper alucina frases con ellos
     if len(contenido) < 4000:
         raise HTTPException(422, "No se ha detectado voz. Mantén pulsado y habla con claridad.")
     transcripcion = cliente.audio.transcriptions.create(
-        model=MODELO_STT,
+        model=modelo_stt,
         file=(audio.filename or "audio.webm", contenido),
         language="es",
         temperature=0.0,
@@ -186,6 +190,7 @@ def estado():
         **agente.info_proveedor(),
         "voz_disponible": get_cliente_stt() is not None,
         "tts_servidor": RUTA_VOZ_PIPER.exists(),
+        "configurado": ajustes.cargar()["activo"] is not None,
     }
 
 
