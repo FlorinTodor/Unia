@@ -51,8 +51,8 @@ doctor?»).
 
 ## 4. Voz de salida dual: navegador + Piper en servidor (18-jul)
 
-**Contexto.** En el equipo del usuario (Ubuntu + Chrome) no sonaba nada:
-Chrome en Linux no trae voces de `speechSynthesis` (falla en silencio).
+**Contexto.** En el equipo del usuario (Ubuntu + Brave/Firefox) no sonaba nada:
+Brave (Chromium) en Linux no trae voces de `speechSynthesis` (falla en silencio).
 
 **Decisión.** Doble vía: voces del navegador si existen; si no, `POST /tts` con
 **Piper** (`es_ES-sharvard-medium`, local, ~0,3 s/frase). Números convertidos a

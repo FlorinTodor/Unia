@@ -29,7 +29,7 @@ natural y generar **gráficos dinámicos sin plantillas**.
   configuración Chart.js completa, que el frontend renderiza tal cual.
 - **Voz**: entrada por Whisper large-v3-turbo (API gratuita de Groq, con temperatura 0,
   prompt de dominio y filtro de audio corto contra alucinaciones). Salida con doble vía:
-  voces del navegador (Web Speech API) si existen, y si no —Chrome en Linux no trae
+  voces del navegador (Web Speech API) si existen, y si no —Brave/Chromium en Linux no trae
   voces— síntesis en el servidor con **Piper** (voz neuronal española local, ~0,3 s por
   frase, endpoint `POST /tts`). Ambas son opcionales: el chat escrito funciona siempre.
   Para descargar la voz: `python -m piper.download_voices es_ES-sharvard-medium --data-dir data/voces`

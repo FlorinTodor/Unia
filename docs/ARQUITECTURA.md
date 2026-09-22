@@ -75,7 +75,7 @@ para resumir lo conseguido.
   (`language=es`, `temperature=0`, prompt de dominio bancario; audio <4000 bytes se
   rechaza — anti-alucinación).
 - **Salida**: `frontend/app.js::leerEnVozAlta()` — voces del navegador si existen;
-  si no (Chrome en Linux no trae), `POST /tts` → Piper local. Antes de sintetizar,
+  si no (Brave/Chromium en Linux no trae), `POST /tts` → Piper local. Antes de sintetizar,
   `main._normalizar_para_voz()` convierte números a palabras con num2words (Piper los
   lee dígito a dígito); >7 dígitos (teléfonos/IBAN) se dejan tal cual. Las tablas y el
   código NO se leen: el frontend filtra líneas que empiezan por `|` o ```` ``` ````.
