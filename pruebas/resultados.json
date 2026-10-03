@@ -1,6 +1,223 @@
 {
- "fecha": "2026-10-03 18:17",
+ "fecha": "2026-10-03 20:53",
  "resultados": [
+  {
+   "grupo": "Seguridad",
+   "nombre": "Sin sesión: GET /api/banco/saldo → 401",
+   "ok": true,
+   "detalle": "HTTP 401",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Sin sesión: GET /estado → 401",
+   "ok": true,
+   "detalle": "HTTP 401",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Sin sesión: GET /ajustes → 401",
+   "ok": true,
+   "detalle": "HTTP 401",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Sin sesión: POST /chat → 401",
+   "ok": true,
+   "detalle": "HTTP 401",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Contraseña incorrecta rechazada (mensaje genérico)",
+   "ok": true,
+   "detalle": "Usuario o contraseña incorrectos.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Login correcto con cookie HttpOnly + SameSite=Strict",
+   "ok": true,
+   "detalle": "sesion=5szuulbw4eiz8zmf0ierufqdrpzweugw1okibxus4y0; httponly…",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Bloqueo temporal tras 5 intentos fallidos (429)",
+   "ok": true,
+   "detalle": "Demasiados intentos. Cuenta bloqueada 5 min por seguridad.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Cada cliente ve su propia cuenta",
+   "ok": true,
+   "detalle": "Alex García 4200.0 € · Ana Ruiz 480.0 €",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Aislamiento SQL: «SELECT * FROM main.movimientos…» no ve datos de otros",
+   "ok": true,
+   "detalle": "Ana tiene 784 movimientos",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Aislamiento SQL: «WITH movimientos AS (SELECT * FROM main.movimien…» no ve datos de otros",
+   "ok": true,
+   "detalle": "Ana tiene 784 movimientos",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Aislamiento SQL: SELECT hash_contrasena FROM clientes bloqueado",
+   "ok": true,
+   "detalle": "Error SQL: no such table: clientes",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Aislamiento SQL: SELECT name FROM sqlite_master bloqueado",
+   "ok": true,
+   "detalle": "Error SQL: access to sqlite_master.name is prohibited",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Bizum solo queda pendiente (no mueve dinero sin OTP)",
+   "ok": true,
+   "detalle": "operación rhxuDUJvpnpXEFCN",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "El código llega solo al móvil simulado, no en la respuesta",
+   "ok": true,
+   "detalle": "Código de confirmación: 203977. Bizum de 7,00 € a María López. Caduca ",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Código incorrecto rechazado",
+   "ok": true,
+   "detalle": "Código incorrecto. Te quedan 2 intentos.",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Otro cliente no puede tocar mi operación (404)",
+   "ok": true,
+   "detalle": "HTTP 404",
+   "ms": null
+  },
+  {
+   "grupo": "Seguridad",
+   "nombre": "Saldo intacto tras cancelar el Bizum",
+   "ok": true,
+   "detalle": "",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Confirmar una operación ya cancelada → 409",
+   "ok": true,
+   "detalle": "Esta operación ya está cancelada.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "JSON roto → 400",
+   "ok": true,
+   "detalle": "HTTP 400 · La petición no es un JSON válido o está vacía.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Importe no numérico → 422",
+   "ok": true,
+   "detalle": "HTTP 422 · Datos no válidos: revisa importe.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Importe por encima del tope → 422",
+   "ok": true,
+   "detalle": "HTTP 422 · Bizum permite un máximo de 1.000 € por operación.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Contacto inexistente → 404",
+   "ok": true,
+   "detalle": "HTTP 404 · No encuentro el contacto 'Nadie'.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Saldo insuficiente → 409",
+   "ok": true,
+   "detalle": "HTTP 409 · Saldo insuficiente (480,00 €) para enviar 900,00 €.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Operación inventada → 404",
+   "ok": true,
+   "detalle": "HTTP 404 · No encuentro esa operación.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Ruta inexistente → 404",
+   "ok": true,
+   "detalle": "HTTP 404 · No existe ese recurso.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Método incorrecto → 405",
+   "ok": true,
+   "detalle": "HTTP 405 · Método no permitido para este recurso.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Escritura desde otro origen → 403",
+   "ok": true,
+   "detalle": "HTTP 403 · Origen no permitido.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Mensaje de chat demasiado largo → 413",
+   "ok": true,
+   "detalle": "HTTP 413 · El mensaje es demasiado largo (2000 caracteres; máximo 1500). Resúmelo",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Mensaje de chat vacío → 422",
+   "ok": true,
+   "detalle": "HTTP 422 · Escribe un mensaje.",
+   "ms": null
+  },
+  {
+   "grupo": "Códigos HTTP",
+   "nombre": "Fichero que no es audio → 415",
+   "ok": true,
+   "detalle": "HTTP 415 · El fichero debe ser un audio (webm, wav, mp3...).",
+   "ms": null
+  },
+  {
+   "grupo": "Uso de la IA",
+   "nombre": "GET /api/uso informa del gasto y los límites",
+   "ok": true,
+   "detalle": "0 / 80000 tokens hoy · tope por pregunta 30000",
+   "ms": null
+  },
   {
    "grupo": "Servidor",
    "nombre": "GET /estado responde",
@@ -47,7 +264,7 @@
    "nombre": "Validar clave Groq (sin gastar cuota)",
    "ok": true,
    "detalle": "Clave válida · 4 modelos disponibles.",
-   "ms": 282
+   "ms": 637
   },
   {
    "grupo": "Ajustes",
@@ -60,19 +277,19 @@
    "grupo": "API banco",
    "nombre": "GET /api/banco/saldo",
    "ok": true,
-   "detalle": "4963.02 € · Alex García",
+   "detalle": "4200.0 € · Alex García",
    "ms": null,
    "saldo": {
     "iban": "ES21 2103 0000 1122 3344 5566",
     "titular": "Alex García",
-    "saldo": 4963.02
+    "saldo": 4200.0
    }
   },
   {
    "grupo": "API banco",
    "nombre": "GET /api/banco/contactos",
    "ok": true,
-   "detalle": "María López, Pablo Ruiz, Lucía Fernández, Javi Moreno",
+   "detalle": "Javi Moreno, Lucía Fernández, María López, Pablo Ruiz",
    "ms": null
   },
   {
@@ -92,39 +309,39 @@
     ],
     "filas": [
      [
-      "2026-07-18",
-      "Bizum",
-      "Bizum enviado a María López — regalo de cumpleaños",
-      "Bizum",
-      -500.0
+      "2026-10-03",
+      "Ocio",
+      "Ocio y entretenimiento",
+      "Bolera Ozone",
+      -14.85
      ],
      [
-      "2026-07-18",
-      "Compras online",
-      "Pedido online",
-      "Amazon",
-      -66.35
-     ],
-     [
-      "2026-07-17",
+      "2026-10-03",
       "Restaurantes",
       "Comida/cena fuera",
-      "100 Montaditos",
-      -44.21
+      "Burger King",
+      -39.88
      ],
      [
-      "2026-07-15",
-      "Transporte",
-      "Combustible",
-      "BP",
-      -63.83
+      "2026-10-03",
+      "Deporte",
+      "Cuota mensual gimnasio",
+      "Basic-Fit",
+      -29.9
      ],
      [
-      "2026-07-15",
-      "Suscripciones",
-      "Netflix",
-      "Netflix",
-      -12.99
+      "2026-10-02",
+      "Vivienda",
+      "Alquiler piso c/ Recogidas",
+      "Inmobiliaria Genil",
+      -650.0
+     ],
+     [
+      "2026-10-01",
+      "Supermercado",
+      "Compra alimentación",
+      "Dia",
+      -51.92
      ]
     ],
     "num_filas": 5,
@@ -135,56 +352,60 @@
    "grupo": "Base de datos",
    "nombre": "Movimientos ficticios generados",
    "ok": true,
-   "detalle": "362 movimientos del 2025-07-18 al 2026-07-18",
+   "detalle": "3278 movimientos del 2024-10-03 al 2026-10-03",
    "ms": null,
    "categorias": [
     [
      "Vivienda",
-     -8670.4
+     -52583.8
     ],
     [
      "Supermercado",
-     -4327.65
-    ],
-    [
-     "Restaurantes",
-     -1785.31
+     -44930.01
     ],
     [
      "Transporte",
-     -927.57
+     -11389.96
     ],
     [
-     "Suscripciones",
-     -695.57
-    ],
-    [
-     "Ropa",
-     -452.21
-    ],
-    [
-     "Ocio",
-     -435.6
-    ],
-    [
-     "Deporte",
-     -358.8
-    ],
-    [
-     "Compras online",
-     -333.92
+     "Restaurantes",
+     -11223.28
     ],
     [
      "Salud",
-     -238.22
+     -6895.68
+    ],
+    [
+     "Compras online",
+     -5739.69
+    ],
+    [
+     "Ocio",
+     -5329.62
+    ],
+    [
+     "Suscripciones",
+     -5046.24
+    ],
+    [
+     "Educación",
+     -4349.86
+    ],
+    [
+     "Ropa",
+     -4348.2
+    ],
+    [
+     "Deporte",
+     -747.5
     ],
     [
      "Bizum",
-     -211.73
+     -603.62
     ],
     [
      "Nómina",
-     22200.0
+     179820.0
     ]
    ]
   },
@@ -242,81 +463,89 @@
    "nombre": "Consulta de saldo",
    "ok": true,
    "detalle": "",
-   "ms": 861,
+   "ms": 2516,
    "pregunta": "¿Cuánto dinero tengo?",
-   "respuesta": "Tienes **4 963,02 €** disponibles en tu cuenta. ¡A tu disposición para cualquier consulta!",
+   "respuesta": "Tienes **4.200,00 €** en tu cuenta (IBAN ES21 2103 0000 1122 3344 5566). ¡A tu disposición para cualquier consulta!",
    "herramientas": [
     "consultar_saldo"
    ],
    "graficos": [],
-   "avisos": [],
-   "primer_token_ms": 811
+   "avisos": [
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto. Espero 1 s y lo reintento."
+   ],
+   "primer_token_ms": 2415
   },
   {
    "grupo": "Chat",
    "nombre": "Pregunta en lenguaje natural → SQL",
    "ok": true,
    "detalle": "",
-   "ms": 1588,
+   "ms": 11394,
    "pregunta": "¿Cuánto gasté en supermercados el mes pasado?",
-   "respuesta": "En septiembre de 2026 no registraste gastos en la categoría **Supermercado**, así que el total gastado fue **0,00 €**.",
+   "respuesta": "En septiembre gastaste un total de **354,18 €** en supermercados.",
    "herramientas": [
     "consultar_movimientos"
    ],
    "graficos": [],
-   "avisos": [],
-   "primer_token_ms": 1515
+   "avisos": [
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto. Espero 9 s y lo reintento.",
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto (se libera en unos segundos). Cambiando a openai/gpt-oss-20b (Groq)."
+   ],
+   "primer_token_ms": 11374
   },
   {
    "grupo": "Chat",
    "nombre": "Último movimiento",
    "ok": true,
    "detalle": "",
-   "ms": 1601,
+   "ms": 11863,
    "pregunta": "¿Cuál fue mi último movimiento?",
-   "respuesta": "Tu último movimiento fue el **18 de julio de 2026**: enviaste un Bizum de **‑500,00 €** a María López (concepto: regalo de cumpleaños).",
+   "respuesta": "El último movimiento fue el **18 de octubre de 2026**: una salida de **14,85 €** en la categoría *Ocio* por la bolera Ozone.",
    "herramientas": [
     "consultar_movimientos"
    ],
    "graficos": [],
-   "avisos": [],
-   "primer_token_ms": 1516
+   "avisos": [
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto. Espero 10 s y lo reintento.",
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto (se libera en unos segundos). Cambiando a openai/gpt-oss-20b (Groq)."
+   ],
+   "primer_token_ms": 11810
   },
   {
    "grupo": "Chat",
    "nombre": "Gráfico autónomo (categorías)",
-   "ok": true,
+   "ok": false,
    "detalle": "tipo elegido por el LLM: ['bar']",
-   "ms": 2509,
+   "ms": 26821,
    "pregunta": "Hazme un gráfico de mis gastos por categoría de los últimos 3 meses",
-   "respuesta": "Aquí tienes el gráfico de tus gastos por categoría en los últimos tres meses. Destaca que la mayor parte del gasto corresponde a **Vivienda** (713,21 €) y a **Bizum** (500,00 €). El resto se reparte entre Supermercado, Ropa, Restaurantes y otras categorías.",
+   "respuesta": "",
    "herramientas": [
     "consultar_movimientos",
     "generar_grafico"
    ],
    "graficos": [
     {
-     "titulo": "Gastos por categoría últimos 3 meses",
+     "titulo": "Gastos por categoría (julio‑septiembre 2026)",
      "tipo": "bar",
      "config": {
       "data": {
        "datasets": [
         {
-         "backgroundColor": "rgba(54, 162, 235, 0.6)",
-         "borderColor": "rgba(54, 162, 235, 1)",
+         "backgroundColor": "rgba(54,162,235,0.6)",
+         "borderColor": "rgba(54,162,235,1)",
          "borderWidth": 1,
          "data": [
-          500,
-          141.56,
-          29.9,
-          45.54,
-          93.11,
-          98.29,
-          23.29,
-          117.45,
-          47.89,
-          63.83,
-          713.21
+          53.5,
+          150.2,
+          89.7,
+          108.31,
+          362.26,
+          154.12,
+          113.74,
+          1009.33,
+          176.64,
+          392.65,
+          2142.88
          ],
          "label": "Gasto (€)"
         }
@@ -336,22 +565,10 @@
        ]
       },
       "options": {
-       "plugins": {
-        "legend": {
-         "display": false
-        },
-        "title": {
-         "display": true,
-         "text": "Gastos por categoría últimos 3 meses"
-        }
-       },
-       "responsive": true,
        "scales": {
         "y": {
-         "beginAtZero": true,
-         "title": {
-          "display": true,
-          "text": "Euros (€)"
+         "ticks": {
+          "beginAtZero": true
          }
         }
        }
@@ -360,109 +577,62 @@
      }
     }
    ],
-   "avisos": [],
-   "primer_token_ms": 2362
+   "avisos": [
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto. Espero 11 s y lo reintento.",
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto (se libera en unos segundos). Cambiando a openai/gpt-oss-20b (Groq).",
+    "openai/gpt-oss-20b ha alcanzado su límite por minuto. Espero 14 s y lo reintento.",
+    "openai/gpt-oss-20b ha alcanzado su límite por minuto (se libera en unos segundos). Cambiando a qwen3:8b (IA local)."
+   ],
+   "primer_token_ms": null
   },
   {
    "grupo": "Chat",
    "nombre": "Gráfico autónomo (evolución)",
-   "ok": true,
-   "detalle": "tipo elegido por el LLM: ['line']",
-   "ms": 3174,
+   "ok": false,
+   "detalle": "tipo elegido por el LLM: []",
+   "ms": 15748,
    "pregunta": "¿Cómo ha evolucionado mi gasto mensual este año?",
-   "respuesta": "Tu gasto mensual ha ido aumentando progresivamente a lo largo del año. En enero gastaste 1 373,87 €, en febrero 1 571,33 €, en marzo 1 443,81 €, en abril 1 290,53 €, en mayo 1 666,13 €, en junio 1 706,01 € y en julio 1 874,07 €. El gráfico muestra esta tendencia ascendente.",
+   "respuesta": "Este año tus gastos mensuales han ido variando, con una tendencia a la baja en los últimos meses:\n\n- **Enero:** 1.632,10 €\n- **Febrero:** 1.552,05 €\n- **Marzo:** 1.561,56 €\n- **Abril:** 1.743,75 €\n- **Mayo:** 1.461,02 €\n- **Junio:** 1.406,87 €\n- **Julio:** 1.450,07 €\n- **Agosto:** 1.689,68 €\n- **Septiembre:** 1.613,58 €\n- **Octubre (hasta el 3):** 786,55 €\n\nEn general, el gasto ha disminuido notablemente en octubre, mientras que los meses de primavera y verano fueron los más altos. Si quieres verlo en un gráfico de líneas o comparar con otro año, avísame.",
    "herramientas": [
-    "consultar_movimientos",
-    "generar_grafico"
+    "consultar_movimientos"
    ],
-   "graficos": [
-    {
-     "titulo": "Evolución del gasto mensual en 2026",
-     "tipo": "line",
-     "config": {
-      "data": {
-       "datasets": [
-        {
-         "backgroundColor": "rgba(75, 192, 192, 0.2)",
-         "borderColor": "rgba(75, 192, 192, 1)",
-         "data": [
-          1373.87,
-          1571.33,
-          1443.81,
-          1290.53,
-          1666.13,
-          1706.01,
-          1874.07
-         ],
-         "fill": false,
-         "label": "Gasto mensual",
-         "tension": 0.1
-        }
-       ],
-       "labels": [
-        "enero",
-        "febrero",
-        "marzo",
-        "abril",
-        "mayo",
-        "junio",
-        "julio"
-       ]
-      },
-      "options": {
-       "scales": {
-        "x": {
-         "title": {
-          "display": true,
-          "text": "Mes"
-         }
-        },
-        "y": {
-         "title": {
-          "display": true,
-          "text": "Gasto (€)"
-         }
-        }
-       }
-      },
-      "type": "line"
-     }
-    }
+   "graficos": [],
+   "avisos": [
+    "openai/gpt-oss-120b ha alcanzado su límite por minuto. Espero 14 s y lo reintento."
    ],
-   "avisos": [],
-   "primer_token_ms": 2976
+   "primer_token_ms": 15320
   },
   {
    "grupo": "Chat",
    "nombre": "Bizum: pide confirmación antes de enviar",
    "ok": true,
    "detalle": "no envía sin confirmar",
-   "ms": 518,
+   "ms": 439,
    "pregunta": "Envíale 15 € a María por la cena",
-   "respuesta": "Claro, voy a preparar el Bizum.  \nDestinatario: **María**  \nImporte: **15,00 €**  \n\n¿Confirmas que quieres enviarle esos 15 € a María? (Responde con “sí” o “no”).",
+   "respuesta": "¿Quieres enviar **15,00 €** a **María** por la cena? Por favor, confirma el destinatario y el importe para proceder.",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 403
+   "primer_token_ms": 358
   },
   {
    "grupo": "Chat",
    "nombre": "Bizum: cancelar con «no»",
    "ok": true,
    "detalle": "",
-   "ms": 603,
+   "ms": 547,
    "pregunta": "No, déjalo, no lo envíes",
-   "respuesta": "Entendido, no se envía nada. Si necesitas algo más, aquí estoy.",
+   "respuesta": "Entendido, no se realizará ningún Bizum. Si necesitas otra cosa, aquí estoy.",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 569
+   "primer_token_ms": 481
   },
   {
    "grupo": "Chat",
    "nombre": "Saldo intacto tras cancelar",
    "ok": true,
-   "detalle": "4963.02 € → 4963.02 €",
+   "detalle": "4200.0 € → 4200.0 €",
    "ms": null
   },
   {
@@ -470,27 +640,34 @@
    "nombre": "Fuera de ámbito (se reconduce)",
    "ok": true,
    "detalle": "",
-   "ms": 869,
+   "ms": 644,
    "pregunta": "Recomiéndame un libro de misa",
-   "respuesta": "Soy tu asistente financiero y solo puedo ayudarte con temas relacionados con tu cuenta, tus movimientos, saldo, Bizum o visualizaciones de tus finanzas. Si necesitas algo de eso, estaré encantado de asistirte.",
+   "respuesta": "Soy tu asistente financiero y solo puedo ayudar con temas relacionados con tus finanzas, como consultar saldo, movimientos, enviar Bizum o visualizar tus datos en gráficos. Si necesitas ayuda con eso, dime en qué puedo asistirte.",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 772
+   "primer_token_ms": 535
+  },
+  {
+   "grupo": "Uso de la IA",
+   "nombre": "El gasto de tokens se mide con el dato REAL del proveedor",
+   "ok": true,
+   "detalle": "26226 tokens en las pruebas de chat · 10/10 llamadas con uso real",
+   "ms": null
   },
   {
    "grupo": "Voz",
    "nombre": "TTS Piper (texto → audio)",
    "ok": true,
-   "detalle": "1.87 s de audio, 80 KB",
-   "ms": 4394
+   "detalle": "1.86 s de audio, 80 KB",
+   "ms": 119
   },
   {
    "grupo": "Voz",
    "nombre": "STT Whisper (audio → texto), ida y vuelta",
    "ok": true,
-   "detalle": "«¿Cuánto gasté en restaurantes en agosto?» → «¿Cuánto gasté en restaurantes en agosto?»",
-   "ms": 464
+   "detalle": "«¿Cuánto gasté en restaurantes en agosto?» → «Cuánto gasté en restaurantes en agosto.»",
+   "ms": 461
   },
   {
    "grupo": "Voz",

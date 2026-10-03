@@ -21,25 +21,36 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend.adaptadores.salida.persistencia.ajustes_json import AjustesJson  # noqa: E402
 from backend.adaptadores.salida.sqlite.conexion import RUTA_DB, BaseDeDatos  # noqa: E402
-from backend.adaptadores.salida.sqlite.repositorios import ConsultorMovimientosSqlite  # noqa: E402
+from backend.adaptadores.salida.sqlite.consultor import ConsultorMovimientosSqlite  # noqa: E402
 from backend.aplicacion.casos_uso.banco import ConsultarMovimientos  # noqa: E402
 from backend.dominio.errores import ErrorDeDominio  # noqa: E402
+from backend.dominio.modelos import Cliente  # noqa: E402
 
 CLAVES = AjustesJson().cargar().claves
-_consultar = ConsultarMovimientos(ConsultorMovimientosSqlite(BaseDeDatos()))
+
+class _AuditoriaNula:
+    def registrar(self, *_):
+        pass
 
 
-def ejecutar_select(sql):
-    """Misma ruta que usa el LLM (validación del dominio + conexión de solo lectura)."""
+_consultar = ConsultarMovimientos(ConsultorMovimientosSqlite(BaseDeDatos()), _AuditoriaNula())
+CLIENTES = {
+    "alex": Cliente(1, "alex", "Alex García", "611000111"),
+    "ana": Cliente(2, "ana", "Ana Ruiz", "622000222"),
+}
+
+
+def ejecutar_select(sql, cliente="alex"):
+    """Misma ruta que usa el LLM (validación del dominio + copia aislada del cliente)."""
     try:
-        r = _consultar(sql)
+        r = _consultar(CLIENTES[cliente], sql)
     except ErrorDeDominio as e:
         return {"ok": False, "error": e.mensaje}
     return {"ok": True, "filas": r.filas}
 
 BASE = "http://localhost:8000"
 # Groq gratis: ~8.000 tokens/min por modelo; sin pausa, 4 mensajes seguidos agotan la cadena
-PAUSA_CHAT = 20
+PAUSA_CHAT = 40  # un turno con gráfico gasta ~10.000 tokens y el plan gratuito de Groq permite 8.000 por minuto
 RESULTADOS = []
 
 
@@ -49,11 +60,14 @@ def registrar(grupo, nombre, ok, detalle="", ms=None, extra=None):
     print(f"{marca} [{grupo}] {nombre} {f'({ms} ms)' if ms else ''} {detalle[:120]}")
 
 
+COOKIES = None  # sesión iniciada por main()
+
+
 def chat(sesion, mensaje):
     """Envía un mensaje y recoge los eventos SSE. Devuelve dict con texto, herramientas, gráficos…"""
     r = {"texto": "", "herramientas": [], "graficos": [], "avisos": [], "errores": [], "primer_token_ms": None}
     t0 = time.perf_counter()
-    with httpx.stream("POST", f"{BASE}/chat", json={"session_id": sesion, "mensaje": mensaje}, timeout=120) as resp:
+    with httpx.stream("POST", f"{BASE}/chat", json={"session_id": sesion, "mensaje": mensaje}, cookies=COOKIES, timeout=120) as resp:
         for linea in resp.iter_lines():
             if not linea.startswith("data: "):
                 continue
@@ -94,7 +108,72 @@ def prueba_chat(nombre, mensaje, comprobar, sesion=None):
 
 
 def main():
+    global COOKIES
     cli = httpx.Client(base_url=BASE, timeout=60)
+
+    # ── Acceso: sin sesión no se entra; con sesión, cada cliente ve lo suyo ──
+    for metodo, ruta in [("GET", "/api/banco/saldo"), ("GET", "/estado"), ("GET", "/ajustes"), ("POST", "/chat")]:
+        r = cli.request(metodo, ruta, json={})
+        registrar("Seguridad", f"Sin sesión: {metodo} {ruta} → 401", r.status_code == 401, f"HTTP {r.status_code}")
+    r = cli.post("/auth/login", json={"usuario": "alex", "contrasena": "incorrecta"})
+    registrar("Seguridad", "Contraseña incorrecta rechazada (mensaje genérico)", r.status_code == 401 and "incorrectos" in r.json()["detail"], r.json()["detail"])
+    r = cli.post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"})
+    cookie = r.headers.get("set-cookie", "").lower()
+    registrar("Seguridad", "Login correcto con cookie HttpOnly + SameSite=Strict", r.status_code == 200 and "httponly" in cookie and "samesite=strict" in cookie, cookie[:60] + "…")
+    COOKIES = cli.cookies
+    otro = httpx.Client(base_url=BASE, timeout=60)
+    for _ in range(5):
+        r5 = otro.post("/auth/login", json={"usuario": "usuario-inexistente", "contrasena": "x"})
+    registrar("Seguridad", "Bloqueo temporal tras 5 intentos fallidos (429)", r5.status_code == 429, r5.json()["detail"])
+    r = otro.post("/auth/login", json={"usuario": "ana", "contrasena": "ana2026"})
+    ana = httpx.Client(base_url=BASE, timeout=60, cookies=otro.cookies)
+    saldo_alex, saldo_ana = cli.get("/api/banco/saldo").json(), ana.get("/api/banco/saldo").json()
+    registrar("Seguridad", "Cada cliente ve su propia cuenta", saldo_alex["titular"] == "Alex García" and saldo_ana["titular"] == "Ana Ruiz",
+              f"{saldo_alex['titular']} {saldo_alex['saldo']} € · {saldo_ana['titular']} {saldo_ana['saldo']} €")
+    for sql in ["SELECT * FROM main.movimientos", "WITH movimientos AS (SELECT * FROM main.movimientos) SELECT * FROM movimientos"]:
+        propios = ejecutar_select("SELECT COUNT(*) FROM movimientos", "ana")["filas"][0][0]
+        res = ejecutar_select(sql, "ana")
+        ok = res["ok"] and all("María López" not in str(f) and "Alex" not in str(f) for f in res["filas"])
+        registrar("Seguridad", f"Aislamiento SQL: «{sql[:48]}…» no ve datos de otros", ok, f"Ana tiene {propios} movimientos")
+    for sql in ["SELECT hash_contrasena FROM clientes", "SELECT name FROM sqlite_master"]:
+        res = ejecutar_select(sql, "ana")
+        registrar("Seguridad", f"Aislamiento SQL: {sql} bloqueado", not res["ok"], str(res.get("error", ""))[:80])
+    saldo_antes_otp = cli.get("/api/banco/saldo").json()["saldo"]
+    op = cli.post("/api/banco/bizum", json={"destinatario": "María", "importe": 7}).json()
+    registrar("Seguridad", "Bizum solo queda pendiente (no mueve dinero sin OTP)", op.get("estado") == "pendiente_de_confirmacion" and cli.get("/api/banco/saldo").json()["saldo"] == saldo_antes_otp, f"operación {op.get('operacion', {}).get('id')}")
+    sms = cli.get("/movil/mensajes").json()
+    registrar("Seguridad", "El código llega solo al móvil simulado, no en la respuesta", bool(sms) and "Código de confirmación" in sms[0]["texto"] and "Código de confirmación" not in json.dumps(op), sms[0]["texto"][:70] if sms else "")
+    id_op = op["operacion"]["id"]
+    mala = cli.post(f"/operaciones/{id_op}/confirmar", json={"codigo": "000000"})
+    registrar("Seguridad", "Código incorrecto rechazado", mala.status_code == 422 and "Te quedan" in mala.json()["detail"], mala.json()["detail"])
+    ajena = ana.post(f"/operaciones/{id_op}/confirmar", json={"codigo": "000000"})
+    registrar("Seguridad", "Otro cliente no puede tocar mi operación (404)", ajena.status_code == 404, f"HTTP {ajena.status_code}")
+    cli.post(f"/operaciones/{id_op}/cancelar")
+    registrar("Seguridad", "Saldo intacto tras cancelar el Bizum", cli.get("/api/banco/saldo").json()["saldo"] == saldo_antes_otp)
+    r = cli.post(f"/operaciones/{id_op}/confirmar", json={"codigo": "000000"})
+    registrar("Códigos HTTP", "Confirmar una operación ya cancelada → 409", r.status_code == 409, r.json()["detail"])
+
+    # ── Códigos de error: cada caso, su código ───────────────────────────
+    casos = [
+        ("JSON roto → 400", lambda: cli.post("/api/banco/bizum", content=b"{roto", headers={"Content-Type": "application/json"}), 400),
+        ("Importe no numérico → 422", lambda: cli.post("/api/banco/bizum", json={"destinatario": "María", "importe": "mucho"}), 422),
+        ("Importe por encima del tope → 422", lambda: cli.post("/api/banco/bizum", json={"destinatario": "María", "importe": 5000}), 422),
+        ("Contacto inexistente → 404", lambda: cli.post("/api/banco/bizum", json={"destinatario": "Nadie", "importe": 5}), 404),
+        ("Saldo insuficiente → 409", lambda: ana.post("/api/banco/bizum", json={"destinatario": "Mamá", "importe": 900}), 409),
+        ("Operación inventada → 404", lambda: cli.post("/operaciones/inventada/confirmar", json={"codigo": "123456"}), 404),
+        ("Ruta inexistente → 404", lambda: cli.get("/api/no-existe"), 404),
+        ("Método incorrecto → 405", lambda: cli.delete("/api/banco/saldo"), 405),
+        ("Escritura desde otro origen → 403", lambda: cli.post("/api/banco/bizum", json={"destinatario": "María", "importe": 1}, headers={"Origin": "https://sitio-malicioso.example"}), 403),
+        ("Mensaje de chat demasiado largo → 413", lambda: cli.post("/chat", json={"session_id": "x", "mensaje": "x" * 2000}), 413),
+        ("Mensaje de chat vacío → 422", lambda: cli.post("/chat", json={"session_id": "x", "mensaje": "  "}), 422),
+        ("Fichero que no es audio → 415", lambda: cli.post("/stt", files={"audio": ("nota.txt", b"hola" * 2000, "text/plain")}), 415),
+    ]
+    for nombre, peticion, esperado in casos:
+        r = peticion()
+        registrar("Códigos HTTP", nombre, r.status_code == esperado, f"HTTP {r.status_code} · {str(r.json().get('detail', ''))[:70]}")
+    uso0 = cli.get("/api/uso").json()
+    registrar("Uso de la IA", "GET /api/uso informa del gasto y los límites", uso0["limite_dia"] > 0 and "ultimos" in uso0,
+              f"{uso0['tokens_hoy']} / {uso0['limite_dia']} tokens hoy · tope por pregunta {uso0['por_turno']}")
 
     # ── Servidor y configuración ─────────────────────────────────────────
     t = time.perf_counter()
@@ -158,6 +237,10 @@ def main():
     registrar("Chat", "Saldo intacto tras cancelar", saldo_antes == saldo_despues, f"{saldo_antes} € → {saldo_despues} €")
     prueba_chat("Fuera de ámbito (se reconduce)", "Recomiéndame un libro de misa",
                 lambda r: (not r["herramientas"], ""))
+    uso1 = cli.get("/api/uso").json()
+    reales = [u for u in uso1["ultimos"] if not u["estimado"]]
+    registrar("Uso de la IA", "El gasto de tokens se mide con el dato REAL del proveedor", uso1["tokens_hoy"] > uso0["tokens_hoy"] and bool(reales),
+              f"{uso1['tokens_hoy'] - uso0['tokens_hoy']} tokens en las pruebas de chat · {len(reales)}/{len(uso1['ultimos'])} llamadas con uso real")
 
     # ── Voz: Piper (TTS) → Whisper (STT), ida y vuelta ───────────────────
     frase = "¿Cuánto gasté en restaurantes en agosto?"
