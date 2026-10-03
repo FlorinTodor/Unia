@@ -5,6 +5,16 @@ from typing import Literal
 
 
 @dataclass(frozen=True)
+class Cliente:
+    """Persona autenticada. Todo acceso a datos y toda herramienta del agente se hace en su nombre."""
+
+    id: int
+    usuario: str
+    nombre: str
+    telefono: str  # al que se envían los códigos OTP
+
+
+@dataclass(frozen=True)
 class Cuenta:
     iban: str
     titular: str
