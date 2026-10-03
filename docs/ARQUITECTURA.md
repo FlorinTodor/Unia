@@ -74,10 +74,12 @@ tests/                         # ~200 pruebas sin red: dominio, casos de uso, ag
 frontend/
   index.html, styles.css
   js/main.js                   # composición del frontend
-  js/api/                      # adaptadores hacia el backend (http, chat SSE, voz, ajustes, estado)
+  js/marca.js                  # nombre, lema y paleta de Unia (un solo sitio para cambiarlos)
+  js/api/                      # adaptadores hacia el backend (http, auth, chat SSE, voz, banco, operaciones, uso, ajustes, estado)
   js/aplicacion/conversacion.js# caso de uso: enviar mensaje y reflejar cada evento SSE
   js/dispositivos/             # micrófono, altavoz, preferencias (APIs del navegador)
-  js/ui/                       # vista_chat, cabecera, panel_ajustes, dom
+  js/ui/                       # vista_chat, panel_cuenta, sugerencias, tarjeta_operacion, movil, medidor_uso, vista_login, panel_ajustes, iconos
+  fonts/                       # Manrope (OFL), servida desde el propio servidor
 ```
 
 ### Cómo se amplía
@@ -136,6 +138,15 @@ Los casos de uso lanzan errores de dominio con categoría (`dominio/errores.py`)
 `tests/test_errores_http.py` impide que una clase de error nueva quede por descuido en el 400 genérico.
 Dentro del chat (SSE) los fallos del modelo no son errores HTTP: llegan como evento `error` o `aviso`; pero
 los rechazos previos (413, 422, 429) sí se devuelven como HTTP antes de abrir el flujo.
+
+## Estado que sobrevive a un reinicio
+
+Sesiones de login, operaciones pendientes de confirmar, SMS del móvil simulado y conversaciones del chat se guardan en
+SQLite (`salida/persistencia/sqlite_estado.py`, tablas `sesiones_auth`, `operaciones_pendientes`, `sms_movil` y
+`sesiones_chat`), no en memoria. Así un reinicio del servidor (o la recarga automática de uvicorn con `--reload`) no
+desconecta al cliente, no tira un Bizum a medias ni borra el SMS con el código. El token de sesión nunca se guarda en
+claro (solo su huella sha256) y las operaciones guardan la huella del código, no el código. Lo único que sigue en memoria
+es el contador de intentos de login y el limitador de ritmo, que se reinician a cero sin riesgo.
 
 ## Accesibilidad de la confirmación (ceguera, sordera, motricidad)
 

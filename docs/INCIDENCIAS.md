@@ -42,6 +42,7 @@ y dónde está el arreglo. Material directo para el apartado de robustez de la m
 | 34 | Con todos los modelos sin cuota salía «La IA local no responde: ¿está Ollama en marcha?» aunque el problema era la cuota | al agotarse la cadena se mostraba el motivo del último eslabón | mensaje claro: «todos los modelos han alcanzado su límite; espera un minuto» y la pista de Ollama solo si es lo último que falló | `Agente._mensaje_sin_modelos` |
 | 35 | «Te quedan 1 intentos» | plural fijo | concordancia de número | `dominio/operaciones.py` |
 | 36 | El OTP solo servía a quien podía leer un SMS en un panel y teclear 6 dígitos (barrera para ceguera y motricidad) | el flujo era puramente visual | aprobación con huella, foco y resumen para lectores de pantalla, SMS en voz alta cifra a cifra, aviso visual y vibración; ver DECISIONES nº 13 | `tarjeta_operacion.js`, `movil.js` |
+| 37 | Al abrir Ajustes en mitad de una conversación: «Failed to fetch» o «tu sesión ha caducado»; y el navegador mostraba el saldo sin separador de miles tras corregirlo | sesiones, operaciones y SMS en memoria (cada reinicio los borraba), JS/CSS viejos en la caché del navegador y `alert()` nativo para el error de red | estado persistido en SQLite, `Cache-Control: no-cache` en `/static`, aviso emergente y mensaje claro sin conexión; las pruebas de la app van a otro puerto | `persistencia/sqlite_estado.py`, `app.py`, `ui/avisos.js` |
 
 ## Lecciones generales
 

@@ -1,4 +1,6 @@
-# 💬💶 Habla con tu dinero — Reto Unicaja · UGR
+# Unia · asistente de Unicaja
+
+> Proyecto del reto «Habla con tu dinero» (Cátedra Unicaja · UGR). Identidad y colores: `docs/MARCA.md`.
 
 Asistente bancario conversacional basado en IA generativa. Permite interactuar con
 tus finanzas **por voz o por escrito** (accesible para personas que no pueden o no

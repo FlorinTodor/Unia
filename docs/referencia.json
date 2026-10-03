@@ -1,0 +1,1343 @@
+{
+  "puertos": [
+    {
+      "puerto": "RepositorioCuenta",
+      "fichero": "aplicacion/puertos/banco.py",
+      "metodos": [
+        "obtener(cliente_id: int) → Cuenta",
+        "registrar_movimiento(cliente_id: int, movimiento: Movimiento) → Cuenta",
+        "bizum_enviado_el(cliente_id: int, dia: date) → float",
+        "envios_bizum_a(cliente_id: int, nombre: str) → int"
+      ],
+      "adaptador": "RepositorioCuentaSqlite",
+      "fichero_adaptador": "salida/sqlite/repositorios.py",
+      "doble": "CuentaEnMemoria"
+    },
+    {
+      "puerto": "RepositorioContactos",
+      "fichero": "aplicacion/puertos/banco.py",
+      "metodos": [
+        "listar(cliente_id: int) → list[Contacto]",
+        "buscar(cliente_id: int, nombre_o_telefono: str) → Contacto | None"
+      ],
+      "adaptador": "RepositorioContactosSqlite",
+      "fichero_adaptador": "salida/sqlite/repositorios.py",
+      "doble": "ContactosEnMemoria"
+    },
+    {
+      "puerto": "ConsultorMovimientos",
+      "fichero": "aplicacion/puertos/banco.py",
+      "metodos": [
+        "ejecutar_select(cliente_id: int, sql: str, limite: int) → ResultadoConsulta"
+      ],
+      "adaptador": "ConsultorMovimientosSqlite",
+      "fichero_adaptador": "salida/sqlite/consultor.py",
+      "doble": "ConsultorFalso"
+    },
+    {
+      "puerto": "RepositorioSesiones",
+      "fichero": "aplicacion/puertos/infraestructura.py",
+      "metodos": [
+        "obtener(id_sesion: str) → list[Mensaje] | None",
+        "guardar(id_sesion: str, mensajes: list[Mensaje]) → None"
+      ],
+      "adaptador": "SesionesChatSqlite",
+      "fichero_adaptador": "salida/persistencia/sqlite_estado.py",
+      "doble": "SesionesEnMemoria"
+    },
+    {
+      "puerto": "RepositorioAjustes",
+      "fichero": "aplicacion/puertos/infraestructura.py",
+      "metodos": [
+        "cargar() → Ajustes",
+        "guardar(ajustes: Ajustes) → None"
+      ],
+      "adaptador": "AjustesJson",
+      "fichero_adaptador": "salida/persistencia/ajustes_json.py",
+      "doble": "AjustesEnMemoria"
+    },
+    {
+      "puerto": "Reloj",
+      "fichero": "aplicacion/puertos/infraestructura.py",
+      "metodos": [
+        "hoy() → date",
+        "ahora() → datetime"
+      ],
+      "adaptador": "RelojSistema",
+      "fichero_adaptador": "salida/reloj.py",
+      "doble": "RelojFijo"
+    },
+    {
+      "puerto": "SondaProveedores",
+      "fichero": "aplicacion/puertos/infraestructura.py",
+      "metodos": [
+        "listar_modelos(proveedor: str, api_key: str | None=None) → list[str]",
+        "estado_ollama(url: str) → EstadoOllama"
+      ],
+      "adaptador": "SondaOpenAI",
+      "fichero_adaptador": "salida/llm/sonda.py",
+      "doble": "SondaFalsa"
+    },
+    {
+      "puerto": "ProveedorLLM",
+      "fichero": "aplicacion/puertos/llm.py",
+      "metodos": [
+        "completar(modelo: ModeloRef, mensajes: Sequence[Mensaje], herramientas: Sequence[EsquemaHerramienta] | None, max_tokens: int | None=None) → Iterator[EventoLLM]"
+      ],
+      "adaptador": "ProveedorLLMOpenAI",
+      "fichero_adaptador": "salida/llm/openai_compat.py",
+      "doble": "LLMGuionizado"
+    },
+    {
+      "puerto": "RepositorioClientes",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "buscar_por_usuario(usuario: str) → tuple[Cliente, str] | None",
+        "obtener(cliente_id: int) → Cliente | None"
+      ],
+      "adaptador": "RepositorioClientesSqlite",
+      "fichero_adaptador": "salida/sqlite/repositorios.py",
+      "doble": "ClientesFalsos (test_acceso)"
+    },
+    {
+      "puerto": "Hasheador",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "hashear(contrasena: str) → str",
+        "verificar(contrasena: str, hash_guardado: str) → bool",
+        "gastar_tiempo(contrasena: str) → None"
+      ],
+      "adaptador": "HasheadorScrypt",
+      "fichero_adaptador": "salida/seguridad/hasheador.py",
+      "doble": "(el real, es rápido de crear)"
+    },
+    {
+      "puerto": "SesionesAutenticadas",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "crear(cliente_id: int) → str",
+        "cliente_de(token: str) → int | None",
+        "cerrar(token: str) → None"
+      ],
+      "adaptador": "SesionesAutenticadasSqlite",
+      "fichero_adaptador": "salida/persistencia/sqlite_estado.py",
+      "doble": "SesionesAutenticadasEnMemoria"
+    },
+    {
+      "puerto": "RegistroIntentos",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "obtener(usuario: str) → EstadoIntentos",
+        "guardar(usuario: str, estado: EstadoIntentos) → None"
+      ],
+      "adaptador": "IntentosEnMemoria",
+      "fichero_adaptador": "salida/persistencia/memoria_seguridad.py",
+      "doble": "IntentosEnMemoria"
+    },
+    {
+      "puerto": "RepositorioOperaciones",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "guardar(operacion: OperacionPendiente) → None",
+        "obtener(id_operacion: str) → OperacionPendiente | None"
+      ],
+      "adaptador": "OperacionesSqlite",
+      "fichero_adaptador": "salida/persistencia/sqlite_estado.py",
+      "doble": "OperacionesEnMemoria"
+    },
+    {
+      "puerto": "GeneradorCodigos",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "nuevo_id() → str",
+        "nuevo_codigo() → str"
+      ],
+      "adaptador": "GeneradorCodigosSeguro",
+      "fichero_adaptador": "salida/seguridad/codigos.py",
+      "doble": "CodigosFijos"
+    },
+    {
+      "puerto": "CanalOTP",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "enviar(cliente_id: int, texto: str) → None"
+      ],
+      "adaptador": "MovilSqlite",
+      "fichero_adaptador": "salida/persistencia/sqlite_estado.py",
+      "doble": "MovilFalso"
+    },
+    {
+      "puerto": "BandejaMovil",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "mensajes(cliente_id: int) → list[dict]"
+      ],
+      "adaptador": "MovilSqlite",
+      "fichero_adaptador": "salida/persistencia/sqlite_estado.py",
+      "doble": "MovilFalso"
+    },
+    {
+      "puerto": "Auditoria",
+      "fichero": "aplicacion/puertos/seguridad.py",
+      "metodos": [
+        "registrar(cliente_id: int | None, accion: str, detalle: str, resultado: str) → None",
+        "ultimos(cliente_id: int, limite: int=20) → list[dict]"
+      ],
+      "adaptador": "AuditoriaSqlite",
+      "fichero_adaptador": "salida/sqlite/auditoria.py",
+      "doble": "AuditoriaEnMemoria"
+    },
+    {
+      "puerto": "RegistroUso",
+      "fichero": "aplicacion/puertos/uso.py",
+      "metodos": [
+        "registrar(cliente_id: int, proveedor: str, modelo: str, uso: Uso, momento: datetime) → None",
+        "tokens_del_dia(cliente_id: int, dia: date) → int",
+        "ultimos(cliente_id: int, limite: int=10) → list[dict]"
+      ],
+      "adaptador": "UsoSqlite",
+      "fichero_adaptador": "salida/sqlite/uso.py",
+      "doble": "UsoEnMemoria"
+    },
+    {
+      "puerto": "LimitadorPeticiones",
+      "fichero": "aplicacion/puertos/uso.py",
+      "metodos": [
+        "permitir(cliente_id: int, ahora: datetime) → int | None"
+      ],
+      "adaptador": "LimitadorEnMemoria",
+      "fichero_adaptador": "salida/persistencia/limitador.py",
+      "doble": "LimitadorEnMemoria"
+    },
+    {
+      "puerto": "Transcriptor",
+      "fichero": "aplicacion/puertos/voz.py",
+      "metodos": [
+        "transcribir(audio: bytes, nombre_fichero: str) → str"
+      ],
+      "adaptador": "TranscriptorWhisper",
+      "fichero_adaptador": "salida/voz/whisper.py",
+      "doble": "TranscriptorFalso (test_http)"
+    },
+    {
+      "puerto": "Sintetizador",
+      "fichero": "aplicacion/puertos/voz.py",
+      "metodos": [
+        "disponible() → bool",
+        "sintetizar(texto: str) → bytes"
+      ],
+      "adaptador": "SintetizadorPiper",
+      "fichero_adaptador": "salida/voz/piper.py",
+      "doble": "SintetizadorFalso (test_http)"
+    }
+  ],
+  "casos_uso": [
+    {
+      "caso": "IniciarSesion",
+      "fichero": "aplicacion/casos_uso/acceso.py",
+      "puertos": [
+        "RepositorioClientes",
+        "Hasheador",
+        "SesionesAutenticadas",
+        "RegistroIntentos",
+        "Reloj",
+        "Auditoria"
+      ],
+      "doc": "",
+      "usado_por": "POST /auth/login"
+    },
+    {
+      "caso": "IdentificarCliente",
+      "fichero": "aplicacion/casos_uso/acceso.py",
+      "puertos": [
+        "SesionesAutenticadas",
+        "RepositorioClientes"
+      ],
+      "doc": "Resuelve el cliente de una sesión; es lo que protege cada endpoint.",
+      "usado_por": "dependencia de todos los endpoints protegidos"
+    },
+    {
+      "caso": "CerrarSesion",
+      "fichero": "aplicacion/casos_uso/acceso.py",
+      "puertos": [
+        "SesionesAutenticadas",
+        "Auditoria"
+      ],
+      "doc": "",
+      "usado_por": "POST /auth/logout"
+    },
+    {
+      "caso": "GestionAjustes",
+      "fichero": "aplicacion/casos_uso/ajustes.py",
+      "puertos": [
+        "RepositorioAjustes",
+        "SondaProveedores"
+      ],
+      "doc": "",
+      "usado_por": "/ajustes/*"
+    },
+    {
+      "caso": "ConsultarSaldo",
+      "fichero": "aplicacion/casos_uso/banco.py",
+      "puertos": [
+        "RepositorioCuenta"
+      ],
+      "doc": "",
+      "usado_por": "herramienta consultar_saldo · GET /api/banco/saldo"
+    },
+    {
+      "caso": "ListarContactos",
+      "fichero": "aplicacion/casos_uso/banco.py",
+      "puertos": [
+        "RepositorioContactos"
+      ],
+      "doc": "",
+      "usado_por": "herramienta listar_contactos_bizum · GET /api/banco/contactos"
+    },
+    {
+      "caso": "ConsultarMovimientos",
+      "fichero": "aplicacion/casos_uso/banco.py",
+      "puertos": [
+        "ConsultorMovimientos",
+        "Auditoria"
+      ],
+      "doc": "NL→SQL: el LLM escribe el SELECT; aquí se valida y el adaptador lo ejecuta aislado en el cliente.",
+      "usado_por": "herramienta consultar_movimientos · GET /api/banco/movimientos"
+    },
+    {
+      "caso": "SolicitarBizum",
+      "fichero": "aplicacion/casos_uso/bizum.py",
+      "puertos": [
+        "RepositorioCuenta",
+        "RepositorioContactos",
+        "RepositorioOperaciones",
+        "GeneradorCodigos",
+        "CanalOTP",
+        "Reloj",
+        "Auditoria"
+      ],
+      "doc": "",
+      "usado_por": "herramienta transferencia_bizum · POST /api/banco/bizum"
+    },
+    {
+      "caso": "ConfirmarOperacion",
+      "fichero": "aplicacion/casos_uso/bizum.py",
+      "puertos": [
+        "RepositorioCuenta",
+        "RepositorioOperaciones",
+        "Reloj",
+        "Auditoria"
+      ],
+      "doc": "Ejecuta el Bizum cuando el cliente demuestra que es él: con el código OTP o aprobando con su huella.",
+      "usado_por": "POST /operaciones/{id}/confirmar y /aprobar"
+    },
+    {
+      "caso": "CancelarOperacion",
+      "fichero": "aplicacion/casos_uso/bizum.py",
+      "puertos": [
+        "RepositorioOperaciones",
+        "Auditoria"
+      ],
+      "doc": "",
+      "usado_por": "POST /operaciones/{id}/cancelar"
+    },
+    {
+      "caso": "ConsultarEstado",
+      "fichero": "aplicacion/casos_uso/estado.py",
+      "puertos": [
+        "RepositorioAjustes",
+        "Sintetizador"
+      ],
+      "doc": "",
+      "usado_por": "GET /estado"
+    },
+    {
+      "caso": "LeerMensajesMovil",
+      "fichero": "aplicacion/casos_uso/movil.py",
+      "puertos": [
+        "BandejaMovil"
+      ],
+      "doc": "",
+      "usado_por": "GET /movil/mensajes"
+    },
+    {
+      "caso": "ConsultarUso",
+      "fichero": "aplicacion/casos_uso/uso.py",
+      "puertos": [
+        "RegistroUso",
+        "PresupuestoUso",
+        "Reloj"
+      ],
+      "doc": "",
+      "usado_por": "GET /api/uso"
+    },
+    {
+      "caso": "TranscribirAudio",
+      "fichero": "aplicacion/casos_uso/voz.py",
+      "puertos": [
+        "Transcriptor",
+        "RepositorioAjustes"
+      ],
+      "doc": "",
+      "usado_por": "POST /stt"
+    },
+    {
+      "caso": "SintetizarVoz",
+      "fichero": "aplicacion/casos_uso/voz.py",
+      "puertos": [
+        "Sintetizador"
+      ],
+      "doc": "",
+      "usado_por": "POST /tts"
+    }
+  ],
+  "herramientas": [
+    {
+      "nombre": "consultar_saldo",
+      "riesgo": "lectura",
+      "etiqueta": "Consultando saldo…",
+      "fichero": "aplicacion/herramientas/saldo.py",
+      "descripcion": "Obtiene el saldo actual, el IBAN y el titular de la cuenta."
+    },
+    {
+      "nombre": "listar_contactos_bizum",
+      "riesgo": "lectura",
+      "etiqueta": "Buscando contactos…",
+      "fichero": "aplicacion/herramientas/contactos.py",
+      "descripcion": "Lista los contactos disponibles para enviar Bizum (nombre y teléfono)."
+    },
+    {
+      "nombre": "transferencia_bizum",
+      "riesgo": "escritura",
+      "etiqueta": "Preparando el Bizum…",
+      "fichero": "aplicacion/herramientas/bizum.py",
+      "descripcion": "Inicia un Bizum a un contacto. NO lo envía: el cliente debe confirmarlo con un código OTP. SOLO debe llamarse después de que el usuario haya confirmado explícitamente el destinatario y el importe."
+    },
+    {
+      "nombre": "consultar_movimientos",
+      "riesgo": "lectura",
+      "etiqueta": "Analizando tus movimientos…",
+      "fichero": "aplicacion/herramientas/movimientos.py",
+      "descripcion": "Ejecuta una consulta SQL (SQLite, solo SELECT) sobre el histórico de movimientos para responder preguntas sobre gastos, ingresos, categorías, comercios o fechas."
+    },
+    {
+      "nombre": "generar_grafico",
+      "riesgo": "lectura",
+      "etiqueta": "Generando gráfico…",
+      "fichero": "aplicacion/herramientas/grafico.py",
+      "descripcion": "Muestra al usuario un gráfico interactivo. Tú decides el tipo de gráfico más adecuado a los datos (bar, line, pie, doughnut, radar, scatter...) y construyes la configuración completa de Chart.js con los datos reales obtenidos previamente con consultar_movimientos."
+    }
+  ],
+  "endpoints": [
+    {
+      "metodo": "POST",
+      "ruta": "/auth/login",
+      "etiqueta": "auth",
+      "resumen": "Iniciar sesión",
+      "auth": false,
+      "peticion": "PeticionLogin",
+      "respuesta": "ClienteOut",
+      "errores": [
+        "401",
+        "429"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/auth/yo",
+      "etiqueta": "auth",
+      "resumen": "Cliente de la sesión actual",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "ClienteOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/auth/logout",
+      "etiqueta": "auth",
+      "resumen": "Cerrar sesión",
+      "auth": false,
+      "peticion": "",
+      "respuesta": "OkOut",
+      "errores": []
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/api/banco/saldo",
+      "etiqueta": "banco",
+      "resumen": "Saldo de la cuenta",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "CuentaOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/api/banco/contactos",
+      "etiqueta": "banco",
+      "resumen": "Contactos Bizum del cliente",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "lista de ContactoOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/api/banco/bizum",
+      "etiqueta": "banco",
+      "resumen": "Iniciar un Bizum (pendiente de código OTP)",
+      "auth": true,
+      "peticion": "PeticionBizum",
+      "respuesta": "BizumPendienteOut",
+      "errores": [
+        "401",
+        "404",
+        "409"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/api/banco/movimientos",
+      "etiqueta": "banco",
+      "resumen": "Últimos movimientos",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "ConsultaOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/operaciones/{id_operacion}/confirmar",
+      "etiqueta": "operaciones",
+      "resumen": "Confirmar una operación con su código OTP",
+      "auth": true,
+      "peticion": "PeticionCodigo",
+      "respuesta": "ComprobanteOut",
+      "errores": [
+        "400",
+        "401",
+        "404",
+        "409",
+        "410",
+        "423"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/operaciones/{id_operacion}/aprobar",
+      "etiqueta": "operaciones",
+      "resumen": "Aprobar una operación con huella o Face ID (simulado)",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "ComprobanteOut",
+      "errores": [
+        "401",
+        "404",
+        "409",
+        "410"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/operaciones/{id_operacion}/cancelar",
+      "etiqueta": "operaciones",
+      "resumen": "Cancelar una operación pendiente",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "OkOut",
+      "errores": [
+        "401",
+        "404",
+        "409"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/movil/mensajes",
+      "etiqueta": "operaciones",
+      "resumen": "SMS del móvil simulado",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "lista de SmsOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/api/uso",
+      "etiqueta": "uso",
+      "resumen": "Gasto de tokens de la IA",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "UsoOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/ajustes",
+      "etiqueta": "ajustes",
+      "resumen": "Ajustes actuales",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "AjustesOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/ajustes/probar",
+      "etiqueta": "ajustes",
+      "resumen": "Validar una clave API",
+      "auth": true,
+      "peticion": "PeticionProbar",
+      "respuesta": "PruebaClaveOut",
+      "errores": [
+        "401",
+        "404"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/ajustes/claves",
+      "etiqueta": "ajustes",
+      "resumen": "Añadir o reemplazar una clave",
+      "auth": true,
+      "peticion": "PeticionClave",
+      "respuesta": "AjustesConMensajeOut",
+      "errores": [
+        "401",
+        "404"
+      ]
+    },
+    {
+      "metodo": "PATCH",
+      "ruta": "/ajustes/claves/{proveedor}",
+      "etiqueta": "ajustes",
+      "resumen": "Cambiar los modelos de una clave",
+      "auth": true,
+      "peticion": "PeticionModelos",
+      "respuesta": "AjustesOut",
+      "errores": [
+        "401",
+        "404"
+      ]
+    },
+    {
+      "metodo": "DELETE",
+      "ruta": "/ajustes/claves/{proveedor}",
+      "etiqueta": "ajustes",
+      "resumen": "Borrar una clave",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "AjustesOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/ajustes/activar",
+      "etiqueta": "ajustes",
+      "resumen": "Elegir el proveedor principal",
+      "auth": true,
+      "peticion": "PeticionActivar",
+      "respuesta": "AjustesOut",
+      "errores": [
+        "401",
+        "404"
+      ]
+    },
+    {
+      "metodo": "PUT",
+      "ruta": "/ajustes/ollama",
+      "etiqueta": "ajustes",
+      "resumen": "Configurar la IA local (Ollama)",
+      "auth": true,
+      "peticion": "PeticionOllama",
+      "respuesta": "AjustesOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/ajustes/ollama/estado",
+      "etiqueta": "ajustes",
+      "resumen": "Comprobar si Ollama responde",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "EstadoOllamaOut",
+      "errores": [
+        "401"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/chat",
+      "etiqueta": "chat",
+      "resumen": "Enviar un mensaje al asistente (SSE)",
+      "auth": true,
+      "peticion": "PeticionChat",
+      "respuesta": "—",
+      "errores": [
+        "400",
+        "401",
+        "413",
+        "429"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/stt",
+      "etiqueta": "voz",
+      "resumen": "Transcribir voz a texto (Whisper)",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "TranscripcionOut",
+      "errores": [
+        "401",
+        "413",
+        "415",
+        "429",
+        "502",
+        "503",
+        "504"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/tts",
+      "etiqueta": "voz",
+      "resumen": "Sintetizar voz en el servidor (Piper)",
+      "auth": true,
+      "peticion": "PeticionTTS",
+      "respuesta": "—",
+      "errores": [
+        "401",
+        "503"
+      ]
+    },
+    {
+      "metodo": "GET",
+      "ruta": "/estado",
+      "etiqueta": "estado",
+      "resumen": "Estado del asistente",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "EstadoOut",
+      "errores": [
+        "401"
+      ]
+    }
+  ],
+  "tests": {
+    "test_acceso.py": 8,
+    "test_agente.py": 23,
+    "test_arquitectura.py": 69,
+    "test_bizum_otp.py": 18,
+    "test_chat.py": 9,
+    "test_dominio.py": 15,
+    "test_errores_http.py": 38,
+    "test_http.py": 45,
+    "test_persistencia.py": 7,
+    "test_seguridad_chat.py": 5,
+    "test_sqlite.py": 35,
+    "test_texto.py": 6,
+    "test_uso.py": 21,
+    "test_uso_http.py": 6
+  },
+  "ficheros": {
+    "adaptadores/entrada": [
+      {
+        "fichero": "backend/adaptadores/entrada/http/app.py",
+        "lineas": 98,
+        "doc": "Construcción de la aplicación FastAPI: routers, manejo de errores, cabeceras de seguridad y frontend."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/errores_http.py",
+        "lineas": 97,
+        "doc": "Traducción de errores a respuestas HTTP: un solo lugar, con todos los casos."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/esquemas.py",
+        "lineas": 232,
+        "doc": "Modelos de petición y respuesta de la API (lo que aparece en OpenAPI / Swagger)."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/presentadores.py",
+        "lineas": 105,
+        "doc": "Conversión de objetos de la aplicación a las respuestas JSON de la API."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_ajustes.py",
+        "lineas": 63,
+        "doc": "Panel ⚙️ Ajustes: alta/baja de claves, modelos, proveedor activo e IA local."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_auth.py",
+        "lineas": 52,
+        "doc": "Login, sesión actual y logout."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_banco.py",
+        "lineas": 55,
+        "doc": "API bancaria ficticia (REST): saldo, contactos, Bizum y movimientos del cliente autenticado."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_chat.py",
+        "lineas": 98,
+        "doc": "POST /chat (SSE), POST /stt, POST /tts y GET /estado."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_operaciones.py",
+        "lineas": 66,
+        "doc": "Confirmación de operaciones con OTP y móvil simulado."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/rutas_uso.py",
+        "lineas": 24,
+        "doc": "Consumo de tokens de la IA del cliente."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/seguridad.py",
+        "lineas": 37,
+        "doc": "Autenticación en la entrada HTTP: sesión por cookie `HttpOnly` + `SameSite=Strict`."
+      },
+      {
+        "fichero": "backend/adaptadores/entrada/http/sse.py",
+        "lineas": 47,
+        "doc": "Protocolo SSE del chat: traduce los eventos de la aplicación a `data: {tipo, dato}`."
+      }
+    ],
+    "adaptadores/salida": [
+      {
+        "fichero": "backend/adaptadores/salida/llm/clientes.py",
+        "lineas": 36,
+        "doc": "Fábrica de clientes OpenAI-compatible: todos los proveedores comparten API, solo cambia la URL."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/llm/openai_compat.py",
+        "lineas": 169,
+        "doc": "Adaptador del puerto ProveedorLLM sobre cualquier API compatible con OpenAI (streaming)."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/llm/sonda.py",
+        "lineas": 44,
+        "doc": "Adaptador de SondaProveedores: validar claves, listar modelos y comprobar Ollama."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/persistencia/ajustes_json.py",
+        "lineas": 61,
+        "doc": "Ajustes persistidos en `data/ajustes.json` (gitignored, permisos 600)."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/persistencia/limitador.py",
+        "lineas": 18,
+        "doc": "Limitador de peticiones por cliente: ventana deslizante de un minuto, en memoria."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/persistencia/memoria_seguridad.py",
+        "lineas": 42,
+        "doc": "Estado de seguridad en memoria: intentos de login, operaciones pendientes y el móvil simulado."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/persistencia/sesiones_memoria.py",
+        "lineas": 13,
+        "doc": "Sesiones de chat en memoria (se pierden al reiniciar el servidor)."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/persistencia/sqlite_estado.py",
+        "lineas": 171,
+        "doc": "Estado de la aplicación que debe SOBREVIVIR a un reinicio del servidor."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/reloj.py",
+        "lineas": 10,
+        "doc": "Reloj del sistema."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/seguridad/codigos.py",
+        "lineas": 10,
+        "doc": "Identificadores y códigos OTP criptográficamente aleatorios (módulo `secrets`, no `random`)."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/seguridad/hasheador.py",
+        "lineas": 32,
+        "doc": "Contraseñas con scrypt (biblioteca estándar): lento a propósito, con sal aleatoria por contraseña."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/seguridad/sesiones_auth.py",
+        "lineas": 36,
+        "doc": "Sesiones autenticadas en memoria. El token es opaco y aleatorio; solo se guarda su huella."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/auditoria.py",
+        "lineas": 32,
+        "doc": "Registro de auditoría en SQLite: quién hizo qué, cuándo y con qué resultado."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/conexion.py",
+        "lineas": 19,
+        "doc": "Acceso a la base de datos SQLite (data/banco.db)."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/consultor.py",
+        "lineas": 67,
+        "doc": "Consulta NL→SQL aislada por cliente."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/esquema.py",
+        "lineas": 179,
+        "doc": "Esquema de la base de datos (varios clientes) y carga inicial con datos ficticios."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/generador.py",
+        "lineas": 46,
+        "doc": "Generador procedural de movimientos ficticios a partir de un perfil. Semilla fija: demo reproducible."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/perfiles.py",
+        "lineas": 156,
+        "doc": "Los cuatro clientes ficticios de la demo, con vidas financieras distintas."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/repositorios.py",
+        "lineas": 115,
+        "doc": "Implementaciones SQLite de los puertos bancarios. Cada consulta filtra por `cliente_id`."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/sqlite/uso.py",
+        "lineas": 46,
+        "doc": "Registro de uso de tokens en SQLite: sobrevive a los reinicios y permite ver el gasto por cliente y día."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/voz/piper.py",
+        "lineas": 34,
+        "doc": "Adaptador Sintetizador: voz neuronal local con Piper."
+      },
+      {
+        "fichero": "backend/adaptadores/salida/voz/whisper.py",
+        "lineas": 42,
+        "doc": "Adaptador Transcriptor: Whisper vía API OpenAI-compatible (Groq u OpenAI)."
+      }
+    ],
+    "aplicacion": [
+      {
+        "fichero": "backend/aplicacion/agente.py",
+        "lineas": 253,
+        "doc": "Agente conversacional: bucle de tool calling con streaming y cadena de fallback."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/acceso.py",
+        "lineas": 96,
+        "doc": "Acceso: login con contraseña, sesión por cookie y bloqueo temporal tras intentos fallidos."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/ajustes.py",
+        "lineas": 129,
+        "doc": "Casos de uso del panel ⚙️ Ajustes: claves, modelos, proveedor activo e IA local."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/banco.py",
+        "lineas": 47,
+        "doc": "Casos de uso bancarios. Orquestan reglas del dominio y puertos; no saben de SQL ni de HTTP."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/bizum.py",
+        "lineas": 153,
+        "doc": "Bizum con confirmación OTP en dos pasos."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/estado.py",
+        "lineas": 33,
+        "doc": "Caso de uso: estado general del sistema para la cabecera de la interfaz."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/graficos.py",
+        "lineas": 40,
+        "doc": "Caso de uso: preparar un gráfico que el LLM ha diseñado (sin plantillas)."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/movil.py",
+        "lineas": 11,
+        "doc": "El móvil simulado del cliente: donde llegan los códigos OTP (canal distinto al chat)."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/uso.py",
+        "lineas": 39,
+        "doc": "Consulta del gasto de tokens del cliente (medidor de la interfaz y endpoint `/api/uso`)."
+      },
+      {
+        "fichero": "backend/aplicacion/casos_uso/voz.py",
+        "lineas": 49,
+        "doc": "Casos de uso de voz: transcribir lo que dice el usuario y sintetizar la respuesta."
+      },
+      {
+        "fichero": "backend/aplicacion/chat.py",
+        "lineas": 155,
+        "doc": "Servicio de chat: sesiones, compactación del historial y un turno de conversación."
+      },
+      {
+        "fichero": "backend/aplicacion/eventos.py",
+        "lineas": 58,
+        "doc": "Eventos que la aplicación emite durante un turno de chat (los adaptadores los traducen a SSE)."
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/bizum.py",
+        "lineas": 55,
+        "doc": ""
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/contactos.py",
+        "lineas": 21,
+        "doc": ""
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/grafico.py",
+        "lineas": 38,
+        "doc": ""
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/movimientos.py",
+        "lineas": 47,
+        "doc": ""
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/registro.py",
+        "lineas": 69,
+        "doc": "Registro de herramientas: añadir una herramienta = escribir un módulo y registrarla."
+      },
+      {
+        "fichero": "backend/aplicacion/herramientas/saldo.py",
+        "lineas": 23,
+        "doc": ""
+      },
+      {
+        "fichero": "backend/aplicacion/prompt.py",
+        "lineas": 83,
+        "doc": "System prompt del agente. Cada norma nace de un bug real (ver docs/INCIDENCIAS.md)."
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/banco.py",
+        "lineas": 35,
+        "doc": "Puertos de salida del dominio bancario. TODOS reciben el `cliente_id`: la separación de datos"
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/infraestructura.py",
+        "lineas": 57,
+        "doc": "Puertos de infraestructura general: sesiones, ajustes, reloj y sonda de proveedores."
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/llm.py",
+        "lineas": 94,
+        "doc": "Puerto del modelo de lenguaje: la aplicación no sabe qué proveedor ni qué SDK hay detrás."
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/seguridad.py",
+        "lineas": 71,
+        "doc": "Puertos de seguridad: identidad, contraseñas, sesiones, OTP y auditoría."
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/uso.py",
+        "lineas": 19,
+        "doc": "Puertos del control de uso: contabilidad de tokens y limitador de peticiones."
+      },
+      {
+        "fichero": "backend/aplicacion/puertos/voz.py",
+        "lineas": 14,
+        "doc": "Puertos de voz: transcribir (voz → texto) y sintetizar (texto → voz)."
+      },
+      {
+        "fichero": "backend/aplicacion/texto.py",
+        "lineas": 90,
+        "doc": "Tratamiento de texto puro: limpieza de la salida del modelo y preparación para voz."
+      }
+    ],
+    "composicion.py": [
+      {
+        "fichero": "backend/composicion.py",
+        "lineas": 156,
+        "doc": "Raíz de composición: el ÚNICO lugar donde se conectan puertos con adaptadores."
+      }
+    ],
+    "dominio": [
+      {
+        "fichero": "backend/dominio/acceso.py",
+        "lineas": 26,
+        "doc": "Reglas de acceso: bloqueo temporal tras varios intentos fallidos."
+      },
+      {
+        "fichero": "backend/dominio/ajustes.py",
+        "lineas": 58,
+        "doc": "Ajustes del usuario (claves API, modelos, IA local) y las reglas que de ellos se derivan."
+      },
+      {
+        "fichero": "backend/dominio/errores.py",
+        "lineas": 170,
+        "doc": "Errores de negocio. Todos llevan un mensaje ya legible para el usuario."
+      },
+      {
+        "fichero": "backend/dominio/modelos.py",
+        "lineas": 92,
+        "doc": "Entidades del negocio bancario y de la conversación."
+      },
+      {
+        "fichero": "backend/dominio/operaciones.py",
+        "lineas": 93,
+        "doc": "Operaciones que exigen confirmación con un código de un solo uso (OTP), como la SCA de la PSD2."
+      },
+      {
+        "fichero": "backend/dominio/proveedores.py",
+        "lineas": 75,
+        "doc": "Proveedores de IA soportados y su catálogo (datos de negocio, no de infraestructura)."
+      },
+      {
+        "fichero": "backend/dominio/reglas.py",
+        "lineas": 74,
+        "doc": "Reglas de negocio puras: sin base de datos, sin red, sin framework."
+      },
+      {
+        "fichero": "backend/dominio/uso.py",
+        "lineas": 64,
+        "doc": "Control del gasto de tokens de la IA: medición, presupuestos y reglas de límite."
+      }
+    ],
+    "main.py": [
+      {
+        "fichero": "backend/main.py",
+        "lineas": 4,
+        "doc": "Punto de entrada: `uvicorn backend.main:app`."
+      }
+    ],
+    "frontend/api": [
+      {
+        "fichero": "frontend/js/api/ajustes.js",
+        "lineas": 11,
+        "doc": "Adaptador del panel de ajustes: un método por endpoint de /ajustes."
+      },
+      {
+        "fichero": "frontend/js/api/auth.js",
+        "lineas": 6,
+        "doc": "Adaptador de acceso: login, sesión actual y logout (la cookie la gestiona el navegador, HttpOnly)."
+      },
+      {
+        "fichero": "frontend/js/api/banco.js",
+        "lineas": 5,
+        "doc": "Adaptador de los datos bancarios del cliente: saldo y movimientos."
+      },
+      {
+        "fichero": "frontend/js/api/chat.js",
+        "lineas": 36,
+        "doc": "Adaptador del chat: POST /chat y lectura del flujo SSE como un iterador asíncrono de eventos."
+      },
+      {
+        "fichero": "frontend/js/api/estado.js",
+        "lineas": 3,
+        "doc": ""
+      },
+      {
+        "fichero": "frontend/js/api/http.js",
+        "lineas": 59,
+        "doc": "Cliente HTTP mínimo: JSON dentro, JSON fuera, errores con el mensaje legible del servidor."
+      },
+      {
+        "fichero": "frontend/js/api/operaciones.js",
+        "lineas": 7,
+        "doc": "Adaptador de operaciones con OTP y del móvil simulado. El código viaja SOLO por aquí, nunca por el chat."
+      },
+      {
+        "fichero": "frontend/js/api/uso.js",
+        "lineas": 4,
+        "doc": "Adaptador del gasto de tokens de la IA."
+      },
+      {
+        "fichero": "frontend/js/api/voz.js",
+        "lineas": 25,
+        "doc": "Adaptador de voz del servidor: transcripción (Whisper) y síntesis (Piper)."
+      }
+    ],
+    "frontend/aplicacion": [
+      {
+        "fichero": "frontend/js/aplicacion/conversacion.js",
+        "lineas": 90,
+        "doc": "Caso de uso del chat: envía un mensaje y traduce cada evento del servidor en cambios de la vista."
+      }
+    ],
+    "frontend/dispositivos": [
+      {
+        "fichero": "frontend/js/dispositivos/altavoz.js",
+        "lineas": 59,
+        "doc": "Salida de voz: voces del navegador si existen y, si no, la voz neuronal del servidor (Piper)."
+      },
+      {
+        "fichero": "frontend/js/dispositivos/microfono.js",
+        "lineas": 26,
+        "doc": "Entrada de voz: graba con el micrófono del navegador."
+      },
+      {
+        "fichero": "frontend/js/dispositivos/preferencias.js",
+        "lineas": 15,
+        "doc": "Preferencias del navegador (localStorage puede estar bloqueado: nunca debe romper la app)."
+      }
+    ],
+    "frontend": [
+      {
+        "fichero": "frontend/js/main.js",
+        "lineas": 167,
+        "doc": "Raíz de composición del frontend: conecta vistas, casos de uso y adaptadores."
+      },
+      {
+        "fichero": "frontend/js/marca.js",
+        "lineas": 20,
+        "doc": "Marca del asistente. Para cambiar el nombre o el lema basta con editar este fichero."
+      }
+    ],
+    "frontend/ui": [
+      {
+        "fichero": "frontend/js/ui/avisos.js",
+        "lineas": 25,
+        "doc": "Avisos emergentes no bloqueantes: sustituyen a `alert()`. Se anuncian a los lectores de pantalla y se cierran solos."
+      },
+      {
+        "fichero": "frontend/js/ui/cabecera.js",
+        "lineas": 13,
+        "doc": "Cabecera: modelo en uso y disponibilidad de la voz."
+      },
+      {
+        "fichero": "frontend/js/ui/dom.js",
+        "lineas": 18,
+        "doc": "Utilidades de DOM y de renderizado de texto."
+      },
+      {
+        "fichero": "frontend/js/ui/formato.js",
+        "lineas": 4,
+        "doc": "Formato de importes en español."
+      },
+      {
+        "fichero": "frontend/js/ui/iconos.js",
+        "lineas": 39,
+        "doc": "Iconos de trazo (24×24) dibujados a mano con formas simples. Una categoría de gasto = un icono."
+      },
+      {
+        "fichero": "frontend/js/ui/medidor_uso.js",
+        "lineas": 22,
+        "doc": "Medidor del gasto diario de tokens de la IA, en la cabecera."
+      },
+      {
+        "fichero": "frontend/js/ui/movil.js",
+        "lineas": 107,
+        "doc": "Móvil simulado: donde llegan los SMS con el código OTP. Es un canal aparte del chat, como en la vida real."
+      },
+      {
+        "fichero": "frontend/js/ui/panel_ajustes.js",
+        "lineas": 247,
+        "doc": "Panel de ajustes: claves API por proveedor, modelos, IA local (Ollama) y voz."
+      },
+      {
+        "fichero": "frontend/js/ui/panel_cuenta.js",
+        "lineas": 75,
+        "doc": "Panel de la cuenta: saldo y últimos movimientos. Refuerzo visual permanente junto a la conversación."
+      },
+      {
+        "fichero": "frontend/js/ui/sugerencias.js",
+        "lineas": 33,
+        "doc": "Preguntas rápidas sobre el cuadro de texto: ayudan a empezar y sirven a quien no quiere escribir."
+      },
+      {
+        "fichero": "frontend/js/ui/tarjeta_operacion.js",
+        "lineas": 155,
+        "doc": "Tarjeta «Confirma tu Bizum»: el cliente confirma con el código que le llegó al móvil o con su huella."
+      },
+      {
+        "fichero": "frontend/js/ui/vista_chat.js",
+        "lineas": 177,
+        "doc": "Vista del chat: burbujas, estados de herramienta, avisos y tarjetas de gráfico."
+      },
+      {
+        "fichero": "frontend/js/ui/vista_login.js",
+        "lineas": 67,
+        "doc": "Pantalla de acceso: modal que no se puede cerrar hasta iniciar sesión."
+      }
+    ]
+  },
+  "entorno": [
+    [
+      "LLM_PROVIDER",
+      "groq",
+      "Groq (https://console.groq.com/keys) — también se usa para Whisper (voz)"
+    ],
+    [
+      "GROQ_API_KEY",
+      "",
+      "GROQ_MODEL=llama-3.3-70b-versatile"
+    ],
+    [
+      "CEREBRAS_API_KEY",
+      "",
+      "CEREBRAS_MODEL=llama-3.3-70b"
+    ],
+    [
+      "OLLAMA_URL",
+      "http://localhost:11434/v1",
+      "OLLAMA_MODEL=qwen3:4b   (ya instalado; qwen3:8b da mejor calidad si cabe en tu GPU)"
+    ],
+    [
+      "TOKENS_DIA_CLIENTE",
+      "80000",
+      "tokens por cliente y día (se renueva a medianoche)"
+    ],
+    [
+      "TOKENS_MAX_TURNO",
+      "30000",
+      "tope de una sola pregunta con todas sus rondas de herramientas"
+    ],
+    [
+      "MAX_CARACTERES_MENSAJE",
+      "1500",
+      "mensaje más largo -> 413"
+    ],
+    [
+      "PETICIONES_POR_MINUTO",
+      "20",
+      "por cliente -> 429 con Retry-After"
+    ],
+    [
+      "MAX_TOKENS_RESPUESTA",
+      "4096",
+      "tope de salida por llamada al modelo"
+    ],
+    [
+      "MAX_TOKENS_HISTORIAL",
+      "3000",
+      "lo que se reenvía de la conversación anterior"
+    ],
+    [
+      "MAX_CARACTERES_RESULTADO",
+      "6000",
+      "tamaño máximo de un resultado SQL que se devuelve al modelo"
+    ],
+    [
+      "DOCS_API",
+      "1",
+      "publica Swagger (/docs), ReDoc y /openapi.json (apagado por defecto)"
+    ],
+    [
+      "COOKIE_SEGURA",
+      "1",
+      "marca la cookie de sesión como Secure (activar al servir por HTTPS)"
+    ]
+  ]
+}

@@ -238,3 +238,39 @@ micrófono: se mandaría a un servicio de transcripción externo.
 **Relacionado.** El modelo ahora se entera de cómo acabó una operación que el cliente resolvió fuera del chat (avisos
 `[auto]` en el turno siguiente): antes seguía diciendo «está pendiente» cuando ya estaba enviada o bloqueada.
 
+## 14. Marca propia con los colores de Unicaja y rediseño de la interfaz (3-oct)
+
+**Contexto.** La interfaz era funcional pero improvisada: tema oscuro genérico con azules sueltos, emojis como
+iconos y el nombre del reto («Habla con tu dinero») como nombre del producto, largo y sin relación con la entidad.
+El reto es de Unicaja y la defensa es ante ellos.
+
+**Decisión.** Un producto con nombre propio, **Unia** (Unicaja + IA), y una interfaz construida sobre la identidad
+visual que Unicaja publica en su web: petróleo `#005265`, verde `#278600`, lima y ámbar, sus colores semánticos y su
+tipografía (Manrope, servida desde nuestro servidor). Claro por defecto y oscuro automático. Panel de cuenta con
+saldo y movimientos, preguntas rápidas, iconos propios en lugar de emojis y gráficos con la paleta corporativa.
+La marca vive en un solo fichero (`js/marca.js`) para poder cambiar nombre o lema en una línea.
+
+**Motivo.** Que parezca una pieza de Unicaja y no una demo genérica; que el refuerzo visual (saldo, movimientos,
+gráficos) esté siempre en pantalla, como pidieron; y que todo cumpla contraste AA. Los colores se extrajeron de su
+CSS en vez de inventarlos, y se documenta la procedencia y lo que falta confirmar (`docs/MARCA.md`).
+
+**Límites.** Son los colores publicados en su web, no los de un manual de marca; no se ha dibujado ningún logotipo
+(hay un hueco para el oficial); la tipografía y los tonos deben confirmarse con la Cátedra antes de la entrega.
+
+## 15. El estado de la sesión se guarda en SQLite, no en memoria (3-oct)
+
+**Contexto.** Probando la app a mano, abrir Ajustes en mitad de una conversación daba «Failed to fetch» o pedía iniciar
+sesión otra vez. Causa: durante el desarrollo el servidor se reinicia a menudo (y uvicorn con `--reload` lo hace en cada
+cambio de un `.py`), y las sesiones, las operaciones pendientes y los SMS vivían solo en memoria. Además el navegador servía
+ficheros estáticos viejos desde la caché y los fallos de conexión se mostraban con un `alert()` nativo.
+
+**Decisión.** Persistir en SQLite todo el estado que el cliente percibe como suyo (sesiones, operaciones pendientes, SMS y
+conversaciones), servir `/static` con `Cache-Control: no-cache` (se guarda, pero se revalida siempre) y mostrar los fallos
+de conexión con un aviso emergente propio y un mensaje comprensible.
+
+**Motivo.** Una demo en directo no puede perder la sesión ni el código OTP por un reinicio, y en producción real las
+sesiones tampoco vivirían en la memoria de un solo proceso. Es un cambio de adaptador: los puertos no cambiaron.
+
+**Límites.** Con un solo proceso y SQLite basta; con varios habría que pasar a una base de datos de servidor o a Redis.
+Los intentos de login y el limitador siguen en memoria a propósito.
+
