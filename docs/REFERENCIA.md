@@ -87,12 +87,12 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | POST | `/tts` | sí | PeticionTTS | — | 401, 503 |
 | GET | `/estado` | sí | — | EstadoOut | 401 |
 
-## Tests (305)
+## Tests (311)
 
 | Fichero | Pruebas |
 |---|---|
 | `tests/test_acceso.py` | 8 |
-| `tests/test_agente.py` | 23 |
+| `tests/test_agente.py` | 29 |
 | `tests/test_arquitectura.py` | 69 |
 | `tests/test_bizum_otp.py` | 18 |
 | `tests/test_chat.py` | 9 |

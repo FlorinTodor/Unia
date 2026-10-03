@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Habla con tu dinero",
-    "description": "API del asistente bancario conversacional «Habla con tu dinero» (Reto Unicaja · UGR).\n\n**Autenticación.** Todo menos el login exige la cookie de sesión `sesion` (`HttpOnly`, `SameSite=Strict`).\nEn Swagger: ejecuta `POST /auth/login` con una cuenta de demostración y las demás peticiones usarán la cookie.\n\n**Seguridad.** El asistente (LLM) nunca mueve dinero: un Bizum solo se ejecuta tras confirmar el código OTP\nque llega al móvil simulado, por `POST /operaciones/{id}/confirmar`.\n\n**Errores.** Los fallos de negocio devuelven `{\"detail\": \"mensaje legible\"}` con 401, 404, 422, 429 o 503.",
+    "title": "Unia · API",
+    "description": "API de Unia, el asistente bancario conversacional de Unicaja (Reto Unicaja · UGR: «Habla con tu dinero»).\n\n**Autenticación.** Todo menos el login exige la cookie de sesión `sesion` (`HttpOnly`, `SameSite=Strict`).\nEn Swagger: ejecuta `POST /auth/login` con una cuenta de demostración y las demás peticiones usarán la cookie.\n\n**Seguridad.** El asistente (LLM) nunca mueve dinero: un Bizum solo se ejecuta tras confirmar el código OTP\nque llega al móvil simulado, por `POST /operaciones/{id}/confirmar`.\n\n**Errores.** Los fallos de negocio devuelven `{\"detail\": \"mensaje legible\"}` con 401, 404, 422, 429 o 503.",
     "version": "1.0.0"
   },
   "paths": {

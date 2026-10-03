@@ -745,7 +745,7 @@
   ],
   "tests": {
     "test_acceso.py": 8,
-    "test_agente.py": 23,
+    "test_agente.py": 29,
     "test_arquitectura.py": 69,
     "test_bizum_otp.py": 18,
     "test_chat.py": 9,
@@ -830,7 +830,7 @@
       },
       {
         "fichero": "backend/adaptadores/salida/llm/openai_compat.py",
-        "lineas": 169,
+        "lineas": 170,
         "doc": "Adaptador del puerto ProveedorLLM sobre cualquier API compatible con OpenAI (streaming)."
       },
       {
@@ -937,7 +937,7 @@
     "aplicacion": [
       {
         "fichero": "backend/aplicacion/agente.py",
-        "lineas": 253,
+        "lineas": 283,
         "doc": "Agente conversacional: bucle de tool calling con streaming y cadena de fallback."
       },
       {
@@ -997,7 +997,7 @@
       },
       {
         "fichero": "backend/aplicacion/herramientas/bizum.py",
-        "lineas": 55,
+        "lineas": 60,
         "doc": ""
       },
       {
@@ -1017,7 +1017,7 @@
       },
       {
         "fichero": "backend/aplicacion/herramientas/registro.py",
-        "lineas": 69,
+        "lineas": 72,
         "doc": "Registro de herramientas: añadir una herramienta = escribir un módulo y registrarla."
       },
       {
@@ -1027,7 +1027,7 @@
       },
       {
         "fichero": "backend/aplicacion/prompt.py",
-        "lineas": 83,
+        "lineas": 84,
         "doc": "System prompt del agente. Cada norma nace de un bug real (ver docs/INCIDENCIAS.md)."
       },
       {

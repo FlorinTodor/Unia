@@ -111,6 +111,8 @@ El agente no se fía del modelo (sobre todo del pequeño al que cae tras un lím
 - **Promesa sin acción:** si la respuesta termina en «voy a… un momento» sin llamar a ninguna herramienta, se le obliga a cumplirlo (un empujón por turno).
 - **Cifras o gráficos sin respaldo:** si no ha consultado nada y da importes que no aparecen en la conversación, o dice «aquí tienes el gráfico» sin haberlo generado, se le obliga a consultar antes de responder.
 - **Gráfico escrito como ```json:** se convierte en gráfico.
+- **Modelos sin cuota:** un modelo que agota su cuota del día se salta hasta que el proveedor la devuelve (o 15 min por defecto); si no queda ninguno, se dice a qué hora volver sin llamar a nadie.
+- **Respuesta fija de una herramienta:** `transferencia_bizum` devuelve el texto final («He preparado el Bizum…») y el turno acaba sin otra vuelta al modelo: instantáneo, sin gastar tokens y sin riesgo de que el modelo afirme que se envió.
 
 ## Errores y códigos HTTP
 
