@@ -1,0 +1,24 @@
+"""Protocolo SSE del chat: traduce los eventos de la aplicación a `data: {tipo, dato}`."""
+import json
+
+from ....aplicacion.eventos import Aviso, Delta, ErrorChat, EventoChat, Fin, Grafico, HerramientaEnUso
+
+
+def a_dict(evento: EventoChat) -> dict:
+    if isinstance(evento, Delta):
+        return {"tipo": "delta", "dato": evento.texto}
+    if isinstance(evento, HerramientaEnUso):
+        return {"tipo": "herramienta", "dato": evento.nombre, "etiqueta": evento.etiqueta}
+    if isinstance(evento, Aviso):
+        return {"tipo": "aviso", "dato": evento.texto}
+    if isinstance(evento, Grafico):
+        return {"tipo": "grafico", "dato": {"titulo": evento.titulo, "config": evento.config}}
+    if isinstance(evento, Fin):
+        return {"tipo": "fin", "dato": evento.texto}
+    if isinstance(evento, ErrorChat):
+        return {"tipo": "error", "dato": evento.mensaje}
+    raise TypeError(f"Evento desconocido: {evento!r}")
+
+
+def a_linea_sse(evento: EventoChat) -> str:
+    return f"data: {json.dumps(a_dict(evento), ensure_ascii=False)}\n\n"
