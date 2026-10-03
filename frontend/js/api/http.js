@@ -23,6 +23,17 @@ export function errorHttp(mensaje, estado, reintentarEn = null) {
   return error;
 }
 
+export const MENSAJE_SIN_CONEXION = "No se puede conectar con el servidor. Comprueba que está en marcha e inténtalo de nuevo.";
+
+/** `fetch` que, si no hay conexión (servidor parado o reiniciándose), falla con un mensaje comprensible en vez de «Failed to fetch». */
+export async function fetchSeguro(url, opciones) {
+  try {
+    return await fetch(url, opciones);
+  } catch {
+    throw errorHttp(MENSAJE_SIN_CONEXION, 0);
+  }
+}
+
 /** Convierte una respuesta de error en un `Error` legible: el servidor siempre manda `{detail}`. */
 export async function errorDeRespuesta(respuesta) {
   const datos = await respuesta.json().catch(() => ({}));
@@ -34,7 +45,7 @@ export async function errorDeRespuesta(respuesta) {
 const SIN_AVISO_DE_SESION = new Set(["/auth/login", "/auth/yo"]);
 
 export async function pedirJson(metodo, ruta, cuerpo) {
-  const respuesta = await fetch(ruta, {
+  const respuesta = await fetchSeguro(ruta, {
     method: metodo,
     headers: cuerpo ? { "Content-Type": "application/json" } : {},
     body: cuerpo ? JSON.stringify(cuerpo) : undefined,

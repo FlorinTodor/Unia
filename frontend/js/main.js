@@ -8,9 +8,12 @@ import { Conversacion } from "./aplicacion/conversacion.js";
 import { leerEnVozAlta, pararVoz } from "./dispositivos/altavoz.js";
 import { Microfono } from "./dispositivos/microfono.js";
 import { pintarEstado } from "./ui/cabecera.js";
+import { aplicarMarca } from "./marca.js";
 import { MedidorUso } from "./ui/medidor_uso.js";
 import { Movil } from "./ui/movil.js";
+import { PanelCuenta } from "./ui/panel_cuenta.js";
 import { iniciarPanelAjustes } from "./ui/panel_ajustes.js";
+import { Sugerencias } from "./ui/sugerencias.js";
 import { VistaChat } from "./ui/vista_chat.js";
 import { VistaLogin } from "./ui/vista_login.js";
 
@@ -20,7 +23,15 @@ const entrada = $("entrada");
 const btnMic = $("btn-mic");
 const ttsCheck = $("tts-check");
 
+aplicarMarca();
+
+// si existe frontend/assets/logo-unicaja.svg se muestra junto al nombre; si no, no pasa nada
+const logo = $("logo-entidad");
+logo.addEventListener("load", () => (logo.hidden = false));
+logo.src = "/static/assets/logo-unicaja.svg";
+
 const vista = new VistaChat($("chat"));
+const panelCuenta = new PanelCuenta();
 const movil = new Movil();
 const medidor = new MedidorUso();
 const conversacion = new Conversacion(
@@ -30,7 +41,10 @@ const conversacion = new Conversacion(
   },
   {
     alOperacion: () => movil.avisarMensajeNuevo(),
-    alResolverOperacion: () => movil.refrescar(),
+    alResolverOperacion: () => {
+      movil.refrescar();
+      panelCuenta.cargar(); // un Bizum confirmado cambia el saldo y los movimientos
+    },
     alUso: (uso) => medidor.pintar(uso),
   }
 );
@@ -45,10 +59,15 @@ async function actualizarEstado() {
   }
 }
 
+const sugerencias = new Sugerencias((texto) => enviar(texto));
+
 async function enviar(texto) {
   pararVoz();
   entrada.value = "";
+  sugerencias.deshabilitar(true);
   await conversacion.enviar(texto);
+  sugerencias.deshabilitar(false);
+  panelCuenta.cargar(); // el asistente puede haber cambiado datos (p. ej. tras una operación)
   entrada.focus();
 }
 
@@ -66,7 +85,6 @@ async function alternarGrabacion() {
   try {
     await microfono.empezar(async (audio) => {
       btnMic.classList.remove("grabando");
-      btnMic.textContent = "🎤";
       entrada.placeholder = "Transcribiendo…";
       try {
         const texto = await transcribir(audio);
@@ -81,7 +99,6 @@ async function alternarGrabacion() {
       }
     });
     btnMic.classList.add("grabando");
-    btnMic.textContent = "⏹";
   } catch {
     vista.mensajeError("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
   }
@@ -104,6 +121,8 @@ const login = new VistaLogin(async (usuario, contrasena) => {
 async function entrarComo(cliente) {
   login.ocultar();
   $("usuario-actual").textContent = cliente.nombre;
+  $("usuario-avatar").textContent = cliente.nombre.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  panelCuenta.cargar();
   document.body.classList.add("con-sesion");
   conversacion.reiniciar();
   movil.sembrar();
@@ -125,6 +144,7 @@ function salirDeLaSesion(mensaje = "") {
   vista.limpiar();
   movil.reiniciar();
   medidor.ocultar();
+  panelCuenta.limpiar();
   conversacion.reiniciar();
   document.body.classList.remove("con-sesion");
   $("usuario-actual").textContent = "";

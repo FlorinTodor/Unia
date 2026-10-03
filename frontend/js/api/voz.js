@@ -1,10 +1,10 @@
 /* Adaptador de voz del servidor: transcripción (Whisper) y síntesis (Piper). */
-import { comprobarSesion, errorDeRespuesta } from "./http.js";
+import { comprobarSesion, errorDeRespuesta, fetchSeguro } from "./http.js";
 
 export async function transcribir(audio) {
   const datos = new FormData();
   datos.append("audio", audio, "grabacion.webm");
-  const respuesta = await fetch("/stt", { method: "POST", body: datos });
+  const respuesta = await fetchSeguro("/stt", { method: "POST", body: datos });
   comprobarSesion(respuesta);
   if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
   return (await respuesta.json()).texto;

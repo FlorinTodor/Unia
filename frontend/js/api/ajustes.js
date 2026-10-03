@@ -1,4 +1,4 @@
-/* Adaptador del panel ⚙️ Ajustes: un método por endpoint de /ajustes. */
+/* Adaptador del panel de ajustes: un método por endpoint de /ajustes. */
 import { pedirJson } from "./http.js";
 
 export const leerAjustes = () => pedirJson("GET", "/ajustes");

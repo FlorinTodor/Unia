@@ -1,6 +1,7 @@
-/* Panel ⚙️ Ajustes: claves API por proveedor, modelos, IA local (Ollama) y voz. */
+/* Panel de ajustes: claves API por proveedor, modelos, IA local (Ollama) y voz. */
 import * as api from "../api/ajustes.js";
 import { guardarPreferencia, leerPreferencia } from "../dispositivos/preferencias.js";
+import { mostrarAviso } from "./avisos.js";
 import { escaparHtml } from "./dom.js";
 
 const ICONO_LLAVE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>`;
@@ -57,7 +58,7 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
     $("resumen-cadena").innerHTML = cadena.length
       ? `<b>${escaparHtml(cadena[0])}</b>` +
         (cadena.length > 1 ? `<br>Si falla o agota su cuota: ${cadena.slice(1).map(escaparHtml).join(" → ")}` : "")
-      : "⚠️ Ningún motor configurado. Añade una clave o activa la IA local.";
+      : "Ningún motor configurado. Añade una clave o activa la IA local.";
 
     if (!selProveedor.options.length) {
       for (const c of v.catalogo) selProveedor.add(new Option(c.nombre, c.id));
@@ -122,7 +123,7 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
       renderizar(await fn());
       alCambiar();
     } catch (e) {
-      alert(e.message);
+      mostrarAviso(e.message);
     }
   }
 
@@ -153,13 +154,13 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
       ponerMensaje(mensajeClave, "Comprobando clave…");
       try {
         const r = await api.probarClave(selProveedor.value, clave);
-        ponerMensaje(mensajeClave, (r.ok ? "✅ " : "❌ ") + r.mensaje, r.ok ? "ok" : "error");
+        ponerMensaje(mensajeClave, r.mensaje, r.ok ? "ok" : "error");
         if (r.ok && r.modelos.length) {
           rellenarSelect(selModelo, r.modelos, selModelo.value);
           rellenarSelect(selRespaldo, r.modelos, selRespaldo.value, { sinRespaldo: true });
         }
       } catch (e) {
-        ponerMensaje(mensajeClave, "❌ " + e.message, "error");
+        ponerMensaje(mensajeClave, e.message, "error");
       }
     }, 600);
   });
@@ -181,10 +182,10 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
       });
       renderizar(r);
       cambiarProveedorNuevo();
-      ponerMensaje(mensajeClave, "✅ " + r.mensaje, "ok");
+      ponerMensaje(mensajeClave, r.mensaje, "ok");
       alCambiar();
     } catch (e) {
-      ponerMensaje(mensajeClave, "❌ " + e.message, "error");
+      ponerMensaje(mensajeClave, e.message, "error");
     } finally {
       btnGuardarClave.disabled = false;
     }
@@ -203,11 +204,11 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
     estadoOllama.className = "texto-mini";
     try {
       const r = await api.estadoOllama(inputOllamaUrl.value);
-      estadoOllama.textContent = (r.ok ? "🟢 " : "🔴 ") + r.mensaje;
+      estadoOllama.textContent = r.mensaje;
       estadoOllama.className = `texto-mini ${r.ok ? "ok" : "error"}`;
       rellenarSelect(selOllama, r.modelos, vista.ollama.modelo);
     } catch {
-      estadoOllama.textContent = "🔴 No se pudo comprobar Ollama.";
+      estadoOllama.textContent = "No se pudo comprobar Ollama.";
     }
   }
 
@@ -231,7 +232,7 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
     try {
       renderizar(await api.leerAjustes());
     } catch (e) {
-      alert(e.message);
+      mostrarAviso(e.message);
       return;
     }
     if (!panel.open) panel.showModal();

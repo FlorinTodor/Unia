@@ -5,6 +5,7 @@
  * resumen de la operación), los errores se anuncian como alertas y hay una alternativa a teclear los 6 dígitos. */
 import { aprobarOperacion, cancelarOperacion, confirmarOperacion } from "../api/operaciones.js";
 import { formatearEuros } from "./formato.js";
+import { icono } from "./iconos.js";
 
 function fila(etiqueta, valor) {
   const dt = document.createElement("dt");
@@ -37,7 +38,7 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
 
   const titulo = document.createElement("h3");
   titulo.id = `op-titulo-${operacion.id}`;
-  titulo.textContent = "🔐 Confirma tu Bizum";
+  titulo.textContent = "Confirma tu Bizum";
 
   const datos = document.createElement("dl");
   datos.append(...fila("Para", operacion.destinatario), ...fila("Importe", importe));
@@ -82,9 +83,10 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
 
   // alternativa a teclear: aprobar con un gesto desde el móvil, como en las apps bancarias reales
   const huella = boton(
-    "button", "btn-huella", "👆 Aprobar con huella",
+    "button", "btn-huella", "",
     `Aprobar el Bizum de ${importe} con la huella o Face ID. Alternativa a escribir el código.`
   );
+  huella.append(icono("huella", 18), document.createTextNode(" Aprobar con huella"));
   const nota = document.createElement("p");
   nota.className = "texto-mini";
   nota.textContent = "Huella o Face ID simulados: sirve si no puedes leer o teclear el código.";
@@ -120,13 +122,13 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
     estado.textContent = "Comprobando…";
     try {
       const r = await peticion();
-      cerrar("confirmada", `✅ Bizum enviado: ${formatearEuros(r.importe)} a ${r.destinatario}. Nuevo saldo: ${formatearEuros(r.nuevo_saldo)}.`);
+      cerrar("confirmada", `Bizum enviado: ${formatearEuros(r.importe)} a ${r.destinatario}. Nuevo saldo: ${formatearEuros(r.nuevo_saldo)}.`);
     } catch (err) {
       // 404 no existe · 409 ya procesada o sin saldo · 410 caducada · 423 intentos agotados: no se puede reintentar
-      if ([404, 409, 410, 423].includes(err.estado)) return cerrar("error", `❌ ${err.message}`);
+      if ([404, 409, 410, 423].includes(err.estado)) return cerrar("error", err.message);
       estado.className = "mensaje-estado error";
       estado.setAttribute("role", "alert");
-      estado.textContent = `❌ ${err.message}`;
+      estado.textContent = err.message;
       for (const el of [confirmar, huella]) el.disabled = false;
       codigo.select();
     }
@@ -145,7 +147,7 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
     } catch (err) {
       estado.className = "mensaje-estado error";
       estado.setAttribute("role", "alert");
-      estado.textContent = `❌ ${err.message}`;
+      estado.textContent = err.message;
     }
   });
 

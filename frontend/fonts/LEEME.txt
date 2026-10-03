@@ -1,0 +1,6 @@
+Manrope (variable, pesos 200-800). Autor: Mikhail Sharanda. Licencia SIL Open Font License 1.1
+(https://openfontlicense.org). Fuente: https://fonts.google.com/specimen/Manrope
+
+Se sirve desde aquí, y no desde Google Fonts, por tres motivos: la política de seguridad del navegador no deja
+cargar estilos ni tipografías de otros dominios, no se envían datos de los clientes a terceros y la app
+funciona sin internet. Es la misma tipografía que usa unicajabanco.es.

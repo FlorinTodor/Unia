@@ -1,4 +1,5 @@
 /* Vista del chat: burbujas, estados de herramienta, avisos y tarjetas de gráfico. */
+import { MARCA } from "../marca.js";
 import { escaparHtml, renderizarMarkdown } from "./dom.js";
 import { crearTarjetaOperacion } from "./tarjeta_operacion.js";
 
@@ -17,6 +18,13 @@ export class VistaChat {
   crearBurbuja(rol) {
     const contenedor = document.createElement("div");
     contenedor.className = `mensaje ${rol}`;
+    if (rol === "asistente") {
+      const avatar = document.createElement("span");
+      avatar.className = "avatar-ia";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = MARCA.nombre[0].toLowerCase();
+      contenedor.appendChild(avatar);
+    }
     const burbuja = document.createElement("div");
     burbuja.className = "burbuja";
     contenedor.appendChild(burbuja);
@@ -37,26 +45,29 @@ export class VistaChat {
   }
 
   pintarTexto(burbuja, markdown, { error = false } = {}) {
-    burbuja.innerHTML = (error ? "⚠️ " : "") + renderizarMarkdown(markdown);
+    burbuja.classList.toggle("error", error);
+    burbuja.innerHTML = renderizarMarkdown(markdown);
     this.#scrollAlFinal();
   }
 
   mensajeError(texto) {
-    this.crearBurbuja("asistente").innerHTML = "⚠️ " + escaparHtml(texto);
+    const burbuja = this.crearBurbuja("asistente");
+    burbuja.classList.add("error");
+    burbuja.textContent = texto;
   }
 
-  /** Estado efímero «⚙️ Consultando saldo…». Devuelve el elemento para poder quitarlo. */
+  /** Estado efímero «Consultando saldo…» con un indicador de actividad. Devuelve el elemento para quitarlo. */
   estadoHerramienta(etiqueta) {
-    return this.#nota(`⚙️ ${etiqueta}`);
+    return this.#nota(etiqueta, "estado-herramienta trabajando");
   }
 
   aviso(texto) {
-    this.#nota(`ℹ️ ${texto}`);
+    this.#nota(texto, "estado-herramienta aviso");
   }
 
-  #nota(texto) {
+  #nota(texto, clase) {
     const div = document.createElement("div");
-    div.className = "estado-herramienta";
+    div.className = clase;
     div.textContent = texto;
     this.#chat.appendChild(div);
     this.#scrollAlFinal();
@@ -67,7 +78,7 @@ export class VistaChat {
     const tarjeta = document.createElement("div");
     tarjeta.className = "tarjeta-grafico";
     const h3 = document.createElement("h3");
-    h3.textContent = `📊 ${titulo}`;
+    h3.textContent = titulo;
     const lienzo = document.createElement("div");
     lienzo.className = "lienzo";
     const canvas = document.createElement("canvas");
@@ -76,7 +87,7 @@ export class VistaChat {
     this.#chat.appendChild(tarjeta);
 
     try {
-      config.options = Object.assign({ responsive: true, maintainAspectRatio: false }, config.options);
+      aplicarEstiloCorporativo(config);
       new Chart(canvas, config);
     } catch (e) {
       lienzo.textContent = "No se pudo renderizar el gráfico: " + e.message;
@@ -105,9 +116,10 @@ export class VistaChat {
   saludo(nombre) {
     this.#chat.replaceChildren();
     this.crearBurbuja("asistente").innerHTML =
-      `¡Hola, ${escaparHtml(nombre.split(' ')[0])}! 👋 Soy tu asistente financiero. Puedes <b>escribirme o hablarme</b>: ` +
-      "consulta tu saldo, tus gastos («¿cuánto gasté en restaurantes en junio?»), " +
-      "envía un Bizum o pídeme un gráfico de tus finanzas.";
+      `Hola, ${escaparHtml(nombre.split(" ")[0])}. Soy <b>${escaparHtml(MARCA.nombre)}</b>, tu ${escaparHtml(MARCA.descriptor)}. ` +
+      "Puedes <b>escribirme o hablarme</b>: pregúntame por tu saldo o tus gastos " +
+      "(«¿cuánto gasté en restaurantes en junio?»), envía un Bizum o pídeme un gráfico. " +
+      "Elige una pregunta de abajo para empezar.";
   }
 
   limpiar() {
@@ -116,5 +128,50 @@ export class VistaChat {
 
   alFinal() {
     this.#scrollAlFinal();
+  }
+}
+
+
+const TIPOS_DE_REPARTO = new Set(["pie", "doughnut", "polarArea"]);
+
+/** Colores y tipografía de Unicaja en cualquier gráfico, elija lo que elija el modelo. Los datos no se tocan. */
+function aplicarEstiloCorporativo(config) {
+  const estilo = getComputedStyle(document.documentElement);
+  const texto = estilo.getPropertyValue("--texto-suave").trim() || "#4b5a60";
+  const rejilla = estilo.getPropertyValue("--borde-suave").trim() || "#e5eef0";
+  Chart.defaults.font.family = '"Manrope", system-ui, sans-serif';
+  Chart.defaults.color = texto;
+
+  const oscuro = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  const paleta = oscuro ? MARCA.paletaOscura : MARCA.paleta;
+  const reparto = TIPOS_DE_REPARTO.has(config.type);
+  (config.data?.datasets ?? []).forEach((conjunto, i) => {
+    const color = paleta[i % paleta.length];
+    if (reparto) {
+      conjunto.backgroundColor = (conjunto.data ?? []).map((_, j) => paleta[j % paleta.length]);
+      conjunto.borderColor = estilo.getPropertyValue("--superficie").trim() || "#fff";
+    } else if (config.type === "line" || config.type === "radar") {
+      conjunto.borderColor = color;
+      conjunto.backgroundColor = `${color}33`; // el mismo color con transparencia para el área
+      conjunto.tension ??= 0.3;
+      conjunto.pointBackgroundColor = color;
+    } else {
+      conjunto.backgroundColor = color;
+      conjunto.borderRadius ??= 6;
+    }
+  });
+
+  config.options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    ...config.options,
+    plugins: {
+      ...config.options?.plugins,
+      legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, ...config.options?.plugins?.legend?.labels } },
+    },
+  };
+  if (!reparto && config.type !== "radar") {
+    const eje = (e) => ({ ...e, grid: { color: rejilla, ...e?.grid }, border: { display: false } });
+    config.options.scales = { ...config.options.scales, x: eje(config.options.scales?.x), y: eje(config.options.scales?.y) };
   }
 }
