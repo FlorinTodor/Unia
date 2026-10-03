@@ -1,0 +1,26 @@
+/* Adaptador de voz del servidor: transcripción (Whisper) y síntesis (Piper). */
+
+export async function transcribir(audio) {
+  const datos = new FormData();
+  datos.append("audio", audio, "grabacion.webm");
+  const respuesta = await fetch("/stt", { method: "POST", body: datos });
+  if (!respuesta.ok) {
+    const error = await respuesta.json().catch(() => ({}));
+    throw new Error(error.detail || "No se pudo transcribir el audio");
+  }
+  return (await respuesta.json()).texto;
+}
+
+/** Devuelve el audio WAV, o null si el servidor no puede sintetizar. */
+export async function sintetizar(texto) {
+  try {
+    const respuesta = await fetch("/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto }),
+    });
+    return respuesta.ok ? await respuesta.blob() : null;
+  } catch {
+    return null;
+  }
+}
