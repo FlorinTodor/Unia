@@ -116,3 +116,40 @@ fechas con mes en palabras, tuteo, importes con 2 decimales y €.
 
 **Motivo.** Cada norma nace de un fallo observado en pruebas reales (ver
 INCIDENCIAS.md). La calidad conversacional es un criterio puntuado (15).
+
+## 10. Arquitectura hexagonal (puertos y adaptadores) (3-oct)
+
+**Contexto.** El prototipo creció en módulos que mezclaban capas: `main.py` hacía HTTP,
+sesiones, voz y normalización de texto; `agente.py` importaba el SDK de OpenAI y sus
+excepciones; `herramientas.py` llamaba directamente a SQLite; las reglas de negocio (tope de
+Bizum) vivían junto al SQL. Con la seguridad (login, OTP, varios clientes) y la escalabilidad
+(de 5 a 40 herramientas, MCP) por delante, cada cambio tocaba media aplicación y no se podía
+probar nada sin red ni base de datos.
+
+**Decisión.** Tres capas con la dependencia siempre hacia dentro —dominio (reglas y entidades
+puras), aplicación (casos de uso, agente, registro de herramientas, **puertos**) y
+adaptadores (FastAPI, SQLite, OpenAI-compatible, Whisper, Piper)— más una raíz de composición
+(`composicion.py`) que es lo único que conoce las implementaciones. La regla se verifica con
+un test que analiza los imports (`tests/test_arquitectura.py`).
+
+**Motivo.**
+- *Seguridad*: «el LLM no autoriza, el servidor sí» pasa a ser estructural. El LLM solo llega
+  al banco a través de herramientas del registro → casos de uso → reglas del dominio. Añadir
+  OTP o aislamiento por cliente es tocar un caso de uso y un puerto, no el agente.
+- *Escalabilidad*: una herramienta nueva es un módulo en `aplicacion/herramientas/` y una
+  línea en la composición; el agente no cambia. Cada herramienta declara su `Riesgo`
+  (lectura/escritura), que es el gancho para exigir OTP.
+- *Pruebas*: 100 tests sin red ni cuota de Groq (LLM falso con guion, repositorios en
+  memoria, SQLite temporal, cliente HTTP de prueba). Antes solo existía la batería contra la
+  app en marcha.
+- *Intercambiabilidad*: cambiar de proveedor LLM, de BD o de voz es escribir un adaptador.
+  El agente ya no importa `openai`: los errores del SDK se traducen a errores del puerto
+  (`CuotaAgotada`, `ClaveInvalida`…) y el fallback se decide con ellos.
+
+**Coste.** Más ficheros y algo de código de traducción (mensajes de dominio ↔ API del
+proveedor, eventos ↔ SSE). Se acepta a cambio de poder defender cada pieza en la defensa.
+
+**Cambios de comportamiento deliberados.** Los errores inesperados del chat ya no devuelven
+`str(e)` al navegador (podía filtrar detalles internos): se registran en el log y el usuario
+ve un mensaje genérico. El evento SSE `herramienta` añade el campo `etiqueta`.
+

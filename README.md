@@ -97,14 +97,21 @@ ollama pull qwen3:4b   # (o qwen3:8b si tu GPU tiene VRAM suficiente)
 
 ## Estructura del proyecto
 
+Arquitectura hexagonal (detalle en `docs/ARQUITECTURA.md`): las dependencias apuntan siempre
+hacia dentro, y `tests/test_arquitectura.py` lo verifica.
+
 ```
 backend/
-  config.py        # selección de proveedor LLM (Groq/Cerebras/Ollama)
-  db.py            # SQLite + generador de movimientos ficticios
-  banco_api.py     # API bancaria ficticia (REST)
-  herramientas.py  # definición y ejecución de herramientas (function calling)
-  agente.py        # bucle del agente con streaming
-  main.py          # servidor: chat SSE, /stt (Whisper), estáticos
+  dominio/       # reglas y entidades puras (tope Bizum, SQL de solo lectura, cadena de fallback)
+  aplicacion/    # casos de uso, agente, registro de herramientas y puertos (interfaces)
+  adaptadores/
+    entrada/http/  # FastAPI: chat SSE, voz, API bancaria, ajustes
+    salida/        # SQLite, LLM OpenAI-compatible, Whisper, Piper, ajustes, sesiones
+  composicion.py # único sitio que conecta puertos con adaptadores
+  main.py        # uvicorn backend.main:app
 frontend/
-  index.html, app.js, styles.css   # chat, micrófono, TTS, Chart.js
+  index.html, styles.css
+  js/{api,aplicacion,dispositivos,ui}/   # módulos ES: chat SSE, voz, panel de ajustes, Chart.js
+tests/           # pruebas sin red: python -m pytest -q
+pruebas/         # demo + batería contra la app en marcha (usa el LLM real)
 ```
