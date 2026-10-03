@@ -112,6 +112,6 @@ backend/
 frontend/
   index.html, styles.css
   js/{api,aplicacion,dispositivos,ui}/   # módulos ES: chat SSE, voz, panel de ajustes, Chart.js
-tests/           # pruebas sin red: python -m pytest -q
+tests/           # ~200 pruebas sin red (incluye seguridad y aislamiento): python -m pytest -q
 pruebas/         # demo + batería contra la app en marcha (usa el LLM real)
 ```

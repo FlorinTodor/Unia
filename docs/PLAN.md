@@ -12,14 +12,14 @@ termina con pruebas en `pruebas/demo_pruebas.py` y una entrada en `DECISIONES.md
 | Experiencia conversacional cómoda y fluida | ✅ voz + texto, streaming | 5, 6 |
 | Que ejecute acciones reales | ✅ Bizum, consultas | 4 |
 | Refuerzo visual en pantalla (tarjetas, logos, datos) | 🟡 solo gráficos | 3 |
-| **Seguridad (simulada)** — «lo que ofrece un banco es seguridad» | ❌ | 1 |
+| **Seguridad (simulada)** — «lo que ofrece un banco es seguridad» | ✅ login, OTP, aislamiento | 1 |
 | **Escalabilidad justificada** — «¿y si son 40 funciones?» (MCP, A2A) | 🟡 sin argumentar | 2 |
-| BD ficticia propia (varios clientes) | 🟡 1 cliente | 1 |
+| BD ficticia propia (varios clientes) | ✅ 4 clientes | 1 |
 | Vídeo ≤ 5 min + memoria técnica concisa | ❌ | 7 |
 
 ---
 
-## Bloque 0 · Arreglos rápidos (½ día)
+## Bloque 0 · Arreglos rápidos (½ día) — ✅ hecho el 3-oct
 
 - **Fechas de la BD**: los datos acaban el 18-jul. Regenerar a propósito antes de grabar,
   o mejor: que el generador «desplace» las fechas al arrancar para que el último mes
@@ -32,7 +32,7 @@ termina con pruebas en `pruebas/demo_pruebas.py` y una entrada en `DECISIONES.md
 - Commitear el panel ⚙️ Ajustes y poner al día README/ARQUITECTURA (el principal ya es
   gpt-oss-120b, no Llama 3.3 70B).
 
-## Bloque 1 · Seguridad simulada (el hueco más grande)
+## Bloque 1 · Seguridad simulada (el hueco más grande) — ✅ hecho el 3-oct (ver DECISIONES nº 11)
 
 Idea central para la memoria: **el LLM nunca puede autorizar nada**. Decide *qué* quiere
 hacer; el servidor decide *si se puede*. Así, aunque el modelo alucine o le inyecten
@@ -107,7 +107,7 @@ Mejor pocas y bien hechas. Candidatas, por impacto en la demo:
 4. **Transferencia programada o periódica**.
 5. **Reserva vía A2A** (restaurante): la más vistosa y encaja con su visión, pero la más cara.
 
-## Bloque 5 · Accesibilidad (los colectivos que citó Unicaja)
+## Bloque 5 · Accesibilidad (los colectivos que citó Unicaja) — 🟡 parcial: OTP accesible hecho el 3-oct (DECISIONES nº 13); faltan manos libres, texto grande y alto contraste
 
 Público senior y personas con discapacidad (el ejemplo de la persona ciega y el Bizum):
 

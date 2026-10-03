@@ -1,6 +1,6 @@
 # Registro de incidencias y arreglos
 
-Problemas reales encontrados durante las pruebas (18 de julio de 2026), su causa raíz
+Problemas reales encontrados durante las pruebas (18 de julio y 3 de octubre de 2026), su causa raíz
 y dónde está el arreglo. Material directo para el apartado de robustez de la memoria.
 
 | # | Síntoma | Causa raíz | Arreglo | Dónde |
@@ -22,6 +22,26 @@ y dónde está el arreglo. Material directo para el apartado de robustez de la m
 | 15 | Movimiento con fecha futura (Spotify el 20 siendo día 18) | el generador añadía los recibos del mes en curso sin comprobar el rango | guard de rango en `add()` del generador | `db._generar_movimientos` |
 | 16 | Al comparar «julio y marzo» mezcló julio de 2025 y 2026; etiquetó Bizums recibidos como «Nómina»; narraba «Paso 1 / Paso 2»; «haz lo mismo» no replicaba el gráfico | ambigüedad de año sin regla; el modelo reetiquetaba resultados; estilo verboso de gpt-oss; petición relativa sin regla | normas: mes sin año = más reciente; etiquetas tal cual la BD; prohibido narrar pasos; «lo mismo con X» = replicar formato | prompt n.2, 6, 10 |
 | 17 | El Bizum de prueba «desapareció» | regeneración manual de la BD (semilla fija) para arreglar #15 | comportamiento esperado: la BD solo se regenera a propósito; documentado | `db.inicializar` |
+| 18 | La voz decía «veintiuno céntimos» | `num2words` devuelve «uno»/«veintiuno» y no concuerda con un nombre masculino | `_antes_de_masculino`: «un euro», «veintiún céntimos», «ciento un euros» | `aplicacion/texto.py` |
+| 19 | El gráfico a veces salía como un bloque JSON en la burbuja | el modelo escribía la config Chart.js en el texto en vez de llamar a `generar_grafico` | red de seguridad: un bloque ```` ```json ```` con `type` y `data` se convierte en evento `grafico` y se quita del texto | `casos_uso/graficos.extraer_grafico_del_texto`, `Agente` |
+| 20 | Los gastos por categoría trataban Bizum sin distinguir si era entrada o salida de dinero | la categoría Bizum mezcla envíos (importe < 0) y recibos (importe > 0) y no había norma sobre el signo | norma 11: gasto = importe < 0 e ingreso = importe > 0, también para Bizum; separar enviado y recibido. (Un primer arreglo excluía toda la categoría Bizum y estaba mal: ocultaba gastos reales) | prompt n.11 |
+| 21 | Saludo con sangría y párrafos con huecos enormes | `white-space: pre-wrap` en todas las burbujas respetaba los saltos del HTML renderizado | `pre-wrap` solo en los mensajes del usuario | `styles.css` |
+| 22 | Datos de la demo que acababan el 18 de julio | fechas fijas en la BD generada una vez | `desplazar_fechas()` al arrancar: el último movimiento pasa a ser de hoy | `sqlite/esquema.py` |
+| 23 | El aviso «cuota agotada» salía por un simple límite por minuto | cualquier 429 se trataba igual | `LimitePorMinuto` (hijo de `CuotaAgotada`) con mensaje propio: «se libera en unos segundos» | `openai_compat`, `agente.explicar_fallo` |
+| 24 | **Fuga entre clientes**: una CTE llamada `movimientos` (`WITH movimientos AS (SELECT * FROM main.movimientos) …`) devolvía datos de todos | el *authorizer* de SQLite identifica el origen de una lectura por su nombre, y una CTE con el nombre de mi vista temporal lo suplantaba | el aislamiento ya no filtra: la consulta se ejecuta en una base EN MEMORIA que solo contiene las filas del cliente, con authorizer que deniega ATTACH/PRAGMA/sqlite_master. Lo destapó la prueba de aislamiento escrita antes de dar la función por buena | `sqlite/consultor.py`, `tests/test_sqlite.py` |
+| 25 | GitGuardian marcó un valor de prueba (`sk-clave-larga-123`) como secreto | claves falsas con forma real en un test | valores de prueba sin prefijo de proveedor | `tests/` |
+
+| 26 | «Ingresos de 2025» solo tenía noviembre y diciembre; no se podía comparar con el año pasado | la BD generaba solo 365 días de historial | 2 años de historial (`ANOS_HISTORIAL`) y `PRAGMA user_version` para regenerar la base cuando cambia el esquema o el historial | `sqlite/esquema.py` |
+| 27 | El modelo daba la razón sin comprobar («tienes razón, el gráfico solo llegaba a octubre») cuando los meses futuros no existen | sin norma sobre meses sin datos ni sobre dar la razón por defecto | norma 12: los meses posteriores a hoy no tienen datos y se dice; verificar antes de dar la razón; comparar el mismo periodo y no inventar causas (el modelo atribuyó la diferencia entre 12 y 10 meses a un «incremento salarial») | prompt n.12 |
+| 28 | El modelo cerraba el turno con «Voy a generar el gráfico… Un momento…» y se quedaba parado | modelo pequeño (gpt-oss-20b, al que se cae tras un límite por minuto) que promete y no llama a la herramienta | `promete_sin_hacer` + un «empujón» interno por turno que le obliga a cumplir; el aviso interno no se arrastra a turnos siguientes | `Agente`, `texto.py`, `chat.compactar_historial` |
+| 29 | **Alucinación**: respondió «Bizum 96.770,00 €» y «gráfico comparativo» sin llamar a ninguna herramienta | el modelo pequeño inventó cifras y un gráfico inexistente | guarda del agente: si no ha ejecutado herramientas y da importes que no aparecen en la conversación, o dice «aquí tienes el gráfico» sin haberlo generado, se le obliga a consultar antes de responder | `Agente._correccion_necesaria`, `texto.importes_sin_respaldo` |
+| 30 | Cada turno con gráfico chocaba con el límite de 8.000 tokens/min y caía al modelo pequeño | ~2.300 tokens fijos por petición (prompt + herramientas) × 3 peticiones por turno | un límite por minuto de hasta 20 s se espera y se reintenta con el mismo modelo (se lee el «try again in Xs» de Groq) antes de bajar de modelo | `openai_compat._segundos_de_espera`, `Agente` |
+| 31 | Un Bizum rechazado devolvía 200 con `ok: false`; un fallo de Whisper acababa en un 500 de texto plano; un saldo insuficiente y un campo mal escrito eran el mismo 422 | no había mapa de errores: cada ruta decidía por su cuenta | jerarquía de errores con categoría + módulo único `errores_http.py` (400, 403, 404, 405, 409, 410, 413, 415, 422, 423, 429, 500, 502, 503, 504) y traducción de los errores de Whisper | `dominio/errores.py`, `entrada/http/errores_http.py` |
+| 32 | No se sabía cuántos tokens gastaba cada consulta ni había forma de frenar a un cliente | sin contabilidad ni límites: una consulta cuesta ~4.000 tokens (el prompt y las herramientas se reenvían en cada ronda) | uso real por llamada en `uso_ia`, límites por mensaje, ritmo, pregunta y día, recorte de historial y de resultados SQL, medidor en la interfaz | `Agente`, `ServicioChat`, `dominio/uso.py` |
+| 33 | Tras confirmar (o bloquear) un Bizum fuera del chat, el modelo seguía diciendo «el Bizum está pendiente de confirmación» e inventó consejos | el resultado de la operación se resuelve por un endpoint aparte y el modelo no se entera | `ServicioChat` recuerda las operaciones de cada sesión y, en el turno siguiente, añade un aviso `[auto]` con su resultado real (confirmada, cancelada, caducada o bloqueada); el aviso no se arrastra a turnos posteriores | `chat._avisos_de_operaciones`, prompt n.4 |
+| 34 | Con todos los modelos sin cuota salía «La IA local no responde: ¿está Ollama en marcha?» aunque el problema era la cuota | al agotarse la cadena se mostraba el motivo del último eslabón | mensaje claro: «todos los modelos han alcanzado su límite; espera un minuto» y la pista de Ollama solo si es lo último que falló | `Agente._mensaje_sin_modelos` |
+| 35 | «Te quedan 1 intentos» | plural fijo | concordancia de número | `dominio/operaciones.py` |
+| 36 | El OTP solo servía a quien podía leer un SMS en un panel y teclear 6 dígitos (barrera para ceguera y motricidad) | el flujo era puramente visual | aprobación con huella, foco y resumen para lectores de pantalla, SMS en voz alta cifra a cifra, aviso visual y vibración; ver DECISIONES nº 13 | `tarjeta_operacion.js`, `movil.js` |
 
 ## Lecciones generales
 
@@ -33,3 +53,10 @@ y dónde está el arreglo. Material directo para el apartado de robustez de la m
   el changelog de todos los malentendidos observados.
 - Las pruebas destructivas del usuario («muéstrame todo», preguntas trampa,
   peticiones dobles) destaparon más bugs que cualquier test sintético.
+- **Los modelos pequeños mienten con aplomo**: el que sirve de respaldo inventó cifras y un gráfico. No basta con
+  un prompt: hay guardas en código (cifras sin respaldo, promesas sin acción) y se prefiere esperar unos
+  segundos al modelo bueno antes que bajar de modelo.
+- **Probar el ataque antes de dar la defensa por buena**: el primer diseño del aislamiento por
+  cliente (vistas temporales + *authorizer*) parecía correcto y tenía un agujero (#24). Lo encontró un
+  test de «intento de leer datos ajenos», no una revisión. La defensa robusta fue quitar los datos de la
+  conexión, no filtrarlos.

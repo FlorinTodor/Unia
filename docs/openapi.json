@@ -1,0 +1,2675 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Habla con tu dinero",
+    "description": "API del asistente bancario conversacional «Habla con tu dinero» (Reto Unicaja · UGR).\n\n**Autenticación.** Todo menos el login exige la cookie de sesión `sesion` (`HttpOnly`, `SameSite=Strict`).\nEn Swagger: ejecuta `POST /auth/login` con una cuenta de demostración y las demás peticiones usarán la cookie.\n\n**Seguridad.** El asistente (LLM) nunca mueve dinero: un Bizum solo se ejecuta tras confirmar el código OTP\nque llega al móvil simulado, por `POST /operaciones/{id}/confirmar`.\n\n**Errores.** Los fallos de negocio devuelven `{\"detail\": \"mensaje legible\"}` con 401, 404, 422, 429 o 503.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Iniciar sesión",
+        "description": "Comprueba usuario y contraseña (scrypt) y deja una cookie `sesion` `HttpOnly` y `SameSite=Strict`. Tras 5 intentos fallidos el usuario queda bloqueado 5 minutos. El mensaje de error es el mismo para un usuario inexistente y para una contraseña errónea.",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Usuario o contraseña incorrectos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados intentos: cuenta bloqueada temporalmente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/yo": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Cliente de la sesión actual",
+        "operationId": "yo_auth_yo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Cerrar sesión",
+        "description": "Invalida la sesión en el servidor y borra la cookie. Es idempotente.",
+        "operationId": "logout_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/banco/saldo": {
+      "get": {
+        "tags": [
+          "banco"
+        ],
+        "summary": "Saldo de la cuenta",
+        "operationId": "obtener_saldo_api_banco_saldo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/banco/contactos": {
+      "get": {
+        "tags": [
+          "banco"
+        ],
+        "summary": "Contactos Bizum del cliente",
+        "operationId": "obtener_contactos_api_banco_contactos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContactoOut"
+                  },
+                  "type": "array",
+                  "title": "Response Obtener Contactos Api Banco Contactos Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/banco/bizum": {
+      "post": {
+        "tags": [
+          "banco"
+        ],
+        "summary": "Iniciar un Bizum (pendiente de código OTP)",
+        "description": "**No mueve dinero.** Valida el importe, el contacto, el saldo y el tope diario, crea una operación pendiente y envía un código de 6 dígitos al móvil simulado (`GET /movil/mensajes`). Para ejecutarla hay que llamar a `POST /operaciones/{id}/confirmar` con ese código.",
+        "operationId": "solicitar_bizum_api_banco_bizum_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionBizum"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BizumPendienteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Saldo insuficiente o tope diario superado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/banco/movimientos": {
+      "get": {
+        "tags": [
+          "banco"
+        ],
+        "summary": "Últimos movimientos",
+        "description": "Más recientes primero. Máximo 60 filas.",
+        "operationId": "obtener_movimientos_api_banco_movimientos_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 1,
+              "description": "Cuántos movimientos devolver.",
+              "default": 50,
+              "title": "Limite"
+            },
+            "description": "Cuántos movimientos devolver."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operaciones/{id_operacion}/confirmar": {
+      "post": {
+        "tags": [
+          "operaciones"
+        ],
+        "summary": "Confirmar una operación con su código OTP",
+        "description": "Si el código es correcto se ejecuta el Bizum. El código vale 5 minutos, 3 intentos y un solo uso. Una operación de otro cliente responde 404, como si no existiera.",
+        "operationId": "confirmar_operacion_operaciones__id_operacion__confirmar_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_operacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id Operacion"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionCodigo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComprobanteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El cuerpo no es un JSON válido o está vacío.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Choca con el estado actual (saldo, tope diario, operación ya procesada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "El código ha caducado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Demasiados intentos con el código: operación cancelada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operaciones/{id_operacion}/aprobar": {
+      "post": {
+        "tags": [
+          "operaciones"
+        ],
+        "summary": "Aprobar una operación con huella o Face ID (simulado)",
+        "description": "Alternativa **accesible** al código: quien no puede leer o teclear el OTP (ceguera, motricidad) aprueba con un gesto desde el móvil, como en las apps bancarias reales. Mismas condiciones que el código: la operación debe ser del cliente, estar pendiente y no haber caducado. Tampoco pasa nunca por el LLM.",
+        "operationId": "aprobar_operacion_operaciones__id_operacion__aprobar_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_operacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id Operacion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComprobanteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Choca con el estado actual (saldo, tope diario, operación ya procesada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "El código ha caducado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operaciones/{id_operacion}/cancelar": {
+      "post": {
+        "tags": [
+          "operaciones"
+        ],
+        "summary": "Cancelar una operación pendiente",
+        "operationId": "cancelar_operacion_operaciones__id_operacion__cancelar_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_operacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id Operacion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Choca con el estado actual (saldo, tope diario, operación ya procesada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/movil/mensajes": {
+      "get": {
+        "tags": [
+          "operaciones"
+        ],
+        "summary": "SMS del móvil simulado",
+        "description": "Los 10 más recientes. Es el único canal por el que viaja el código OTP.",
+        "operationId": "mensajes_movil_movil_mensajes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SmsOut"
+                  },
+                  "type": "array",
+                  "title": "Response Mensajes Movil Movil Mensajes Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/uso": {
+      "get": {
+        "tags": [
+          "uso"
+        ],
+        "summary": "Gasto de tokens de la IA",
+        "description": "Tokens gastados hoy por el cliente frente a su límite diario, los topes por pregunta y por minuto, y las últimas llamadas al modelo. Si el proveedor no informa del gasto, se estima (`estimado: true`).",
+        "operationId": "obtener_uso_api_uso_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes": {
+      "get": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Ajustes actuales",
+        "description": "Las claves API nunca salen del servidor: solo su máscara.",
+        "operationId": "leer_ajustes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes/probar": {
+      "post": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Validar una clave API",
+        "description": "Lista los modelos de la cuenta sin gastar cuota. No guarda nada.",
+        "operationId": "probar_ajustes_probar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionProbar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruebaClaveOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes/claves": {
+      "post": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Añadir o reemplazar una clave",
+        "description": "Solo se guarda si el proveedor la acepta. La primera clave se activa sola.",
+        "operationId": "anadir_clave_ajustes_claves_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionClave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesConMensajeOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes/claves/{proveedor}": {
+      "patch": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Cambiar los modelos de una clave",
+        "operationId": "cambiar_modelos_ajustes_claves__proveedor__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "proveedor",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proveedor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionModelos"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Borrar una clave",
+        "operationId": "borrar_clave_ajustes_claves__proveedor__delete",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "proveedor",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proveedor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ajustes/activar": {
+      "post": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Elegir el proveedor principal",
+        "operationId": "activar_ajustes_activar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionActivar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes/ollama": {
+      "put": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Configurar la IA local (Ollama)",
+        "operationId": "guardar_ollama_ajustes_ollama_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionOllama"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ajustes/ollama/estado": {
+      "get": {
+        "tags": [
+          "ajustes"
+        ],
+        "summary": "Comprobar si Ollama responde",
+        "description": "Comprueba si Ollama responde y qué modelos tiene descargados.",
+        "operationId": "estado_ollama_ajustes_ollama_estado_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoOllamaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Enviar un mensaje al asistente (SSE)",
+        "description": "Conversación con el asistente. La respuesta es un flujo **Server-Sent Events**: cada evento es\n`data: {\"tipo\": ..., \"dato\": ...}` seguido de una línea en blanco.\n\n| tipo | dato | significado |\n|---|---|---|\n| `delta` | texto | fragmento de la respuesta en streaming |\n| `herramienta` | nombre (+ `etiqueta`) | el agente está ejecutando una herramienta |\n| `aviso` | texto | nota informativa (p. ej. cambio de modelo) |\n| `grafico` | `{titulo, config}` | configuración Chart.js completa |\n| `operacion` | `{id, destinatario, importe, concepto, alertas, caduca}` | operación por confirmar con el código OTP (nunca incluye el código) |\n| `uso` | `{tokens_turno, tokens_hoy, limite_dia}` | gasto de tokens de la consulta y del día (llega justo antes de `fin`) |\n| `fin` | texto | respuesta completa |\n| `error` | texto | fallo legible para el usuario |\n\nAntes de abrir el flujo se comprueban los límites de uso y se responde con un error HTTP normal:\n**422** mensaje vacío, **413** mensaje demasiado largo, **429** demasiadas peticiones por minuto o cuota diaria de\ntokens agotada (con `Retry-After`).\n\nSwagger no puede mostrar el streaming: usa `curl -N` o la interfaz web.",
+        "operationId": "enviar_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Flujo de eventos SSE.",
+            "content": {
+              "text/event-stream": {
+                "example": "data: {\"tipo\": \"herramienta\", \"dato\": \"consultar_saldo\", \"etiqueta\": \"Consultando saldo…\"}\n\ndata: {\"tipo\": \"delta\", \"dato\": \"Tu saldo es \"}\n\ndata: {\"tipo\": \"fin\", \"dato\": \"Tu saldo es 4.200,00 €.\"}\n\n"
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El cuerpo no es un JSON válido o está vacío.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de uso superado. La cabecera `Retry-After` indica los segundos de espera.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El mensaje supera el máximo de caracteres.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/stt": {
+      "post": {
+        "tags": [
+          "voz"
+        ],
+        "summary": "Transcribir voz a texto (Whisper)",
+        "description": "Sube un audio (webm). Menos de ~0,5 s se rechaza para evitar alucinaciones de Whisper.",
+        "operationId": "stt_stt_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stt_stt_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscripcionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de uso superado. La cabecera `Retry-After` indica los segundos de espera.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falla el servicio externo (IA o voz).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "El servicio externo no responde a tiempo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El audio supera los 4 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "El fichero no es un audio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No hay clave con voz (Groq u OpenAI).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/tts": {
+      "post": {
+        "tags": [
+          "voz"
+        ],
+        "summary": "Sintetizar voz en el servidor (Piper)",
+        "description": "Devuelve audio WAV. Los números se convierten a palabras antes de sintetizar.",
+        "operationId": "tts_tts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionTTS"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Audio WAV.",
+            "content": {
+              "audio/wav": {}
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Falta el modelo de voz Piper.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/estado": {
+      "get": {
+        "tags": [
+          "estado"
+        ],
+        "summary": "Estado del asistente",
+        "description": "Modelo en uso, cadena de respaldo y disponibilidad de la voz.",
+        "operationId": "obtener_estado_estado_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AjustesConMensajeOut": {
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "configurado": {
+            "type": "boolean",
+            "title": "Configurado"
+          },
+          "claves": {
+            "items": {
+              "$ref": "#/components/schemas/ClaveOut"
+            },
+            "type": "array",
+            "title": "Claves"
+          },
+          "catalogo": {
+            "items": {
+              "$ref": "#/components/schemas/ProveedorOut"
+            },
+            "type": "array",
+            "title": "Catalogo"
+          },
+          "ollama": {
+            "$ref": "#/components/schemas/OllamaOut"
+          },
+          "voz_entrada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voz Entrada"
+          },
+          "proveedor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "cadena_fallback": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cadena Fallback"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activo",
+          "configurado",
+          "claves",
+          "catalogo",
+          "ollama",
+          "voz_entrada",
+          "proveedor",
+          "modelo",
+          "cadena_fallback",
+          "mensaje"
+        ],
+        "title": "AjustesConMensajeOut"
+      },
+      "AjustesOut": {
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "configurado": {
+            "type": "boolean",
+            "title": "Configurado"
+          },
+          "claves": {
+            "items": {
+              "$ref": "#/components/schemas/ClaveOut"
+            },
+            "type": "array",
+            "title": "Claves"
+          },
+          "catalogo": {
+            "items": {
+              "$ref": "#/components/schemas/ProveedorOut"
+            },
+            "type": "array",
+            "title": "Catalogo"
+          },
+          "ollama": {
+            "$ref": "#/components/schemas/OllamaOut"
+          },
+          "voz_entrada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voz Entrada"
+          },
+          "proveedor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "cadena_fallback": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cadena Fallback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activo",
+          "configurado",
+          "claves",
+          "catalogo",
+          "ollama",
+          "voz_entrada",
+          "proveedor",
+          "modelo",
+          "cadena_fallback"
+        ],
+        "title": "AjustesOut"
+      },
+      "BizumPendienteOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado",
+            "description": "Siempre `pendiente_de_confirmacion`: el dinero NO se ha movido."
+          },
+          "operacion": {
+            "$ref": "#/components/schemas/OperacionOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "operacion"
+        ],
+        "title": "BizumPendienteOut"
+      },
+      "Body_stt_stt_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Audio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio"
+        ],
+        "title": "Body_stt_stt_post"
+      },
+      "ClaveOut": {
+        "properties": {
+          "proveedor": {
+            "type": "string",
+            "title": "Proveedor"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "mascara": {
+            "type": "string",
+            "title": "Mascara",
+            "description": "La clave API nunca sale del servidor; solo sus últimos 4 caracteres."
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "modelo_respaldo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo Respaldo"
+          },
+          "modelos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modelos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proveedor",
+          "nombre",
+          "mascara",
+          "modelo",
+          "modelo_respaldo",
+          "modelos"
+        ],
+        "title": "ClaveOut"
+      },
+      "ClienteOut": {
+        "properties": {
+          "usuario": {
+            "type": "string",
+            "title": "Usuario"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario",
+          "nombre"
+        ],
+        "title": "ClienteOut"
+      },
+      "ComprobanteOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "destinatario": {
+            "type": "string",
+            "title": "Destinatario"
+          },
+          "telefono": {
+            "type": "string",
+            "title": "Telefono"
+          },
+          "importe": {
+            "type": "number",
+            "title": "Importe"
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto"
+          },
+          "nuevo_saldo": {
+            "type": "number",
+            "title": "Nuevo Saldo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "destinatario",
+          "telefono",
+          "importe",
+          "concepto",
+          "nuevo_saldo"
+        ],
+        "title": "ComprobanteOut"
+      },
+      "ConsultaOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "columnas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columnas"
+          },
+          "filas": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Filas",
+            "description": "Cada fila es una lista de valores en el orden de `columnas`."
+          },
+          "num_filas": {
+            "type": "integer",
+            "title": "Num Filas"
+          },
+          "truncado": {
+            "type": "boolean",
+            "title": "Truncado",
+            "description": "True si hay más filas que el tope de 60."
+          }
+        },
+        "type": "object",
+        "required": [
+          "columnas",
+          "filas",
+          "num_filas",
+          "truncado"
+        ],
+        "title": "ConsultaOut"
+      },
+      "ContactoOut": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "telefono": {
+            "type": "string",
+            "title": "Telefono"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "telefono"
+        ],
+        "title": "ContactoOut"
+      },
+      "CuentaOut": {
+        "properties": {
+          "iban": {
+            "type": "string",
+            "title": "Iban"
+          },
+          "titular": {
+            "type": "string",
+            "title": "Titular"
+          },
+          "saldo": {
+            "type": "number",
+            "title": "Saldo",
+            "description": "Saldo en euros."
+          }
+        },
+        "type": "object",
+        "required": [
+          "iban",
+          "titular",
+          "saldo"
+        ],
+        "title": "CuentaOut"
+      },
+      "ErrorOut": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Motivo del error, ya redactado para mostrarlo al usuario."
+          },
+          "errores": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errores",
+            "description": "Solo en 400/422: `[{campo, motivo}]`."
+          },
+          "contactos_disponibles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contactos Disponibles",
+            "description": "Solo si un contacto Bizum no existe (404)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorOut"
+      },
+      "EstadoOllamaOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "modelos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modelos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "mensaje",
+          "modelos"
+        ],
+        "title": "EstadoOllamaOut"
+      },
+      "EstadoOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "proveedor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "cadena_fallback": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cadena Fallback",
+            "description": "Modelos en orden de uso si el principal falla."
+          },
+          "voz_disponible": {
+            "type": "boolean",
+            "title": "Voz Disponible",
+            "description": "¿Hay una clave con Whisper para transcribir voz?"
+          },
+          "tts_servidor": {
+            "type": "boolean",
+            "title": "Tts Servidor",
+            "description": "¿Está instalada la voz neuronal Piper?"
+          },
+          "configurado": {
+            "type": "boolean",
+            "title": "Configurado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proveedor",
+          "modelo",
+          "cadena_fallback",
+          "voz_disponible",
+          "tts_servidor",
+          "configurado"
+        ],
+        "title": "EstadoOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OkOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "OkOut"
+      },
+      "OllamaOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "modelo": {
+            "type": "string",
+            "title": "Modelo"
+          },
+          "fallback_local": {
+            "type": "boolean",
+            "title": "Fallback Local"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "modelo",
+          "fallback_local"
+        ],
+        "title": "OllamaOut"
+      },
+      "OperacionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "destinatario": {
+            "type": "string",
+            "title": "Destinatario"
+          },
+          "importe": {
+            "type": "number",
+            "title": "Importe"
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto"
+          },
+          "alertas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alertas",
+            "description": "Avisos para el cliente (destinatario nuevo, importe alto...)."
+          },
+          "caduca": {
+            "type": "string",
+            "title": "Caduca",
+            "description": "Instante (ISO 8601) hasta el que vale el código."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "destinatario",
+          "importe",
+          "concepto",
+          "alertas",
+          "caduca"
+        ],
+        "title": "OperacionOut"
+      },
+      "PeticionActivar": {
+        "properties": {
+          "proveedor": {
+            "type": "string",
+            "title": "Proveedor",
+            "description": "Id de un proveedor con clave, o `ollama`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "proveedor"
+        ],
+        "title": "PeticionActivar"
+      },
+      "PeticionBizum": {
+        "properties": {
+          "destinatario": {
+            "type": "string",
+            "title": "Destinatario",
+            "description": "Nombre (o parte) o teléfono de un contacto del cliente."
+          },
+          "importe": {
+            "type": "number",
+            "title": "Importe",
+            "description": "Euros. Máximo 1.000 por operación y 1.500 al día."
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "destinatario",
+          "importe"
+        ],
+        "title": "PeticionBizum",
+        "examples": [
+          {
+            "concepto": "cena",
+            "destinatario": "María",
+            "importe": 25
+          }
+        ]
+      },
+      "PeticionChat": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "Identificador de la conversación (lo elige el cliente). Es privado de cada usuario."
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "mensaje"
+        ],
+        "title": "PeticionChat",
+        "examples": [
+          {
+            "mensaje": "¿Cuánto gasté en restaurantes en junio?",
+            "session_id": "demo-1"
+          }
+        ]
+      },
+      "PeticionClave": {
+        "properties": {
+          "proveedor": {
+            "type": "string",
+            "title": "Proveedor"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "modelo_respaldo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo Respaldo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proveedor",
+          "api_key"
+        ],
+        "title": "PeticionClave"
+      },
+      "PeticionCodigo": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo",
+            "description": "Código de 6 dígitos recibido en el móvil simulado."
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo"
+        ],
+        "title": "PeticionCodigo",
+        "examples": [
+          {
+            "codigo": "123456"
+          }
+        ]
+      },
+      "PeticionLogin": {
+        "properties": {
+          "usuario": {
+            "type": "string",
+            "title": "Usuario",
+            "description": "Usuario (no distingue mayúsculas)."
+          },
+          "contrasena": {
+            "type": "string",
+            "title": "Contrasena"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario",
+          "contrasena"
+        ],
+        "title": "PeticionLogin",
+        "examples": [
+          {
+            "contrasena": "alex2026",
+            "usuario": "alex"
+          }
+        ]
+      },
+      "PeticionModelos": {
+        "properties": {
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "modelo_respaldo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo Respaldo",
+            "description": "Cadena vacía = sin modelo de respaldo."
+          }
+        },
+        "type": "object",
+        "title": "PeticionModelos"
+      },
+      "PeticionOllama": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "fallback_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Local"
+          }
+        },
+        "type": "object",
+        "title": "PeticionOllama"
+      },
+      "PeticionProbar": {
+        "properties": {
+          "proveedor": {
+            "type": "string",
+            "title": "Proveedor"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proveedor",
+          "api_key"
+        ],
+        "title": "PeticionProbar"
+      },
+      "PeticionTTS": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Hasta 1.200 caracteres; los números se leen como palabras."
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "PeticionTTS"
+      },
+      "ProveedorOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "url_claves": {
+            "type": "string",
+            "title": "Url Claves"
+          },
+          "prefijo": {
+            "type": "string",
+            "title": "Prefijo"
+          },
+          "nota": {
+            "type": "string",
+            "title": "Nota"
+          },
+          "modelo": {
+            "type": "string",
+            "title": "Modelo"
+          },
+          "modelo_respaldo": {
+            "type": "string",
+            "title": "Modelo Respaldo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "url_claves",
+          "prefijo",
+          "nota",
+          "modelo",
+          "modelo_respaldo"
+        ],
+        "title": "ProveedorOut"
+      },
+      "PruebaClaveOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "modelos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modelos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "mensaje",
+          "modelos"
+        ],
+        "title": "PruebaClaveOut"
+      },
+      "SmsOut": {
+        "properties": {
+          "remitente": {
+            "type": "string",
+            "title": "Remitente"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Incluye el código de confirmación. Solo se entrega por este canal."
+          },
+          "hora": {
+            "type": "string",
+            "title": "Hora"
+          }
+        },
+        "type": "object",
+        "required": [
+          "remitente",
+          "texto",
+          "hora"
+        ],
+        "title": "SmsOut"
+      },
+      "TranscripcionOut": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "TranscripcionOut"
+      },
+      "UsoOut": {
+        "properties": {
+          "tokens_hoy": {
+            "type": "integer",
+            "title": "Tokens Hoy"
+          },
+          "limite_dia": {
+            "type": "integer",
+            "title": "Limite Dia",
+            "description": "Tokens que puede gastar el cliente al día. Se renueva a medianoche."
+          },
+          "restante": {
+            "type": "integer",
+            "title": "Restante"
+          },
+          "porcentaje": {
+            "type": "number",
+            "title": "Porcentaje"
+          },
+          "por_turno": {
+            "type": "integer",
+            "title": "Por Turno",
+            "description": "Tope de tokens de una sola pregunta (con todas sus rondas)."
+          },
+          "peticiones_por_minuto": {
+            "type": "integer",
+            "title": "Peticiones Por Minuto"
+          },
+          "max_caracteres_mensaje": {
+            "type": "integer",
+            "title": "Max Caracteres Mensaje"
+          },
+          "ultimos": {
+            "items": {
+              "$ref": "#/components/schemas/UsoReciente"
+            },
+            "type": "array",
+            "title": "Ultimos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tokens_hoy",
+          "limite_dia",
+          "restante",
+          "porcentaje",
+          "por_turno",
+          "peticiones_por_minuto",
+          "max_caracteres_mensaje",
+          "ultimos"
+        ],
+        "title": "UsoOut"
+      },
+      "UsoReciente": {
+        "properties": {
+          "momento": {
+            "type": "string",
+            "title": "Momento"
+          },
+          "modelo": {
+            "type": "string",
+            "title": "Modelo"
+          },
+          "entrada": {
+            "type": "integer",
+            "title": "Entrada",
+            "description": "Tokens enviados al modelo."
+          },
+          "salida": {
+            "type": "integer",
+            "title": "Salida",
+            "description": "Tokens generados por el modelo (incluye su razonamiento)."
+          },
+          "estimado": {
+            "type": "boolean",
+            "title": "Estimado",
+            "description": "True si el proveedor no informó y el dato es una aproximación."
+          }
+        },
+        "type": "object",
+        "required": [
+          "momento",
+          "modelo",
+          "entrada",
+          "salida",
+          "estimado"
+        ],
+        "title": "UsoReciente"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "description": "Sesión iniciada con `POST /auth/login` (la pone el servidor).",
+        "in": "cookie",
+        "name": "sesion"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Login con contraseña, sesión por cookie y bloqueo temporal tras intentos fallidos."
+    },
+    {
+      "name": "chat",
+      "description": "Conversación con el asistente (streaming SSE)."
+    },
+    {
+      "name": "voz",
+      "description": "Transcripción (Whisper) y síntesis (Piper)."
+    },
+    {
+      "name": "banco",
+      "description": "API bancaria ficticia: saldo, contactos, movimientos e inicio de Bizum."
+    },
+    {
+      "name": "operaciones",
+      "description": "Confirmación de operaciones con código OTP y móvil simulado."
+    },
+    {
+      "name": "ajustes",
+      "description": "Claves API, modelos y IA local. Las claves nunca salen del servidor."
+    },
+    {
+      "name": "estado",
+      "description": "Modelo en uso y disponibilidad de la voz."
+    },
+    {
+      "name": "uso",
+      "description": "Gasto de tokens de la IA frente a los límites por cliente."
+    }
+  ]
+}
