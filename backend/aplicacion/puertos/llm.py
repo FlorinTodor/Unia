@@ -60,15 +60,15 @@ class ModeloNoEncontrado(ProveedorNoUtilizable):
 
 
 class CuotaAgotada(ProveedorNoUtilizable):
-    pass
+    """El modelo se quedó sin cuota. `espera` son los segundos que indica el proveedor hasta que vuelva, si los da."""
+
+    def __init__(self, mensaje: str, espera: float | None = None):
+        super().__init__(mensaje)
+        self.espera = espera
 
 
 class LimitePorMinuto(CuotaAgotada):
     """Se superó el límite de tokens/peticiones por minuto: pasa solo en unos segundos."""
-
-    def __init__(self, mensaje: str, espera: float | None = None):
-        super().__init__(mensaje)
-        self.espera = espera  # segundos que indica el proveedor, si los indica
 
 
 class ProveedorInaccesible(ProveedorNoUtilizable):

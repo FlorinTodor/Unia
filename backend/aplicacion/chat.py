@@ -91,9 +91,10 @@ class ServicioChat:
         espera = self._limitador.permitir(cliente.id, self._reloj.ahora())
         if espera:
             raise DemasiadasPeticiones(f"Vas demasiado rápido. Espera {espera} s y vuelve a escribir.", reintentar_en=espera)
-        comprobar_cuota_diaria(
-            self._registro_uso.tokens_del_dia(cliente.id, self._reloj.hoy()), self._presupuesto, self._reloj.ahora()
-        )
+        if not self._agente.tiene_respaldo_local():  # con IA local el límite de la nube no bloquea: el agente la usa
+            comprobar_cuota_diaria(
+                self._registro_uso.tokens_del_dia(cliente.id, self._reloj.hoy()), self._presupuesto, self._reloj.ahora()
+            )
         return self._turno(cliente, id_sesion, texto)
 
     def _turno(self, cliente: Cliente, id_sesion: str, texto: str) -> Iterator[EventoChat]:

@@ -123,7 +123,7 @@ def test_el_modelo_recibe_el_resultado_de_la_operacion_en_el_turno_siguiente():
     cuentas, reloj, operaciones = CuentaEnMemoria(), RelojFijo(), OperacionesEnMemoria()
     solicitar = SolicitarBizum(cuentas, ContactosEnMemoria(), operaciones, CodigosFijos(), MovilFalso(), reloj, AuditoriaEnMemoria())
     llm = LLMGuionizado(
-        llamada("transferencia_bizum", json.dumps({"destinatario": "María", "importe": 10})), texto("Confirma en la tarjeta"),
+        llamada("transferencia_bizum", json.dumps({"destinatario": "María", "importe": 10})),  # el turno acaba solo: no hay 2.ª llamada
         texto("Está cancelada"),
         texto("Ya sin avisos"),
     )
@@ -133,8 +133,8 @@ def test_el_modelo_recibe_el_resultado_de_la_operacion_en_el_turno_siguiente():
 
     list(chat.enviar(ALEX, "s", "envía 10 a María"))
     list(chat.enviar(ALEX, "s", "¿y ahora?"))  # el cliente aún no ha hecho nada: no hay aviso
-    assert not any(m.rol == "user" and "[auto]" in (m.contenido or "") for m in llm.llamadas[2][1])
+    assert not any(m.rol == "user" and "[auto]" in (m.contenido or "") for m in llm.llamadas[1][1])
     operaciones.obtener("op1").estado = EstadoOperacion.BLOQUEADA  # el cliente falló el código tres veces fuera del chat
     list(chat.enviar(ALEX, "s", "pero no ha funcionado"))
-    avisos = [m.contenido for m in llm.llamadas[3][1] if m.rol == "user" and "[auto]" in (m.contenido or "")]
+    avisos = [m.contenido for m in llm.llamadas[2][1] if m.rol == "user" and "[auto]" in (m.contenido or "")]
     assert avisos == ["[auto] Resultado del Bizum de 10,00 € a María López: BLOQUEADA por demasiados códigos erróneos: no se ha enviado nada."]

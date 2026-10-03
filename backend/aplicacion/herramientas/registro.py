@@ -22,6 +22,9 @@ class Riesgo(str, Enum):
 class ResultadoHerramienta:
     datos: dict  # lo que se le devuelve al LLM
     eventos: tuple[EventoChat, ...] = field(default_factory=tuple)  # lo que se muestra al usuario
+    # Si la herramienta ya sabe qué decir (p. ej. «he preparado el Bizum, confírmalo en la tarjeta»), el turno termina con
+    # este texto y NO se vuelve a llamar al modelo: es instantáneo, no gasta tokens y no puede desfasarse ni inventar nada.
+    respuesta_final: str | None = None
 
 
 @dataclass(frozen=True)

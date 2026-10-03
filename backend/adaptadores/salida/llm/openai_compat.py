@@ -60,15 +60,16 @@ def _uso_informado(chunk) -> Uso | None:
     return Uso(int(uso.prompt_tokens or 0), int(uso.completion_tokens or 0))
 
 
-_RE_ESPERA = re.compile(r"try again in (\d+(?:\.\d+)?)\s*(ms|s)\b", re.IGNORECASE)
+_RE_ESPERA = re.compile(r"try again in ((?:\d+(?:\.\d+)?(?:ms|h|m|s))+)", re.IGNORECASE)
+_UNIDADES = {"ms": 0.001, "s": 1, "m": 60, "h": 3600}
 
 
 def _segundos_de_espera(texto_error: str) -> float | None:
-    """Groq dice «Please try again in 4.2s»: se aprovecha para esperar justo lo necesario."""
+    """Groq dice «Please try again in 4.2s» o, si es la cuota del día, «…in 17m3.4s»: se aprovecha para esperar justo lo necesario."""
     m = _RE_ESPERA.search(texto_error)
     if not m:
         return None
-    return float(m.group(1)) / (1000 if m.group(2).lower() == "ms" else 1)
+    return sum(float(n) * _UNIDADES[u.lower()] for n, u in re.findall(r"(\d+(?:\.\d+)?)(ms|h|m|s)", m.group(1)))
 
 
 def _a_api(mensaje: Mensaje) -> dict:
@@ -151,7 +152,7 @@ class ProveedorLLMOpenAI:
             texto_error = str(e).lower()
             if "per minute" in texto_error or "tpm" in texto_error or "rpm" in texto_error:
                 raise LimitePorMinuto(str(e), _segundos_de_espera(str(e))) from e
-            raise CuotaAgotada(str(e)) from e
+            raise CuotaAgotada(str(e), _segundos_de_espera(str(e))) from e
         except (APIConnectionError, InternalServerError) as e:
             raise ProveedorInaccesible(str(e)) from e
         except APIError as e:

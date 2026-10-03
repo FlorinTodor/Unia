@@ -71,7 +71,9 @@ def test_fallback_a_siguiente_eslabon_con_aviso():
     ajustes = AjustesEnMemoria(Ajustes(activo="groq", claves={"groq": ConfigClave("k", "grande", "pequeño")}, fallback_local=False))
     llm = LLMGuionizado(CuotaAgotada("429"), texto("desde el respaldo"))
     eventos, _ = correr(crear(llm, ajustes))
-    assert eventos[0] == Aviso("grande ha agotado su cuota gratuita por ahora. Cambiando a pequeño (Groq).")
+    assert eventos[0] == Aviso(
+        "grande ha agotado su cuota gratuita por ahora. No lo intentaré de nuevo hasta las 12:15. Cambiando a pequeño (Groq)."
+    )
     assert eventos[-1] == Fin("desde el respaldo")
     assert [ll[0].modelo for ll in llm.llamadas] == ["grande", "pequeño"]
 
@@ -231,3 +233,77 @@ def test_si_fallan_todos_los_modelos_el_mensaje_es_claro_y_sugiere_encender_olla
     with pytest.raises(ErrorNoDisponible) as e:
         correr(crear(llm, ajustes))
     assert "todos los modelos de IA han alcanzado su límite" in e.value.mensaje and "ollama serve" in e.value.mensaje
+
+
+# ------------------------------------------------------------------ modelos sin cuota y respuestas fijas de herramientas
+
+def _ajustes_dos_modelos():
+    return AjustesEnMemoria(Ajustes(activo="groq", claves={"groq": ConfigClave("k", "grande", "pequeño")}, fallback_local=False))
+
+
+def test_un_modelo_sin_cuota_diaria_no_se_vuelve_a_intentar_hasta_que_vuelva():
+    from datetime import datetime
+
+    from tests.fakes import RelojFijo, UsoEnMemoria
+
+    reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    llm = LLMGuionizado(CuotaAgotada("sin cuota", espera=900), texto("uno"), texto("dos"), texto("tres"))
+    agente = crear_agente(llm, RegistroHerramientas([]), _ajustes_dos_modelos(), reloj=reloj)
+    for turno in ("a", "b"):
+        list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario(turno)], ALEX))
+    # el segundo turno ni siquiera prueba «grande»: no pierde tiempo con un modelo que se sabe agotado
+    assert [ll[0].modelo for ll in llm.llamadas] == ["grande", "pequeño", "pequeño"]
+    reloj.avanzar(16)  # 16 min después, pasados los 15 que indicó el proveedor
+    list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("c")], ALEX))
+    assert [ll[0].modelo for ll in llm.llamadas][-1] == "grande"
+
+
+def test_un_limite_por_minuto_no_marca_al_modelo_como_agotado():
+    llm = LLMGuionizado(LimitePorMinuto("TPM", espera=45), texto("ok"), texto("ok2"))
+    agente = crear_agente(llm, RegistroHerramientas([]), _ajustes_dos_modelos())
+    list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("a")], ALEX))
+    list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("b")], ALEX))
+    assert [ll[0].modelo for ll in llm.llamadas] == ["grande", "pequeño", "grande"]  # «grande» se prueba otra vez
+
+
+def test_si_todos_estan_sin_cuota_se_dice_cuando_volver_sin_llamar_al_modelo():
+    llm = LLMGuionizado(CuotaAgotada("x", espera=600), CuotaAgotada("y", espera=1800))
+    agente = crear_agente(llm, RegistroHerramientas([]), _ajustes_dos_modelos())
+    with pytest.raises(ErrorNoDisponible):
+        list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("a")], ALEX))
+    with pytest.raises(ErrorNoDisponible, match="Vuelve a probar sobre las 12:10"):
+        list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("b")], ALEX))
+    assert len(llm.llamadas) == 2  # el segundo turno no gastó ninguna llamada
+
+
+def test_ollama_sin_el_modelo_descargado_dice_que_hay_que_hacer_pull():
+    from backend.aplicacion.puertos.llm import ModeloNoEncontrado
+
+    ajustes = AjustesEnMemoria(Ajustes(activo="groq", claves={"groq": ConfigClave("k", "a", None)}, ollama_modelo="qwen3:8b", fallback_local=True))
+    llm = LLMGuionizado(CuotaAgotada("x"), ModeloNoEncontrado("no existe"))
+    with pytest.raises(ErrorNoDisponible, match="ollama pull qwen3:8b"):
+        correr(crear(llm, ajustes))
+
+
+def test_una_herramienta_con_respuesta_final_termina_el_turno_sin_otra_vuelta_al_modelo():
+    from backend.aplicacion.herramientas.registro import Herramienta, ResultadoHerramienta
+
+    herramienta = Herramienta(
+        EsquemaHerramienta("fija", "x", {}), lambda _a, _c: ResultadoHerramienta({"ok": True}, respuesta_final="Hecho al instante."), "…"
+    )
+    llm = LLMGuionizado(llamada("fija"), texto("no debería llamarse"))
+    eventos, mensajes = correr(crear(llm, extra=[herramienta]))
+    assert eventos[-1] == Fin("Hecho al instante.") and len(llm.llamadas) == 1
+    assert mensajes[-1] == Mensaje.asistente("Hecho al instante.")
+    # si el modelo ya había escrito algo antes de llamar a la herramienta, se conserva
+    llm = LLMGuionizado([*texto("Voy con ello."), *llamada("fija")])
+    eventos, _ = correr(crear(llm, extra=[herramienta]))
+    assert eventos[-1] == Fin("Voy con ello.\n\nHecho al instante.")
+
+
+def test_se_lee_la_espera_de_horas_minutos_y_segundos_que_indica_groq():
+    from backend.adaptadores.salida.llm.openai_compat import _segundos_de_espera
+
+    assert _segundos_de_espera("Please try again in 17m3.4s. Need more tokens?") == pytest.approx(1023.4)
+    assert _segundos_de_espera("try again in 1h2m") == 3720
+    assert _segundos_de_espera("try again in 2h0m0s") == 7200

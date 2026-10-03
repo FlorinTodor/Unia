@@ -7,6 +7,7 @@ import json
 import math
 import time
 from collections.abc import Callable, Iterator
+from datetime import datetime, timedelta
 
 from ..dominio.errores import ErrorNoDisponible
 from ..dominio.modelos import Cliente, LlamadaHerramienta, Mensaje
@@ -35,7 +36,9 @@ from .puertos.uso import RegistroUso
 
 MAX_RONDAS = 6
 MAX_REINTENTOS_GENERACION = 2
-MAX_ESPERA_SEGUNDOS = 20  # un límite por minuto que se libera antes se espera, en vez de bajar a un modelo peor
+MAX_ESPERA_SEGUNDOS = 20
+MINUTOS_SIN_CUOTA_POR_DEFECTO = 15  # si el proveedor no dice cuándo vuelve la cuota
+MAX_HORAS_SIN_CUOTA = 6  # un límite por minuto que se libera antes se espera, en vez de bajar a un modelo peor
 MAX_EMPUJONES = 1  # veces por turno que se obliga al modelo a cumplir lo que acaba de prometer
 MARCA_AUTOMATICA = "[auto]"
 AVISO_CONTINUAR = (
@@ -70,12 +73,16 @@ def explicar_fallo(eslabon: ModeloRef, error: ProveedorNoUtilizable) -> str:
     return f"{eslabon.modelo} ({nombre}) no está disponible."
 
 
+PROVEEDOR_LOCAL = "ollama"
+
+
 class _Consumo:
     """Tokens gastados en el turno en curso y en el día antes de empezarlo."""
 
     def __init__(self, hoy_al_empezar: int):
-        self.hoy_al_empezar = hoy_al_empezar
+        self.hoy_al_empezar = hoy_al_empezar  # solo modelos en la nube: el local (Ollama) es gratis y no cuenta
         self.turno = Uso()
+        self.nube = Uso()
 
 
 class Agente:
@@ -96,13 +103,18 @@ class Agente:
         self._presupuesto = presupuesto
         self._reloj = reloj
         self._esperar = esperar
+        self._sin_cuota: dict[ModeloRef, datetime] = {}  # modelo → hasta cuándo no merece la pena intentarlo
+
+    def tiene_respaldo_local(self) -> bool:
+        """¿Hay un modelo local (gratis) en la cadena? Entonces la cuota de la nube no impide atender."""
+        return any(m.proveedor == PROVEEDOR_LOCAL for m in self._ajustes.cargar().cadena_llm())
 
     def responder(self, mensajes: list[Mensaje], cliente: Cliente) -> Iterator[EventoChat]:
         """Ejecuta el bucle del agente y, justo antes de la respuesta final, informa del gasto de tokens."""
         consumo = _Consumo(self._registro_uso.tokens_del_dia(cliente.id, self._reloj.hoy()))
         for evento in self._bucle(mensajes, cliente, consumo):
             if isinstance(evento, Fin):
-                yield UsoConsumido(consumo.turno.total, consumo.hoy_al_empezar + consumo.turno.total, self._presupuesto.tokens_por_dia)
+                yield UsoConsumido(consumo.turno.total, consumo.hoy_al_empezar + consumo.nube.total, self._presupuesto.tokens_por_dia)
             yield evento
 
     def _bucle(self, mensajes: list[Mensaje], cliente: Cliente, consumo: "_Consumo") -> Iterator[EventoChat]:
@@ -112,6 +124,22 @@ class Agente:
         conversación continúa. Los cambios de eslabón y los reintentos NO consumen rondas.
         """
         cadena = self._ajustes.cargar().cadena_llm()
+        ahora = self._reloj.ahora()
+        # un modelo al que ya se le acabó la cuota del día no se vuelve a intentar hasta que el proveedor la devuelva:
+        # cada intento fallido costaba una espera inútil de hasta 20 s
+        disponibles = [m for m in cadena if self._sin_cuota.get(m, ahora) <= ahora]
+        if cadena and not disponibles:
+            vuelve = min(self._sin_cuota[m] for m in cadena)
+            raise ErrorNoDisponible(
+                "Ahora mismo no puedo atenderte: todos los modelos de IA se han quedado sin cuota. "
+                f"Vuelve a probar sobre las {vuelve.strftime('%H:%M')}."
+            )
+        cadena = disponibles
+        if consumo.hoy_al_empezar >= self._presupuesto.tokens_por_dia:
+            # cuota diaria de la nube agotada: se sigue atendiendo solo con el modelo local, que es gratis
+            cadena = [m for m in cadena if m.proveedor == PROVEEDOR_LOCAL]
+            if not cadena:
+                raise ErrorNoDisponible(MENSAJE_LIMITE_DIA)
         if not cadena:
             raise ErrorNoDisponible(
                 "No hay ningún motor de IA disponible. Abre ⚙️ Ajustes y añade tu clave de Groq "
@@ -150,6 +178,11 @@ class Agente:
                     self._esperar(espera + 0.5)
                     continue
                 motivo = explicar_fallo(cadena[posicion], e)
+                if isinstance(e, CuotaAgotada) and not isinstance(e, LimitePorMinuto):
+                    espera = e.espera if e.espera is not None else MINUTOS_SIN_CUOTA_POR_DEFECTO * 60
+                    vuelve = self._reloj.ahora() + timedelta(seconds=min(espera, MAX_HORAS_SIN_CUOTA * 3600))
+                    self._sin_cuota[cadena[posicion]] = vuelve
+                    motivo += f" No lo intentaré de nuevo hasta las {vuelve.strftime('%H:%M')}."
                 posicion += 1
                 if posicion >= len(cadena):
                     raise ErrorNoDisponible(self._mensaje_sin_modelos(cadena[-1], e)) from e
@@ -187,6 +220,7 @@ class Agente:
                 return
 
             mensajes.append(Mensaje.asistente(texto or None, llamadas))
+            respuesta_fija = None
             for llamada in llamadas:
                 yield HerramientaEnUso(llamada.nombre, self._herramientas.etiqueta(llamada.nombre))
                 resultado = self._herramientas.ejecutar(llamada.nombre, llamada.argumentos, cliente)
@@ -196,6 +230,13 @@ class Agente:
                 mensajes.append(
                     Mensaje.resultado_herramienta(llamada.id, json.dumps(resultado.datos, ensure_ascii=False))
                 )
+                respuesta_fija = resultado.respuesta_final or respuesta_fija
+
+            if respuesta_fija:  # la herramienta ya sabe qué decir: no hace falta otra vuelta al modelo
+                final = f"{texto.strip()}\n\n{respuesta_fija}".strip() if texto.strip() else respuesta_fija
+                mensajes.append(Mensaje.asistente(final))
+                yield Fin(final)
+                return
 
         yield from self._respuesta_final_sin_herramientas(cadena[posicion], mensajes, cliente, consumo)
 
@@ -220,16 +261,20 @@ class Agente:
         )
         if ultimo.proveedor == OLLAMA and isinstance(error, ProveedorInaccesible):
             mensaje += " La IA local tampoco responde: ¿está Ollama en marcha (`ollama serve`)?"
+        elif ultimo.proveedor == OLLAMA and isinstance(error, ModeloNoEncontrado):
+            mensaje += f" Ollama está en marcha pero no tiene el modelo {ultimo.modelo}: ejecuta `ollama pull {ultimo.modelo}`."
         return mensaje
 
     def _contar(self, consumo: "_Consumo", cliente: Cliente, eslabon: ModeloRef, uso: Uso) -> None:
         consumo.turno += uso
+        if eslabon.proveedor != PROVEEDOR_LOCAL:
+            consumo.nube += uso
         self._registro_uso.registrar(cliente.id, eslabon.proveedor, eslabon.modelo, uso, self._reloj.ahora())
 
     def _limite_superado(self, consumo: "_Consumo") -> str | None:
         if consumo.turno.total >= self._presupuesto.tokens_por_turno:
             return MENSAJE_LIMITE_TURNO
-        if consumo.hoy_al_empezar + consumo.turno.total >= self._presupuesto.tokens_por_dia:
+        if consumo.hoy_al_empezar + consumo.nube.total >= self._presupuesto.tokens_por_dia:
             return MENSAJE_LIMITE_DIA
         return None
 

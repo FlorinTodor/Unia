@@ -169,7 +169,7 @@ class UsoEnMemoria:
         self.registros.append((cliente_id, proveedor, modelo, uso, momento))
 
     def tokens_del_dia(self, cliente_id: int, dia: date) -> int:
-        return sum(r[3].total for r in self.registros if r[0] == cliente_id and r[4].date() == dia)
+        return sum(r[3].total for r in self.registros if r[0] == cliente_id and r[1] != "ollama" and r[4].date() == dia)
 
     def ultimos(self, cliente_id: int, limite: int = 10) -> list[dict]:
         return [

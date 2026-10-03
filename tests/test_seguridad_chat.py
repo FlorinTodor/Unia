@@ -43,6 +43,8 @@ def test_inyeccion_de_prompt_el_llm_pide_un_bizum_pero_no_mueve_dinero():
     assert len(tarjetas) == 1 and tarjetas[0].importe == 900
     resultado = json.loads(next(m for m in mensajes if m.rol == "tool").contenido)
     assert resultado["estado"] == "pendiente_de_confirmacion" and "NO se ha enviado" in resultado["mensaje"]
+    # el texto lo escribe la herramienta, no el modelo: aunque este quisiera mentir («he enviado los 900 €») no tiene ocasión
+    assert eventos[-1].texto.startswith("He preparado el Bizum de 900,00 € a María López") and "enviado los 900" not in eventos[-1].texto
 
 
 def test_el_codigo_otp_nunca_llega_al_llm_ni_a_los_eventos_del_chat():

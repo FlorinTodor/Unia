@@ -296,6 +296,7 @@ def test_chat_el_bizum_del_llm_llega_como_tarjeta_sin_codigo_y_sin_mover_dinero(
     antes = c.get("/api/banco/saldo").json()["saldo"]
     r = c.post("/chat", json={"session_id": "t", "mensaje": "envía 25 a María"})
     ev = eventos(r)
+    assert ev[-1]["tipo"] == "fin" and ev[-1]["dato"].startswith("He preparado el Bizum de 25,00 € a María López")
     tarjeta = next(e for e in ev if e["tipo"] == "operacion")["dato"]
     assert tarjeta["destinatario"] == "María López" and tarjeta["importe"] == 25
     assert "123456" not in r.text  # el código no viaja por el chat

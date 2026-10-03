@@ -25,7 +25,7 @@ class UsoSqlite:
         con = self._bd.abrir(solo_lectura=True)
         try:
             return con.execute(
-                "SELECT COALESCE(SUM(tokens_entrada + tokens_salida), 0) FROM uso_ia WHERE cliente_id = ? AND momento >= ? AND momento < ?",
+                "SELECT COALESCE(SUM(tokens_entrada + tokens_salida), 0) FROM uso_ia WHERE proveedor != 'ollama' AND cliente_id = ? AND momento >= ? AND momento < ?",
                 (cliente_id, dia.isoformat(), (dia.fromordinal(dia.toordinal() + 1)).isoformat()),
             ).fetchone()[0]
         finally:

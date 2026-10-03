@@ -25,7 +25,7 @@ from backend.dominio.errores import DemasiadasPeticiones, ErrorDeValidacion, Lim
 from backend.dominio.modelos import Mensaje
 from backend.dominio.proveedores import ModeloRef
 from backend.dominio.uso import PresupuestoUso, Uso, estimar_tokens
-from tests.fakes import ALEX, ANA, CuentaEnMemoria, LLMGuionizado, RelojFijo, UsoEnMemoria, crear_agente, llamada, texto
+from tests.fakes import ALEX, ANA, CuentaEnMemoria, LLMGuionizado, RelojFijo, UsoEnMemoria, AjustesEnMemoria, crear_agente, llamada, texto
 
 
 # ------------------------------------------------------------------ dominio
@@ -110,6 +110,41 @@ def test_cuota_diaria_agotada_rechaza_el_turno_y_no_afecta_a_otro_cliente_ni_al_
     assert list(chat.enviar(ANA, "s", "hola"))[-1] == Fin("a")  # Ana no ha gastado nada
     reloj.avanzar(24 * 60)  # mañana
     assert list(chat.enviar(ALEX, "s", "hola"))[-1] == Fin("b")
+
+
+def _con_ia_local(llm, uso, reloj, presupuesto):
+    ajustes = AjustesEnMemoria()
+    ajustes.ajustes.fallback_local = True
+    agente = crear_agente(llm, RegistroHerramientas([saldo.crear(ConsultarSaldo(CuentaEnMemoria()))]), ajustes=ajustes, uso=uso, presupuesto=presupuesto, reloj=reloj)
+    return ServicioChat(agente, SesionesEnMemoria(), reloj, uso, LimitadorEnMemoria(presupuesto.peticiones_por_minuto), presupuesto, OperacionesEnMemoria()), agente
+
+
+def test_los_tokens_del_modelo_local_no_cuentan_para_la_cuota_diaria():
+    uso = UsoEnMemoria()
+    reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "ollama", "qwen3:8b", Uso(90_000, 5_000), reloj.ahora())
+    uso.registrar(ALEX.id, "groq", "m", Uso(30, 20), reloj.ahora())
+    assert uso.tokens_del_dia(ALEX.id, reloj.hoy()) == 50
+
+
+def test_con_la_nube_agotada_se_atiende_con_el_modelo_local_en_vez_de_un_429():
+    uso = UsoEnMemoria()
+    reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "groq", "m", Uso(60, 40), reloj.ahora())
+    llm = LLMGuionizado(texto("respuesta local"))
+    chat, agente = _con_ia_local(llm, uso, reloj, PresupuestoUso(tokens_por_dia=100))
+    assert agente.tiene_respaldo_local()
+    assert list(chat.enviar(ALEX, "s", "hola"))[-1] == Fin("respuesta local")
+    assert all(l[0].proveedor == "ollama" for l in llm.llamadas)  # no se toca la nube agotada
+
+
+def test_si_la_nube_se_agota_y_no_hay_modelo_local_sigue_el_429():
+    uso = UsoEnMemoria()
+    reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "groq", "m", Uso(60, 40), reloj.ahora())
+    chat, _, _ = montar(LLMGuionizado(texto("a")), PresupuestoUso(tokens_por_dia=100), uso, reloj)
+    with pytest.raises(LimiteDeTokensExcedido):
+        chat.enviar(ALEX, "s", "hola")
 
 
 def test_cada_llamada_al_modelo_se_registra_con_cliente_proveedor_y_modelo():

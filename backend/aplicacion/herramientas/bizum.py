@@ -1,4 +1,5 @@
 from ...dominio.modelos import Cliente
+from ...dominio.reglas import euros
 from ..casos_uso.bizum import SolicitarBizum
 from ..eventos import OperacionPorConfirmar
 from ..puertos.llm import EsquemaHerramienta
@@ -25,6 +26,10 @@ def crear(solicitar_bizum: SolicitarBizum) -> Herramienta:
                     "confirmarlo en la tarjeta que ve en pantalla. No pidas ni menciones el código."
                 ),
             },
+            respuesta_final=(
+                f"He preparado el Bizum de {euros(operacion.importe)} a {operacion.destinatario}. "
+                "Confírmalo con el código que te hemos enviado por SMS al móvil, o aprobándolo con tu huella, desde la tarjeta."
+            ),
             eventos=(
                 OperacionPorConfirmar(
                     operacion.id, operacion.destinatario, operacion.importe, operacion.concepto,
