@@ -1,9 +1,10 @@
+from ...dominio.modelos import Cliente
 from ..casos_uso.graficos import preparar_grafico
 from ..puertos.llm import EsquemaHerramienta
 from .registro import Herramienta, ResultadoHerramienta
 
 
-def ejecutar(args: dict) -> ResultadoHerramienta:
+def ejecutar(args: dict, _cliente: Cliente) -> ResultadoHerramienta:
     grafico = preparar_grafico(str(args.get("titulo", "Gráfico")), args.get("config"))
     return ResultadoHerramienta(
         {"ok": True, "mensaje": f"Gráfico '{grafico.titulo}' mostrado al usuario."},

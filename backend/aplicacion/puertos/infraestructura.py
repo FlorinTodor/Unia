@@ -1,6 +1,6 @@
 """Puertos de infraestructura general: sesiones, ajustes, reloj y sonda de proveedores."""
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 
 from ...dominio.ajustes import Ajustes
@@ -21,6 +21,8 @@ class RepositorioAjustes(Protocol):
 
 class Reloj(Protocol):
     def hoy(self) -> date: ...
+
+    def ahora(self) -> datetime: ...
 
 
 # ------------------------------------------------------------------ sonda de proveedores

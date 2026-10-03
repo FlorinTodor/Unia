@@ -1,11 +1,12 @@
 """Casos de uso de voz: transcribir lo que dice el usuario y sintetizar la respuesta."""
-from ...dominio.errores import ErrorDeValidacion, ErrorNoDisponible
+from ...dominio.errores import AudioDemasiadoGrande, ErrorDeValidacion, ErrorNoDisponible
 from ..puertos.infraestructura import RepositorioAjustes
 from ..puertos.voz import Sintetizador, Transcriptor
 from ..texto import normalizar_para_voz
 
 # audios de menos de ~0,5 s son silencio/ruido: Whisper alucina frases con ellos
 MIN_BYTES_AUDIO = 4000
+MAX_BYTES_AUDIO = 4 * 1024 * 1024  # ~10 min de webm/opus: más es un abuso, no una consulta
 MAX_CARACTERES_TTS = 1200
 
 
@@ -22,6 +23,8 @@ class TranscribirAudio:
             raise ErrorNoDisponible(
                 "La voz necesita una clave de Groq u OpenAI (añádela en ⚙️ Ajustes). Mientras, puedes escribir."
             )
+        if len(audio) > MAX_BYTES_AUDIO:
+            raise AudioDemasiadoGrande("El audio es demasiado largo. Graba un mensaje más corto.")
         if len(audio) < MIN_BYTES_AUDIO:
             raise ErrorDeValidacion("No se ha detectado voz. Mantén pulsado y habla con claridad.")
         texto = self._transcriptor.transcribir(audio, nombre_fichero).strip()

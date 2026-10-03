@@ -1,12 +1,13 @@
+from ...dominio.modelos import Cliente
 from ..casos_uso.banco import ListarContactos
 from ..puertos.llm import EsquemaHerramienta
 from .registro import Herramienta, ResultadoHerramienta
 
 
 def crear(listar_contactos: ListarContactos) -> Herramienta:
-    def ejecutar(_args: dict) -> ResultadoHerramienta:
+    def ejecutar(_args: dict, cliente: Cliente) -> ResultadoHerramienta:
         return ResultadoHerramienta(
-            {"contactos": [{"nombre": c.nombre, "telefono": c.telefono} for c in listar_contactos()]}
+            {"contactos": [{"nombre": c.nombre, "telefono": c.telefono} for c in listar_contactos(cliente)]}
         )
 
     return Herramienta(

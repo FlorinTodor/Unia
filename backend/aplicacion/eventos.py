@@ -25,6 +25,27 @@ class Grafico:
 
 
 @dataclass(frozen=True)
+class OperacionPorConfirmar:
+    """Tarjeta «confirma con el código». NO lleva el código: ese solo viaja al móvil del cliente."""
+
+    id: str
+    destinatario: str
+    importe: float
+    concepto: str
+    alertas: tuple[str, ...]
+    caduca: str  # ISO 8601
+
+
+@dataclass(frozen=True)
+class UsoConsumido:
+    """Gasto de la consulta que termina y del día, para el medidor de la interfaz."""
+
+    tokens_turno: int
+    tokens_hoy: int
+    limite_dia: int
+
+
+@dataclass(frozen=True)
 class Fin:
     texto: str  # respuesta completa
 
@@ -34,4 +55,4 @@ class ErrorChat:
     mensaje: str
 
 
-EventoChat = Delta | HerramientaEnUso | Aviso | Grafico | Fin | ErrorChat
+EventoChat = Delta | HerramientaEnUso | Aviso | Grafico | OperacionPorConfirmar | UsoConsumido | Fin | ErrorChat

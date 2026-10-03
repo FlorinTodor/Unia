@@ -5,6 +5,7 @@ from typing import Protocol
 
 from ...dominio.modelos import LlamadaHerramienta, Mensaje
 from ...dominio.proveedores import ModeloRef
+from ...dominio.uso import Uso
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,14 @@ class PeticionHerramientas:
     llamadas: tuple[LlamadaHerramienta, ...]
 
 
-EventoLLM = DeltaTexto | PeticionHerramientas
+@dataclass(frozen=True)
+class UsoTokens:
+    """Tokens que ha costado la llamada (siempre se emite al terminar el stream)."""
+
+    uso: Uso
+
+
+EventoLLM = DeltaTexto | PeticionHerramientas | UsoTokens
 
 
 # ------------------------------------------------------------------ errores del puerto
@@ -55,6 +63,14 @@ class CuotaAgotada(ProveedorNoUtilizable):
     pass
 
 
+class LimitePorMinuto(CuotaAgotada):
+    """Se superó el límite de tokens/peticiones por minuto: pasa solo en unos segundos."""
+
+    def __init__(self, mensaje: str, espera: float | None = None):
+        super().__init__(mensaje)
+        self.espera = espera  # segundos que indica el proveedor, si los indica
+
+
 class ProveedorInaccesible(ProveedorNoUtilizable):
     """Sin conexión o error 5xx."""
 
@@ -69,6 +85,10 @@ class ProveedorLLM(Protocol):
         modelo: ModeloRef,
         mensajes: Sequence[Mensaje],
         herramientas: Sequence[EsquemaHerramienta] | None,
+        max_tokens: int | None = None,
     ) -> Iterator[EventoLLM]:
-        """Una llamada en streaming. Emite DeltaTexto y, al final, PeticionHerramientas si procede."""
+        """Una llamada en streaming. Emite DeltaTexto, PeticionHerramientas si procede y, al final, UsoTokens.
+
+        `max_tokens` limita lo que puede generar el modelo en esta llamada.
+        """
         ...

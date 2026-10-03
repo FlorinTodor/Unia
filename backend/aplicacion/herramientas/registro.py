@@ -8,13 +8,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ...dominio.errores import ErrorDeDominio
+from ...dominio.modelos import Cliente
 from ..eventos import EventoChat
 from ..puertos.llm import EsquemaHerramienta
 
 
 class Riesgo(str, Enum):
     LECTURA = "lectura"      # solo consulta datos
-    ESCRITURA = "escritura"  # modifica el estado del banco (candidata a exigir OTP)
+    ESCRITURA = "escritura"  # modifica el estado del banco: debe devolver una operación pendiente de OTP, nunca ejecutar
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ class ResultadoHerramienta:
 @dataclass(frozen=True)
 class Herramienta:
     esquema: EsquemaHerramienta
-    ejecutar: Callable[[dict], ResultadoHerramienta]
+    ejecutar: Callable[[dict, Cliente], ResultadoHerramienta]  # (argumentos del LLM, cliente autenticado)
     etiqueta: str  # estado en pantalla mientras se ejecuta
     riesgo: Riesgo = Riesgo.LECTURA
 
@@ -52,7 +53,7 @@ class RegistroHerramientas:
         herramienta = self._por_nombre.get(nombre)
         return herramienta.riesgo if herramienta else None
 
-    def ejecutar(self, nombre: str, argumentos_json: str) -> ResultadoHerramienta:
+    def ejecutar(self, nombre: str, argumentos_json: str, cliente: Cliente) -> ResultadoHerramienta:
         """Ejecuta una herramienta pedida por el LLM. Nunca lanza errores de negocio:
         se los devuelve al modelo como `{"ok": False, "error": ...}` para que se explique."""
         herramienta = self._por_nombre.get(nombre)
@@ -63,6 +64,6 @@ class RegistroHerramientas:
         except json.JSONDecodeError:
             args = {}
         try:
-            return herramienta.ejecutar(args)
+            return herramienta.ejecutar(args, cliente)
         except ErrorDeDominio as e:
             return ResultadoHerramienta({"ok": False, "error": e.mensaje, **e.datos})
