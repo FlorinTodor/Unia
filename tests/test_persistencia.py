@@ -14,7 +14,7 @@ from backend.adaptadores.salida.sqlite import esquema
 from backend.adaptadores.salida.sqlite.conexion import BaseDeDatos
 from backend.dominio.modelos import LlamadaHerramienta, Mensaje
 from backend.dominio.operaciones import EstadoOperacion, OperacionPendiente
-from tests.fakes import RelojFijo
+from tests.fakes import CONTRASENA_ALEX, RelojFijo
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def test_la_aplicacion_completa_conserva_la_sesion_tras_reiniciar(tmp_path, monk
     monkeypatch.setenv("COOKIE_SEGURA", "0")
 
     with TestClient(composicion.crear_aplicacion()) as primero:
-        assert primero.post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"}).status_code == 200
+        assert primero.post("/auth/login", json={"usuario": "alex", "contrasena": CONTRASENA_ALEX}).status_code == 200
         cookie = primero.cookies.get("sesion")
         op = primero.post("/api/banco/bizum", json={"destinatario": "María", "importe": 10}).json()["operacion"]["id"]
     with TestClient(composicion.crear_aplicacion()) as segundo:  # «reinicio»: aplicación nueva, misma base de datos

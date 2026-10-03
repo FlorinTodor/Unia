@@ -2502,7 +2502,7 @@
         "title": "PeticionLogin",
         "examples": [
           {
-            "contrasena": "alex2026",
+            "contrasena": "<su contraseña>",
             "usuario": "alex"
           }
         ]

@@ -221,3 +221,9 @@ def texto(*trozos: str) -> list:
 
 def llamada(nombre: str, argumentos: str = "{}", id: str = "c1") -> list:
     return [PeticionHerramientas((LlamadaHerramienta(id, nombre, argumentos),))]
+
+
+from backend.adaptadores.salida.sqlite.perfiles import contrasena_demo  # noqa: E402
+
+CONTRASENA_ALEX = contrasena_demo("alex")
+CONTRASENA_ANA = contrasena_demo("ana")

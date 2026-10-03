@@ -1,4 +1,5 @@
 """Los cuatro clientes ficticios de la demo, con vidas financieras distintas."""
+import os
 from dataclasses import dataclass
 
 from ....dominio.modelos import Contacto
@@ -33,7 +34,6 @@ class Perfil:
     usuario: str
     nombre: str
     telefono: str
-    contrasena: str  # SOLO demo: la base de datos guarda únicamente su hash
     iban: str
     semilla: int
     saldo_actual: float  # saldo con el que arranca la demo (el generador no lo deduce de los movimientos)
@@ -45,7 +45,7 @@ class Perfil:
 
 
 ALEX = Perfil(
-    usuario="alex", nombre="Alex García", telefono="611000111", contrasena="alex2026",
+    usuario="alex", nombre="Alex García", telefono="611000111",
     iban="ES21 2103 0000 1122 3344 5566", semilla=42, saldo_actual=4200.0,
     fijos=(
         Fijo(1, "Nómina", "Nómina Tecnosur SL", "Tecnosur SL", 1850.00),
@@ -74,7 +74,7 @@ ALEX = Perfil(
 )
 
 ANA = Perfil(
-    usuario="ana", nombre="Ana Ruiz", telefono="622000222", contrasena="ana2026",
+    usuario="ana", nombre="Ana Ruiz", telefono="622000222",
     iban="ES64 2103 0000 2233 4455 6677", semilla=7, saldo_actual=480.0,
     fijos=(
         Fijo(1, "Vivienda", "Habitación piso compartido", "Inmobiliaria Albaicín", -280.00),
@@ -100,7 +100,7 @@ ANA = Perfil(
 )
 
 MARTA = Perfil(
-    usuario="marta", nombre="Marta Moreno", telefono="633000333", contrasena="marta2026",
+    usuario="marta", nombre="Marta Moreno", telefono="633000333",
     iban="ES18 2103 0000 3344 5566 7788", semilla=21, saldo_actual=3650.0,
     fijos=(
         Fijo(1, "Nómina", "Nómina Hospital Clínico", "SAS", 2100.00),
@@ -129,7 +129,7 @@ MARTA = Perfil(
 )
 
 JOSE = Perfil(
-    usuario="jose", nombre="José Luis Romero", telefono="644000444", contrasena="jose2026",
+    usuario="jose", nombre="José Luis Romero", telefono="644000444",
     iban="ES95 2103 0000 4455 6677 8899", semilla=3, saldo_actual=9400.0,
     fijos=(
         Fijo(1, "Nómina", "Pensión de jubilación", "Seguridad Social", 1480.00),
@@ -162,7 +162,18 @@ class _Administrador:
     usuario = "admin"
     nombre = "Administrador"
     telefono = "+34 600 000 000"
-    contrasena = "admin2026"
 
 
 ADMIN = _Administrador()
+
+
+ANIO_DEMO = 2026
+
+
+def contrasena_demo(usuario: str) -> str:
+    """Contraseña con la que se siembra la base de datos (que solo guarda su hash).
+
+    No hay contraseñas escritas en el código: se toma de `CONTRASENA_<USUARIO>` (p. ej. en `.env`) y, si no
+    existe, es el usuario seguido del año de la demo. Cámbiala con la variable de entorno al desplegar.
+    """
+    return os.getenv(f"CONTRASENA_{usuario.upper()}") or f"{usuario}{ANIO_DEMO}"

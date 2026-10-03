@@ -5,7 +5,7 @@ from ....aplicacion.puertos.infraestructura import Reloj
 from ....aplicacion.puertos.seguridad import Hasheador
 from .conexion import BaseDeDatos
 from .generador import generar_movimientos
-from .perfiles import ADMIN, PERFILES
+from .perfiles import ADMIN, PERFILES, contrasena_demo
 
 VERSION_ESQUEMA = 2  # súbela al cambiar el esquema o el historial: la base se regenera sola
 ANOS_HISTORIAL = 2  # para poder comparar «este año» con «el año pasado»
@@ -143,7 +143,7 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
         movs = generar_movimientos(perfil, hoy - timedelta(days=365 * ANOS_HISTORIAL), hoy)
         con.execute(
             "INSERT INTO clientes (id, usuario, nombre, telefono, hash_contrasena) VALUES (?,?,?,?,?)",
-            (cliente_id, perfil.usuario, perfil.nombre, perfil.telefono, hasheador.hashear(perfil.contrasena)),
+            (cliente_id, perfil.usuario, perfil.nombre, perfil.telefono, hasheador.hashear(contrasena_demo(perfil.usuario))),
         )
         con.executemany(
             "INSERT INTO movimientos (cliente_id, fecha, categoria, concepto, comercio, importe) VALUES (?,?,?,?,?,?)",
@@ -175,7 +175,7 @@ def _asegurar_administrador(bd: BaseDeDatos, hasheador: Hasheador) -> None:
             nuevo_id = con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM clientes").fetchone()[0]
             con.execute(
                 "INSERT INTO clientes (id, usuario, nombre, telefono, hash_contrasena) VALUES (?,?,?,?,?)",
-                (nuevo_id, ADMIN.usuario, ADMIN.nombre, ADMIN.telefono, hasheador.hashear(ADMIN.contrasena)),
+                (nuevo_id, ADMIN.usuario, ADMIN.nombre, ADMIN.telefono, hasheador.hashear(contrasena_demo(ADMIN.usuario))),
             )
             con.execute("INSERT INTO administradores (cliente_id) VALUES (?)", (nuevo_id,))
     finally:

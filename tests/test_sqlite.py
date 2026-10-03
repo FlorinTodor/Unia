@@ -17,7 +17,7 @@ from backend.adaptadores.salida.sqlite.repositorios import (
 from backend.aplicacion.casos_uso.banco import ConsultarMovimientos
 from backend.dominio.errores import ConsultaNoPermitida
 from backend.dominio.modelos import Movimiento
-from tests.fakes import ALEX, ANA, AuditoriaEnMemoria, RelojFijo
+from tests.fakes import CONTRASENA_ALEX, ALEX, ANA, AuditoriaEnMemoria, RelojFijo
 
 HASHEADOR = HasheadorScrypt()
 
@@ -62,7 +62,7 @@ def test_las_contrasenas_se_guardan_con_hash_nunca_en_claro(bd):
     assert all(h.startswith("scrypt$") for h in hashes)
     assert not any("2026" in h for h in hashes)
     cliente, hash_alex = RepositorioClientesSqlite(bd).buscar_por_usuario("alex")
-    assert HASHEADOR.verificar("alex2026", hash_alex) and cliente.nombre == "Alex García"
+    assert HASHEADOR.verificar(CONTRASENA_ALEX, hash_alex) and cliente.nombre == "Alex García"
 
 
 def test_inicializar_es_idempotente(bd):

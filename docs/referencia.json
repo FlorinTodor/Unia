@@ -972,7 +972,7 @@
       },
       {
         "fichero": "backend/adaptadores/salida/sqlite/perfiles.py",
-        "lineas": 168,
+        "lineas": 179,
         "doc": "Los cuatro clientes ficticios de la demo, con vidas financieras distintas."
       },
       {

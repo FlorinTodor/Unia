@@ -1,11 +1,11 @@
 /* Pantalla de acceso: modal que no se puede cerrar hasta iniciar sesión. */
 
 const CUENTAS_DEMO = [
-  { usuario: "alex", contrasena: "alex2026", nombre: "Alex García", perfil: "Trabajador joven" },
-  { usuario: "ana", contrasena: "ana2026", nombre: "Ana Ruiz", perfil: "Estudiante" },
-  { usuario: "marta", contrasena: "marta2026", nombre: "Marta Moreno", perfil: "Familia con hijos" },
-  { usuario: "jose", contrasena: "jose2026", nombre: "José Luis Romero", perfil: "Jubilado" },
-  { usuario: "admin", contrasena: "admin2026", nombre: "Administrador", perfil: "Configura la IA" },
+  { usuario: "alex", nombre: "Alex García", perfil: "Trabajador joven" },
+  { usuario: "ana", nombre: "Ana Ruiz", perfil: "Estudiante" },
+  { usuario: "marta", nombre: "Marta Moreno", perfil: "Familia con hijos" },
+  { usuario: "jose", nombre: "José Luis Romero", perfil: "Jubilado" },
+  { usuario: "admin", nombre: "Administrador", perfil: "Configura la IA" },
 ];
 
 export class VistaLogin {
@@ -33,7 +33,7 @@ export class VistaLogin {
       boton.append(nombre, perfil);
       boton.addEventListener("click", () => {
         this.#usuario.value = cuenta.usuario;
-        this.#contrasena.value = cuenta.contrasena;
+        this.#contrasena.value = "";
         this.#contrasena.focus();
       });
       lista.appendChild(boton);

@@ -1,4 +1,5 @@
 """Adaptador HTTP de extremo a extremo: SQLite temporal + LLM falso, con login, sin red."""
+from backend.adaptadores.salida.sqlite.perfiles import contrasena_demo
 import json
 
 import pytest
@@ -37,7 +38,7 @@ from backend.aplicacion.herramientas import bizum, contactos, grafico, movimient
 from backend.aplicacion.herramientas.registro import RegistroHerramientas
 from backend.dominio.ajustes import Ajustes, ConfigClave
 from backend.adaptadores.entrada.http import rutas_uso
-from tests.fakes import AjustesEnMemoria, CodigosFijos, LLMGuionizado, MovilFalso, RelojFijo, SondaFalsa, crear_agente, llamada, texto
+from tests.fakes import CONTRASENA_ALEX, AjustesEnMemoria, CodigosFijos, LLMGuionizado, MovilFalso, RelojFijo, SondaFalsa, crear_agente, llamada, texto
 
 HASHEADOR = HasheadorScrypt()
 
@@ -116,7 +117,7 @@ class App:
     def cliente(self, usuario=None):
         c = TestClient(self.app)
         if usuario:
-            r = c.post("/auth/login", json={"usuario": usuario, "contrasena": f"{usuario}2026"})
+            r = c.post("/auth/login", json={"usuario": usuario, "contrasena": contrasena_demo(usuario)})
             assert r.status_code == 200, r.text
         return c
 
@@ -153,7 +154,7 @@ def test_con_cookie_inventada_tambien_401(app):
 
 
 def test_login_pone_cookie_httponly_samesite_strict(app):
-    r = app.cliente().post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"})
+    r = app.cliente().post("/auth/login", json={"usuario": "alex", "contrasena": CONTRASENA_ALEX})
     cabecera = r.headers["set-cookie"].lower()
     assert r.json() == {"usuario": "alex", "nombre": "Alex García", "es_admin": False}
     assert "httponly" in cabecera and "samesite=strict" in cabecera and cabecera.startswith(f"{COOKIE_SESION}=")
@@ -165,8 +166,8 @@ def test_login_incorrecto_401_y_bloqueo_429_tras_5_fallos(app):
         assert c.post("/auth/login", json={"usuario": "alex", "contrasena": "mala"}).status_code == 401
     r = c.post("/auth/login", json={"usuario": "alex", "contrasena": "mala"})
     assert r.status_code == 429 and "bloqueada" in r.json()["detail"]
-    assert c.post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"}).status_code == 429
-    assert "set-cookie" not in c.post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"}).headers
+    assert c.post("/auth/login", json={"usuario": "alex", "contrasena": CONTRASENA_ALEX}).status_code == 429
+    assert "set-cookie" not in c.post("/auth/login", json={"usuario": "alex", "contrasena": CONTRASENA_ALEX}).headers
 
 
 def test_logout_cierra_la_sesion(app):

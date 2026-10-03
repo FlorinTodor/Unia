@@ -13,7 +13,7 @@ class ErrorOut(BaseModel):
 class PeticionLogin(BaseModel):
     usuario: str = Field(description="Usuario (no distingue mayúsculas).")
     contrasena: str
-    model_config = {"json_schema_extra": {"examples": [{"usuario": "alex", "contrasena": "alex2026"}]}}
+    model_config = {"json_schema_extra": {"examples": [{"usuario": "alex", "contrasena": "<su contraseña>"}]}}
 
 
 class ClienteOut(BaseModel):

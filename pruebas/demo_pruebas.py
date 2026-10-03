@@ -7,6 +7,7 @@ Uso:
 
 No modifica la BD: el Bizum de la demo se cancela antes de ejecutarse.
 """
+from backend.adaptadores.salida.sqlite.perfiles import contrasena_demo
 import io
 import json
 import sqlite3
@@ -117,7 +118,7 @@ def main():
         registrar("Seguridad", f"Sin sesión: {metodo} {ruta} → 401", r.status_code == 401, f"HTTP {r.status_code}")
     r = cli.post("/auth/login", json={"usuario": "alex", "contrasena": "incorrecta"})
     registrar("Seguridad", "Contraseña incorrecta rechazada (mensaje genérico)", r.status_code == 401 and "incorrectos" in r.json()["detail"], r.json()["detail"])
-    r = cli.post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"})
+    r = cli.post("/auth/login", json={"usuario": "alex", "contrasena": contrasena_demo("alex")})
     cookie = r.headers.get("set-cookie", "").lower()
     registrar("Seguridad", "Login correcto con cookie HttpOnly + SameSite=Strict", r.status_code == 200 and "httponly" in cookie and "samesite=strict" in cookie, cookie[:60] + "…")
     COOKIES = cli.cookies
@@ -125,7 +126,7 @@ def main():
     for _ in range(5):
         r5 = otro.post("/auth/login", json={"usuario": "usuario-inexistente", "contrasena": "x"})
     registrar("Seguridad", "Bloqueo temporal tras 5 intentos fallidos (429)", r5.status_code == 429, r5.json()["detail"])
-    r = otro.post("/auth/login", json={"usuario": "ana", "contrasena": "ana2026"})
+    r = otro.post("/auth/login", json={"usuario": "ana", "contrasena": contrasena_demo("ana")})
     ana = httpx.Client(base_url=BASE, timeout=60, cookies=otro.cookies)
     saldo_alex, saldo_ana = cli.get("/api/banco/saldo").json(), ana.get("/api/banco/saldo").json()
     registrar("Seguridad", "Cada cliente ve su propia cuenta", saldo_alex["titular"] == "Alex García" and saldo_ana["titular"] == "Ana Ruiz",
