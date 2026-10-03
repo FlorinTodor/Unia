@@ -19,7 +19,23 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from backend import ajustes, db  # noqa: E402
+from backend.adaptadores.salida.persistencia.ajustes_json import AjustesJson  # noqa: E402
+from backend.adaptadores.salida.sqlite.conexion import RUTA_DB, BaseDeDatos  # noqa: E402
+from backend.adaptadores.salida.sqlite.repositorios import ConsultorMovimientosSqlite  # noqa: E402
+from backend.aplicacion.casos_uso.banco import ConsultarMovimientos  # noqa: E402
+from backend.dominio.errores import ErrorDeDominio  # noqa: E402
+
+CLAVES = AjustesJson().cargar().claves
+_consultar = ConsultarMovimientos(ConsultorMovimientosSqlite(BaseDeDatos()))
+
+
+def ejecutar_select(sql):
+    """Misma ruta que usa el LLM (validación del dominio + conexión de solo lectura)."""
+    try:
+        r = _consultar(sql)
+    except ErrorDeDominio as e:
+        return {"ok": False, "error": e.mensaje}
+    return {"ok": True, "filas": r.filas}
 
 BASE = "http://localhost:8000"
 # Groq gratis: ~8.000 tokens/min por modelo; sin pausa, 4 mensajes seguidos agotan la cadena
@@ -87,12 +103,12 @@ def main():
               round((time.perf_counter() - t) * 1000), {"estado": est})
     registrar("Servidor", "Página principal servida", cli.get("/").status_code == 200)
     aj = cli.get("/ajustes").json()
-    claves_reales = [c["api_key"] for c in ajustes.cargar()["claves"].values()]
+    claves_reales = [c.api_key for c in CLAVES.values()]
     sin_claves = all("••••" in c["mascara"] for c in aj["claves"]) and not any(k in json.dumps(aj) for k in claves_reales)
     registrar("Ajustes", "Las claves API nunca salen en claro", sin_claves, f"{len(aj['claves'])} clave(s) enmascarada(s)")
     registrar("Ajustes", "Catálogo de proveedores", len(aj["catalogo"]) >= 5, ", ".join(c["nombre"] for c in aj["catalogo"]))
     t = time.perf_counter()
-    pr = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": ajustes.cargar()["claves"]["groq"]["api_key"]}).json()
+    pr = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": CLAVES["groq"].api_key}).json()
     registrar("Ajustes", "Validar clave Groq (sin gastar cuota)", pr.get("ok"), pr.get("mensaje", ""), round((time.perf_counter() - t) * 1000))
     malo = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": "gsk_clave_falsa_123456"}).json()
     registrar("Ajustes", "Clave falsa rechazada con mensaje claro", not malo.get("ok"), malo.get("mensaje", ""))
@@ -107,7 +123,7 @@ def main():
               f"{movs.get('num_filas')} filas · columnas {movs.get('columnas')}", extra={"movimientos": movs})
 
     # ── Base de datos y seguridad NL→SQL ─────────────────────────────────
-    con = sqlite3.connect(f"file:{db.RUTA_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{RUTA_DB}?mode=ro", uri=True)
     n, desde, hasta = con.execute("SELECT COUNT(*), MIN(fecha), MAX(fecha) FROM movimientos").fetchone()
     cats = con.execute("SELECT categoria, ROUND(SUM(importe),2) FROM movimientos GROUP BY categoria ORDER BY 2").fetchall()
     con.close()
@@ -115,11 +131,11 @@ def main():
               extra={"categorias": cats})
     for sql in ["DELETE FROM movimientos", "SELECT 1; DROP TABLE cuenta", "UPDATE cuenta SET saldo = 1e9",
                 "WITH x AS (SELECT 1) INSERT INTO movimientos VALUES (1)", "PRAGMA writable_schema=1"]:
-        res = db.ejecutar_select(sql)
+        res = ejecutar_select(sql)
         registrar("Seguridad SQL", f"Bloquea: {sql}", not res["ok"], str(res.get("error", res))[:100])
-    res = db.ejecutar_select("SELECT categoria, SUM(importe) FROM movimientos GROUP BY categoria")
+    res = ejecutar_select("SELECT categoria, SUM(importe) FROM movimientos GROUP BY categoria")
     registrar("Seguridad SQL", "Permite SELECT de agregación", res["ok"], f"{len(res.get('filas', []))} filas")
-    res = db.ejecutar_select("SELECT * FROM movimientos")
+    res = ejecutar_select("SELECT * FROM movimientos")
     registrar("Seguridad SQL", "Tope de 60 filas", len(res.get("filas", [])) <= 60, f"{len(res.get('filas', []))} filas devueltas")
 
     # ── Chat con el agente (LLM real) ────────────────────────────────────

@@ -1,12 +1,12 @@
 {
- "fecha": "2026-09-22 16:53",
+ "fecha": "2026-10-03 18:17",
  "resultados": [
   {
    "grupo": "Servidor",
    "nombre": "GET /estado responde",
    "ok": true,
    "detalle": "modelo openai/gpt-oss-120b · cadena ['openai/gpt-oss-120b (groq)', 'openai/gpt-oss-20b (groq)', 'qwen3:8b (ollama)']",
-   "ms": 15,
+   "ms": 2,
    "estado": {
     "ok": true,
     "proveedor": "groq",
@@ -47,7 +47,7 @@
    "nombre": "Validar clave Groq (sin gastar cuota)",
    "ok": true,
    "detalle": "Clave válida · 4 modelos disponibles.",
-   "ms": 272
+   "ms": 282
   },
   {
    "grupo": "Ajustes",
@@ -93,17 +93,17 @@
     "filas": [
      [
       "2026-07-18",
-      "Compras online",
-      "Pedido online",
-      "Amazon",
-      -66.35
-     ],
-     [
-      "2026-07-18",
       "Bizum",
       "Bizum enviado a María López — regalo de cumpleaños",
       "Bizum",
       -500.0
+     ],
+     [
+      "2026-07-18",
+      "Compras online",
+      "Pedido online",
+      "Amazon",
+      -66.35
      ],
      [
       "2026-07-17",
@@ -114,17 +114,17 @@
      ],
      [
       "2026-07-15",
-      "Suscripciones",
-      "Netflix",
-      "Netflix",
-      -12.99
-     ],
-     [
-      "2026-07-15",
       "Transporte",
       "Combustible",
       "BP",
       -63.83
+     ],
+     [
+      "2026-07-15",
+      "Suscripciones",
+      "Netflix",
+      "Netflix",
+      -12.99
      ]
     ],
     "num_filas": 5,
@@ -242,54 +242,54 @@
    "nombre": "Consulta de saldo",
    "ok": true,
    "detalle": "",
-   "ms": 1316,
+   "ms": 861,
    "pregunta": "¿Cuánto dinero tengo?",
-   "respuesta": "¡Hola Alex! Actualmente tienes **4 963,02 €** en tu cuenta. ¿En qué más puedo ayudarte hoy?",
+   "respuesta": "Tienes **4 963,02 €** disponibles en tu cuenta. ¡A tu disposición para cualquier consulta!",
    "herramientas": [
     "consultar_saldo"
    ],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 1259
+   "primer_token_ms": 811
   },
   {
    "grupo": "Chat",
    "nombre": "Pregunta en lenguaje natural → SQL",
    "ok": true,
    "detalle": "",
-   "ms": 1163,
+   "ms": 1588,
    "pregunta": "¿Cuánto gasté en supermercados el mes pasado?",
-   "respuesta": "En agosto de 2026 no registraste gastos en la categoría **Supermercado**, así que el total gastado ese mes fue **0,00 €**.",
+   "respuesta": "En septiembre de 2026 no registraste gastos en la categoría **Supermercado**, así que el total gastado fue **0,00 €**.",
    "herramientas": [
     "consultar_movimientos"
    ],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 1087
+   "primer_token_ms": 1515
   },
   {
    "grupo": "Chat",
    "nombre": "Último movimiento",
    "ok": true,
    "detalle": "",
-   "ms": 1179,
+   "ms": 1601,
    "pregunta": "¿Cuál fue mi último movimiento?",
-   "respuesta": "Tu último movimiento fue un **Bizum enviado a María López — regalo de cumpleaños** de **‑500,00 €** el **18 de julio de 2026**.",
+   "respuesta": "Tu último movimiento fue el **18 de julio de 2026**: enviaste un Bizum de **‑500,00 €** a María López (concepto: regalo de cumpleaños).",
    "herramientas": [
     "consultar_movimientos"
    ],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 1104
+   "primer_token_ms": 1516
   },
   {
    "grupo": "Chat",
    "nombre": "Gráfico autónomo (categorías)",
    "ok": true,
    "detalle": "tipo elegido por el LLM: ['bar']",
-   "ms": 3001,
+   "ms": 2509,
    "pregunta": "Hazme un gráfico de mis gastos por categoría de los últimos 3 meses",
-   "respuesta": "Los gastos de los últimos tres meses se concentran principalmente en **Vivienda** (713,21 €) y **Bizum** (500,00 €). Las demás categorías aportan menos de 150 € cada una.\n\nAquí tienes el gráfico de barras con el detalle completo.",
+   "respuesta": "Aquí tienes el gráfico de tus gastos por categoría en los últimos tres meses. Destaca que la mayor parte del gasto corresponde a **Vivienda** (713,21 €) y a **Bizum** (500,00 €). El resto se reparte entre Supermercado, Ropa, Restaurantes y otras categorías.",
    "herramientas": [
     "consultar_movimientos",
     "generar_grafico"
@@ -306,33 +306,33 @@
          "borderColor": "rgba(54, 162, 235, 1)",
          "borderWidth": 1,
          "data": [
-          713.21,
           500,
           141.56,
-          117.45,
-          98.29,
-          93.11,
-          63.83,
-          47.89,
-          45.54,
           29.9,
-          23.29
+          45.54,
+          93.11,
+          98.29,
+          23.29,
+          117.45,
+          47.89,
+          63.83,
+          713.21
          ],
          "label": "Gasto (€)"
         }
        ],
        "labels": [
-        "Vivienda",
         "Bizum",
         "Compras online",
-        "Supermercado",
-        "Ropa",
-        "Restaurantes",
-        "Transporte",
-        "Suscripciones",
-        "Ocio",
         "Deporte",
-        "Salud"
+        "Ocio",
+        "Restaurantes",
+        "Ropa",
+        "Salud",
+        "Supermercado",
+        "Suscripciones",
+        "Transporte",
+        "Vivienda"
        ]
       },
       "options": {
@@ -361,48 +361,102 @@
     }
    ],
    "avisos": [],
-   "primer_token_ms": 2882
+   "primer_token_ms": 2362
   },
   {
    "grupo": "Chat",
    "nombre": "Gráfico autónomo (evolución)",
-   "ok": false,
-   "detalle": "tipo elegido por el LLM: []",
-   "ms": 2028,
+   "ok": true,
+   "detalle": "tipo elegido por el LLM: ['line']",
+   "ms": 3174,
    "pregunta": "¿Cómo ha evolucionado mi gasto mensual este año?",
-   "respuesta": "Este año tu gasto mensual ha ido variando así:\n\n- **Enero:** 1 373,87 €\n- **Febrero:** 1 571,33 €\n- **Marzo:** 1 443,81 €\n- **Abril:** 1 290,53 €\n- **Mayo:** 1 666,13 €\n- **Junio:** 1 706,01 €\n- **Julio:** 1 874,07 €\n\nEn general, la tendencia muestra un aumento progresivo, con un pico en julio.\n\nA continuación tienes un gráfico de líneas que visualiza la evolución mensual del gasto:\n\n```json\n{\n  \"type\": \"line\",\n  \"data\": {\n    \"labels\": [\"Enero\", \"Febrero\", \"Marzo\", \"Abril\", \"Mayo\", \"Junio\", \"Julio\"],\n    \"datasets\": [\n      {\n        \"label\": \"Gasto mensual (€)\",\n        \"data\": [1373.87, 1571.33, 1443.81, 1290.53, 1666.13, 1706.01, 1874.07],\n        \"borderColor\": \"#4e73df\",\n        \"backgroundColor\": \"rgba(78,115,223,0.1)\",\n        \"fill\": false,\n        \"tension\": 0.1\n      }\n    ]\n  },\n  \"options\": {\n    \"responsive\": true,\n    \"plugins\": {\n      \"title\": {\n        \"display\": true,\n        \"text\": \"Evolución del gasto mensual en 2026\"\n      },\n      \"legend\": {\n        \"display\": false\n      }\n    },\n    \"scales\": {\n      \"y\": {\n        \"beginAtZero\": false,\n        \"title\": {\n          \"display\": true,\n          \"text\": \"Euros (€)\"\n        }\n      }\n    }\n  }\n}\n```\n\n**Título del gráfico:** Evolución del gasto mensual en 2026.",
+   "respuesta": "Tu gasto mensual ha ido aumentando progresivamente a lo largo del año. En enero gastaste 1 373,87 €, en febrero 1 571,33 €, en marzo 1 443,81 €, en abril 1 290,53 €, en mayo 1 666,13 €, en junio 1 706,01 € y en julio 1 874,07 €. El gráfico muestra esta tendencia ascendente.",
    "herramientas": [
-    "consultar_movimientos"
+    "consultar_movimientos",
+    "generar_grafico"
    ],
-   "graficos": [],
+   "graficos": [
+    {
+     "titulo": "Evolución del gasto mensual en 2026",
+     "tipo": "line",
+     "config": {
+      "data": {
+       "datasets": [
+        {
+         "backgroundColor": "rgba(75, 192, 192, 0.2)",
+         "borderColor": "rgba(75, 192, 192, 1)",
+         "data": [
+          1373.87,
+          1571.33,
+          1443.81,
+          1290.53,
+          1666.13,
+          1706.01,
+          1874.07
+         ],
+         "fill": false,
+         "label": "Gasto mensual",
+         "tension": 0.1
+        }
+       ],
+       "labels": [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio"
+       ]
+      },
+      "options": {
+       "scales": {
+        "x": {
+         "title": {
+          "display": true,
+          "text": "Mes"
+         }
+        },
+        "y": {
+         "title": {
+          "display": true,
+          "text": "Gasto (€)"
+         }
+        }
+       }
+      },
+      "type": "line"
+     }
+    }
+   ],
    "avisos": [],
-   "primer_token_ms": 1127
+   "primer_token_ms": 2976
   },
   {
    "grupo": "Chat",
    "nombre": "Bizum: pide confirmación antes de enviar",
    "ok": true,
    "detalle": "no envía sin confirmar",
-   "ms": 655,
+   "ms": 518,
    "pregunta": "Envíale 15 € a María por la cena",
-   "respuesta": "¿Me confirmas que quieres enviar **15,00 €** a **María** por la cena? Por favor, responde con “sí” o “no”.",
+   "respuesta": "Claro, voy a preparar el Bizum.  \nDestinatario: **María**  \nImporte: **15,00 €**  \n\n¿Confirmas que quieres enviarle esos 15 € a María? (Responde con “sí” o “no”).",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 580
+   "primer_token_ms": 403
   },
   {
    "grupo": "Chat",
    "nombre": "Bizum: cancelar con «no»",
    "ok": true,
    "detalle": "",
-   "ms": 383,
+   "ms": 603,
    "pregunta": "No, déjalo, no lo envíes",
-   "respuesta": "Entendido, no se realiza ningún Bizum. Si necesitas otra cosa, aquí estoy.",
+   "respuesta": "Entendido, no se envía nada. Si necesitas algo más, aquí estoy.",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 343
+   "primer_token_ms": 569
   },
   {
    "grupo": "Chat",
@@ -416,27 +470,27 @@
    "nombre": "Fuera de ámbito (se reconduce)",
    "ok": true,
    "detalle": "",
-   "ms": 449,
+   "ms": 869,
    "pregunta": "Recomiéndame un libro de misa",
-   "respuesta": "Soy tu asistente financiero y solo puedo ayudarte con temas relacionados con tu cuenta, tus movimientos, Bizum o visualizaciones de tus finanzas. Si necesitas información de ese tipo, ¡dime!",
+   "respuesta": "Soy tu asistente financiero y solo puedo ayudarte con temas relacionados con tu cuenta, tus movimientos, saldo, Bizum o visualizaciones de tus finanzas. Si necesitas algo de eso, estaré encantado de asistirte.",
    "herramientas": [],
    "graficos": [],
    "avisos": [],
-   "primer_token_ms": 254
+   "primer_token_ms": 772
   },
   {
    "grupo": "Voz",
    "nombre": "TTS Piper (texto → audio)",
    "ok": true,
-   "detalle": "1.93 s de audio, 83 KB",
-   "ms": 142
+   "detalle": "1.87 s de audio, 80 KB",
+   "ms": 4394
   },
   {
    "grupo": "Voz",
    "nombre": "STT Whisper (audio → texto), ida y vuelta",
    "ok": true,
-   "detalle": "«¿Cuánto gasté en restaurantes en agosto?» → «Cuánto gasté en restaurantes en agosto.»",
-   "ms": 389
+   "detalle": "«¿Cuánto gasté en restaurantes en agosto?» → «¿Cuánto gasté en restaurantes en agosto?»",
+   "ms": 464
   },
   {
    "grupo": "Voz",
