@@ -46,6 +46,7 @@ ETIQUETAS = [
     {"name": "ajustes", "description": "Claves API, modelos y IA local. Las claves nunca salen del servidor."},
     {"name": "estado", "description": "Modelo en uso y disponibilidad de la voz."},
     {"name": "uso", "description": "Gasto de tokens de la IA frente a los límites por cliente."},
+    {"name": "admin", "description": "Solo el perfil admin: gasto de tokens por cliente y su reinicio (pruebas y demos)."},
 ]
 
 

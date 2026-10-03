@@ -302,3 +302,13 @@ def test_la_tabla_de_uso_se_crea_tambien_en_bases_ya_existentes_sin_regenerarlas
     assert con.execute("SELECT COUNT(*) FROM uso_ia").fetchone()[0] == 0
     assert con.execute("SELECT COUNT(*) FROM movimientos WHERE concepto = 'mi bizum'").fetchone()[0] == 1  # no se regeneró
     con.close()
+
+
+def test_el_perfil_de_administracion_no_puede_usar_el_chat():
+    from dataclasses import replace
+
+    from backend.dominio.errores import ErrorDeAccesoDenegado
+
+    chat, _, _ = montar(LLMGuionizado(texto("a")))
+    with pytest.raises(ErrorDeAccesoDenegado):
+        chat.enviar(replace(ALEX, es_admin=True), "s", "hola")

@@ -12,6 +12,7 @@ class Cliente:
     usuario: str
     nombre: str
     telefono: str  # al que se envían los códigos OTP
+    es_admin: bool = False  # administra la configuración de la IA; no es un cliente con cuenta
 
 
 @dataclass(frozen=True)

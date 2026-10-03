@@ -180,3 +180,34 @@ def test_aprobar_revalida_el_saldo_y_cancela_si_ya_no_alcanza():
     with pytest.raises(SaldoInsuficiente):
         e.confirmar.aprobar(ALEX, op.id)
     assert e.saldo() == 10
+
+
+def test_confirmaciones_simultaneas_ejecutan_el_bizum_una_sola_vez(tmp_path):
+    """Con 8 peticiones paralelas sobre SQLite el dinero salía 8 veces (leer-modificar-guardar sin exclusión)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from backend.adaptadores.salida.persistencia.sqlite_estado import OperacionesSqlite
+    from backend.adaptadores.salida.seguridad.hasheador import HasheadorScrypt
+    from backend.adaptadores.salida.sqlite import esquema
+    from backend.adaptadores.salida.sqlite.conexion import BaseDeDatos
+
+    reloj = RelojFijo()
+    bd = BaseDeDatos(tmp_path / "banco.db")
+    esquema.inicializar(bd, reloj, HasheadorScrypt())
+    e = Escenario()
+    e.operaciones = OperacionesSqlite(bd)
+    e.solicitar = SolicitarBizum(e.cuentas, e.contactos, e.operaciones, CodigosFijos(), e.movil, e.reloj, e.auditoria)
+    e.confirmar = ConfirmarOperacion(e.cuentas, e.operaciones, e.reloj, e.auditoria)
+    op = e.solicitar(ALEX, "maría", 10)
+
+    def intentar(_):
+        try:
+            e.confirmar.aprobar(ALEX, op.id)
+            return "ok"
+        except OperacionYaProcesada:
+            return "ya procesada"
+
+    with ThreadPoolExecutor(8) as pool:
+        resultados = list(pool.map(intentar, range(8)))
+    assert resultados.count("ok") == 1
+    assert e.saldo() == 1990.0 and len(e.cuentas.movimientos[ALEX.id]) == 1

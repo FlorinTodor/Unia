@@ -488,3 +488,18 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
 .aviso-ok { background: var(--exito-fondo); border-color: var(--exito); color: var(--exito-texto); }
 .aviso-cerrar { border: 0; background: transparent; color: inherit; font-size: 1rem; line-height: 1; min-width: 28px; min-height: 28px; border-radius: 8px; }
 .aviso-cerrar:hover { background: rgba(0, 0, 0, 0.08); }
+
+/* perfiles: solo el administrador ve los ajustes; el administrador no tiene cuenta ni chat */
+body:not(.es-admin) #btn-ajustes { display: none; }
+body.es-admin .panel-cuenta, body.es-admin .zona-entrada, body.es-admin #btn-movil,
+body.es-admin .tts-toggle, body.es-admin .medidor-uso { display: none; }
+body.es-admin .cuerpo { display: none; }
+.panel-admin { max-width: 760px; width: 100%; margin: 32px auto; padding: 0 16px; }
+.panel-admin[hidden] { display: none; }
+.panel-admin h1 { font-size: 1.5rem; margin: 0 0 8px; }
+.panel-admin h2 { font-size: 1.1rem; margin: 28px 0 4px; }
+.tabla-admin { width: 100%; border-collapse: collapse; margin-top: 12px; background: var(--superficie); border-radius: var(--radio); overflow: hidden; box-shadow: var(--sombra); }
+.tabla-admin th, .tabla-admin td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--borde-suave); }
+.tabla-admin th { font-size: 0.8rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+.tabla-admin td:last-child { text-align: right; }
+.tabla-admin .btn-secundario { height: 36px; padding: 0 14px; }

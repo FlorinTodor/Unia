@@ -31,6 +31,19 @@ class UsoSqlite:
         finally:
             con.close()
 
+    def reiniciar_dia(self, cliente_id: int, dia: date) -> int:
+        liberados = self.tokens_del_dia(cliente_id, dia)
+        con = self._bd.abrir()
+        try:
+            with con:
+                con.execute(
+                    "DELETE FROM uso_ia WHERE cliente_id = ? AND momento >= ? AND momento < ?",
+                    (cliente_id, dia.isoformat(), (dia.fromordinal(dia.toordinal() + 1)).isoformat()),
+                )
+        finally:
+            con.close()
+        return liberados
+
     def ultimos(self, cliente_id: int, limite: int = 10) -> list[dict]:
         con = self._bd.abrir(solo_lectura=True)
         try:

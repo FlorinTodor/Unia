@@ -19,6 +19,7 @@ class PeticionLogin(BaseModel):
 class ClienteOut(BaseModel):
     usuario: str
     nombre: str
+    es_admin: bool = Field(False, description="Solo el administrador puede ver y cambiar los ajustes de la IA.")
 
 
 class OkOut(BaseModel):
@@ -122,6 +123,13 @@ class UsoReciente(BaseModel):
     entrada: int = Field(description="Tokens enviados al modelo.")
     salida: int = Field(description="Tokens generados por el modelo (incluye su razonamiento).")
     estimado: bool = Field(description="True si el proveedor no informó y el dato es una aproximación.")
+
+
+class UsoClienteOut(BaseModel):
+    usuario: str
+    nombre: str
+    tokens_hoy: int
+    limite_dia: int
 
 
 class UsoOut(BaseModel):

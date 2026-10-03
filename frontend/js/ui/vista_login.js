@@ -5,6 +5,7 @@ const CUENTAS_DEMO = [
   { usuario: "ana", contrasena: "ana2026", nombre: "Ana Ruiz", perfil: "Estudiante" },
   { usuario: "marta", contrasena: "marta2026", nombre: "Marta Moreno", perfil: "Familia con hijos" },
   { usuario: "jose", contrasena: "jose2026", nombre: "José Luis Romero", perfil: "Jubilado" },
+  { usuario: "admin", contrasena: "admin2026", nombre: "Administrador", perfil: "Configura la IA" },
 ];
 
 export class VistaLogin {

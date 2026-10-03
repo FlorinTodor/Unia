@@ -8,7 +8,7 @@ from ....dominio.proveedores import CATALOGO, ModeloRef
 
 
 def cliente(c: Cliente) -> dict:
-    return {"usuario": c.usuario, "nombre": c.nombre}
+    return {"usuario": c.usuario, "nombre": c.nombre, "es_admin": c.es_admin}
 
 
 def operacion_pendiente(o: OperacionPendiente) -> dict:

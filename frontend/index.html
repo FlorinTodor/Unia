@@ -53,6 +53,17 @@
       </div>
     </header>
 
+    <section id="panel-admin" class="panel-admin" hidden aria-labelledby="titulo-admin">
+      <h1 id="titulo-admin">Administración</h1>
+      <p>Configura la IA desde <b>Ajustes</b> (⚙️, arriba a la derecha). Los clientes usan el chat con sus propios usuarios.</p>
+      <h2>Tokens de hoy por cliente</h2>
+      <p class="texto-mini">Para pruebas y demos: reinicia el gasto diario de un cliente que haya llegado a su límite.</p>
+      <table class="tabla-admin">
+        <thead><tr><th scope="col">Cliente</th><th scope="col">Usuario</th><th scope="col">Tokens hoy / límite</th><th scope="col"><span class="solo-lector">Acción</span></th></tr></thead>
+        <tbody id="admin-clientes"></tbody>
+      </table>
+    </section>
+
     <div class="cuerpo">
       <aside id="panel-cuenta" class="panel-cuenta" aria-label="Mi cuenta">
         <section class="saldo">

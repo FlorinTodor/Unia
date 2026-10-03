@@ -14,6 +14,10 @@ class RepositorioClientes(Protocol):
 
     def obtener(self, cliente_id: int) -> Cliente | None: ...
 
+    def listar(self) -> list[Cliente]:
+        """Los clientes con cuenta (sin los administradores)."""
+        ...
+
 
 class Hasheador(Protocol):
     def hashear(self, contrasena: str) -> str: ...

@@ -5,6 +5,8 @@
 2. `ConfirmarOperacion`: el cliente teclea el código en la interfaz (nunca pasa por el LLM) y,
    solo si es correcto, se ejecuta el movimiento.
 """
+import threading
+
 from ...dominio import reglas
 from ...dominio.errores import ERRORES_DE_REGLA, ContactoNoEncontrado, OperacionNoEncontrada
 from ...dominio.modelos import ComprobanteBizum, Cliente, Movimiento
@@ -97,16 +99,27 @@ class ConfirmarOperacion(_OperacionesDelCliente):
         self._cuentas = cuentas
         self._reloj = reloj
         self._auditoria = auditoria
+        # Leer, comprobar y guardar la operación no es atómico: con peticiones paralelas (hilos) un mismo Bizum se
+        # ejecutaba varias veces y el OTP admitía más de 3 intentos. Se serializa por cliente, que además protege
+        # el tope diario entre operaciones distintas. Con varios procesos haría falta la transición atómica en SQL.
+        self._cerrojos: dict[int, threading.Lock] = {}
+        self._cerrojos_guarda = threading.Lock()
+
+    def _cerrojo(self, cliente_id: int) -> threading.Lock:
+        with self._cerrojos_guarda:
+            return self._cerrojos.setdefault(cliente_id, threading.Lock())
 
     def __call__(self, cliente: Cliente, id_operacion: str, codigo: str) -> ComprobanteBizum:
         """Confirma con el código de 6 dígitos que llegó por SMS."""
-        operacion = self.obtener(cliente, id_operacion)
-        return self._ejecutar(cliente, operacion, lambda: operacion.verificar(codigo, self._reloj.ahora()), "otp_rechazado")
+        with self._cerrojo(cliente.id):
+            operacion = self.obtener(cliente, id_operacion)
+            return self._ejecutar(cliente, operacion, lambda: operacion.verificar(codigo, self._reloj.ahora()), "otp_rechazado")
 
     def aprobar(self, cliente: Cliente, id_operacion: str) -> ComprobanteBizum:
         """Confirma aprobándola desde el móvil (huella / Face ID simulados), sin teclear nada."""
-        operacion = self.obtener(cliente, id_operacion)
-        return self._ejecutar(cliente, operacion, lambda: operacion.aprobar(self._reloj.ahora()), "aprobacion_rechazada")
+        with self._cerrojo(cliente.id):
+            operacion = self.obtener(cliente, id_operacion)
+            return self._ejecutar(cliente, operacion, lambda: operacion.aprobar(self._reloj.ahora()), "aprobacion_rechazada")
 
     def _ejecutar(self, cliente: Cliente, operacion, comprobar, accion_si_falla: str) -> ComprobanteBizum:
         try:

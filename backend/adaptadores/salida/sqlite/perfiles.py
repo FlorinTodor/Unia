@@ -154,3 +154,15 @@ JOSE = Perfil(
 )
 
 PERFILES = (ALEX, ANA, MARTA, JOSE)
+
+
+class _Administrador:
+    """Perfil de gestión: configura la IA (claves, modelos, Ollama). Sin cuenta bancaria."""
+
+    usuario = "admin"
+    nombre = "Administrador"
+    telefono = "+34 600 000 000"
+    contrasena = "admin2026"
+
+
+ADMIN = _Administrador()

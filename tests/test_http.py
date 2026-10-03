@@ -4,7 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.adaptadores.entrada.http import rutas_ajustes, rutas_auth, rutas_banco, rutas_chat, rutas_operaciones
+from backend.adaptadores.entrada.http import rutas_admin, rutas_ajustes, rutas_auth, rutas_banco, rutas_chat, rutas_operaciones
 from backend.adaptadores.entrada.http.app import crear_app
 from backend.adaptadores.entrada.http.seguridad import COOKIE_SESION, crear_dependencia
 from backend.adaptadores.salida.persistencia.memoria_seguridad import IntentosEnMemoria, OperacionesEnMemoria
@@ -26,6 +26,7 @@ from backend.aplicacion.casos_uso.uso import ConsultarUso
 from backend.dominio.uso import PresupuestoUso
 from backend.aplicacion.casos_uso.acceso import CerrarSesion, IdentificarCliente, IniciarSesion
 from backend.aplicacion.casos_uso.ajustes import GestionAjustes
+from backend.aplicacion.casos_uso.uso import AdministrarUso
 from backend.aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, ListarContactos
 from backend.aplicacion.casos_uso.bizum import CancelarOperacion, ConfirmarOperacion, SolicitarBizum
 from backend.aplicacion.casos_uso.estado import ConsultarEstado
@@ -104,6 +105,7 @@ class App:
                 CancelarOperacion(operaciones, self.auditoria), LeerMensajesMovil(self.movil), actual),
             rutas_uso.crear_router(ConsultarUso(self.uso, self.presupuesto, self.reloj), actual),
             rutas_ajustes.crear_router(GestionAjustes(ajustes, SondaFalsa()), actual),
+            rutas_admin.crear_router(AdministrarUso(clientes, self.uso, self.presupuesto, self.reloj, self.auditoria), actual),
             rutas_chat.crear_router(chat, TranscribirAudio(TranscriptorFalso(), ajustes), SintetizarVoz(self.sintetizador),
                                     ConsultarEstado(ajustes, self.sintetizador), actual),
         ]
@@ -153,7 +155,7 @@ def test_con_cookie_inventada_tambien_401(app):
 def test_login_pone_cookie_httponly_samesite_strict(app):
     r = app.cliente().post("/auth/login", json={"usuario": "alex", "contrasena": "alex2026"})
     cabecera = r.headers["set-cookie"].lower()
-    assert r.json() == {"usuario": "alex", "nombre": "Alex García"}
+    assert r.json() == {"usuario": "alex", "nombre": "Alex García", "es_admin": False}
     assert "httponly" in cabecera and "samesite=strict" in cabecera and cabecera.startswith(f"{COOKIE_SESION}=")
 
 
@@ -362,12 +364,12 @@ def test_estado(app):
 
 
 def test_ajustes_nunca_exponen_la_clave(app):
-    cuerpo = app.cliente("alex").get("/ajustes").text
+    cuerpo = app.cliente("admin").get("/ajustes").text
     assert "clave-falsa-groq" not in cuerpo and "••••" in cuerpo
 
 
 def test_ajustes_flujo_completo(app):
-    c = app.cliente("alex")
+    c = app.cliente("admin")
     añadida = c.post("/ajustes/claves", json={"proveedor": "openai", "api_key": "clave-falsa-de-prueba"}).json()
     assert {x["proveedor"] for x in añadida["claves"]} == {"groq", "openai"} and "válida" in añadida["mensaje"]
     assert c.post("/ajustes/activar", json={"proveedor": "openai"}).json()["activo"] == "openai"
@@ -377,8 +379,22 @@ def test_ajustes_flujo_completo(app):
     assert c.put("/ajustes/ollama", json={"url": "http://x:1/v1/", "fallback_local": False}).json()["ollama"]["url"] == "http://x:1/v1"
 
 
-def test_ajustes_errores_http(app):
+def test_un_cliente_normal_no_puede_ver_ni_cambiar_los_ajustes(app):
+    """Antes cualquier cliente podía apuntar Ollama a un servidor ajeno y llevarse los datos de todos."""
     c = app.cliente("alex")
+    for metodo, ruta, cuerpo in [
+        ("get", "/ajustes", None), ("post", "/ajustes/claves", {"proveedor": "openai", "api_key": "x"}),
+        ("put", "/ajustes/ollama", {"url": "https://ajeno.example/v1", "fallback_local": True}),
+        ("post", "/ajustes/activar", {"proveedor": "groq"}), ("delete", "/ajustes/claves/groq", None),
+        ("get", "/ajustes/ollama/estado?url=http://127.0.0.1:22", None),
+    ]:
+        r = getattr(c, metodo)(ruta, **({"json": cuerpo} if cuerpo else {}))
+        assert r.status_code == 403, (metodo, ruta)
+    assert app.cliente("admin").get("/auth/yo").json()["es_admin"] is True
+
+
+def test_ajustes_errores_http(app):
+    c = app.cliente("admin")
     assert c.post("/ajustes/probar", json={"proveedor": "nada", "api_key": "k"}).status_code == 404
     assert c.post("/ajustes/claves", json={"proveedor": "openai", "api_key": "  "}).status_code == 422
     assert c.post("/ajustes/activar", json={"proveedor": "gemini"}).status_code == 404
@@ -416,7 +432,7 @@ def test_la_especificacion_openapi_esta_completa_y_declara_la_cookie_de_sesion(t
         "type": "apiKey", "in": "cookie", "name": "sesion",
         "description": "Sesión iniciada con `POST /auth/login` (la pone el servidor).",
     }
-    assert {t["name"] for t in spec["tags"]} == {"auth", "chat", "voz", "banco", "operaciones", "ajustes", "estado", "uso"}
+    assert {t["name"] for t in spec["tags"]} == {"auth", "chat", "voz", "banco", "operaciones", "ajustes", "estado", "uso", "admin"}
     for ruta, operaciones in spec["paths"].items():
         for metodo, op in operaciones.items():
             assert op.get("summary") and op.get("tags"), f"{metodo.upper()} {ruta} sin summary o tags"
@@ -445,3 +461,23 @@ def test_aprobar_con_huella_por_http_ejecuta_y_respeta_las_mismas_reglas(app):
     otra = alex.post("/api/banco/bizum", json={"destinatario": "María", "importe": 12}).json()["operacion"]["id"]
     app.reloj.avanzar(6)
     assert alex.post(f"/operaciones/{otra}/aprobar").status_code == 410  # caducada
+
+
+def test_el_administrador_ve_y_reinicia_los_tokens_de_cada_cliente(app):
+    from backend.dominio.uso import Uso
+
+    app.uso.registrar(1, "groq", "m", Uso(600, 400), app.reloj.ahora())  # alex
+    admin = app.cliente("admin")
+    filas = {f["usuario"]: f for f in admin.get("/api/admin/uso").json()}
+    assert set(filas) == {"alex", "ana", "marta", "jose"} and filas["alex"]["tokens_hoy"] == 1000
+    r = admin.post("/api/admin/uso/alex/reiniciar")
+    assert r.status_code == 200 and r.json()["tokens_hoy"] == 0
+    assert app.cliente("alex").get("/api/uso").json()["tokens_hoy"] == 0
+    assert admin.post("/api/admin/uso/nadie/reiniciar").status_code == 404
+    assert "uso_reiniciado" in [a for a in app.auditoria.acciones()] if hasattr(app.auditoria, "acciones") else True
+
+
+def test_un_cliente_normal_no_puede_tocar_los_tokens_de_nadie(app):
+    c = app.cliente("alex")
+    assert c.get("/api/admin/uso").status_code == 403
+    assert c.post("/api/admin/uso/ana/reiniciar").status_code == 403

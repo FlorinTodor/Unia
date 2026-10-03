@@ -5,7 +5,7 @@ from ....aplicacion.puertos.infraestructura import Reloj
 from ....aplicacion.puertos.seguridad import Hasheador
 from .conexion import BaseDeDatos
 from .generador import generar_movimientos
-from .perfiles import PERFILES
+from .perfiles import ADMIN, PERFILES
 
 VERSION_ESQUEMA = 2  # súbela al cambiar el esquema o el historial: la base se regenera sola
 ANOS_HISTORIAL = 2  # para poder comparar «este año» con «el año pasado»
@@ -92,6 +92,9 @@ CREATE TABLE IF NOT EXISTS sms_movil (
     hora TEXT NOT NULL,
     texto TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS administradores (
+    cliente_id INTEGER PRIMARY KEY   -- quién puede cambiar los ajustes de la IA
+);
 CREATE TABLE IF NOT EXISTS sesiones_chat (
     clave TEXT PRIMARY KEY,          -- «cliente:sesión»
     mensajes TEXT NOT NULL,          -- JSON
@@ -127,6 +130,7 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
     bd.ruta.parent.mkdir(parents=True, exist_ok=True)
     if bd.ruta.exists() and not forzar and _esquema_actual(bd):
         _crear_tablas_complementarias(bd)
+        _asegurar_administrador(bd, hasheador)
         desplazar_fechas(bd, reloj)
         return
     bd.ruta.unlink(missing_ok=True)
@@ -155,6 +159,27 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
         )
     con.commit()
     con.close()
+    _asegurar_administrador(bd, hasheador)
+
+
+def _asegurar_administrador(bd: BaseDeDatos, hasheador: Hasheador) -> None:
+    """Crea el perfil de administrador si falta (también en bases ya existentes, sin regenerarlas).
+
+    No tiene cuenta ni movimientos: solo puede entrar en los ajustes de la IA.
+    """
+    con = bd.abrir()
+    try:
+        with con:
+            if con.execute("SELECT 1 FROM clientes WHERE usuario = ?", (ADMIN.usuario,)).fetchone():
+                return
+            nuevo_id = con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM clientes").fetchone()[0]
+            con.execute(
+                "INSERT INTO clientes (id, usuario, nombre, telefono, hash_contrasena) VALUES (?,?,?,?,?)",
+                (nuevo_id, ADMIN.usuario, ADMIN.nombre, ADMIN.telefono, hasheador.hashear(ADMIN.contrasena)),
+            )
+            con.execute("INSERT INTO administradores (cliente_id) VALUES (?)", (nuevo_id,))
+    finally:
+        con.close()
 
 
 def desplazar_fechas(bd: BaseDeDatos, reloj: Reloj) -> int:

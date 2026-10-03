@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from .adaptadores.entrada.http import (
+    rutas_admin,
     rutas_ajustes,
     rutas_auth,
     rutas_banco,
@@ -53,7 +54,7 @@ from .aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, Li
 from .aplicacion.casos_uso.bizum import CancelarOperacion, ConfirmarOperacion, SolicitarBizum
 from .aplicacion.casos_uso.estado import ConsultarEstado
 from .aplicacion.casos_uso.movil import LeerMensajesMovil
-from .aplicacion.casos_uso.uso import ConsultarUso
+from .aplicacion.casos_uso.uso import AdministrarUso, ConsultarUso
 from .aplicacion.casos_uso.voz import SintetizarVoz, TranscribirAudio
 from .aplicacion.chat import ServicioChat
 from .aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo
@@ -133,6 +134,7 @@ def crear_aplicacion() -> FastAPI:
     agente = Agente(llm, herramientas, ajustes, uso_ia, presupuesto, reloj)
     chat = ServicioChat(agente, sesiones_chat, reloj, uso_ia, limitador, presupuesto, operaciones)
     consultar_uso = ConsultarUso(uso_ia, presupuesto, reloj)
+    administrar_uso = AdministrarUso(clientes, uso_ia, presupuesto, reloj, auditoria)
 
     # ── adaptadores de entrada (HTTP) ────────────────────────────────────
     cliente_actual = crear_dependencia(identificar)
@@ -142,6 +144,7 @@ def crear_aplicacion() -> FastAPI:
         rutas_banco.crear_router(consultar_saldo, listar_contactos, solicitar_bizum, consultar_movimientos, cliente_actual),
         rutas_operaciones.crear_router(confirmar_operacion, cancelar_operacion, LeerMensajesMovil(movil), cliente_actual),
         rutas_uso.crear_router(consultar_uso, cliente_actual),
+        rutas_admin.crear_router(administrar_uso, cliente_actual),
         rutas_ajustes.crear_router(GestionAjustes(ajustes, sonda), cliente_actual),
         rutas_chat.crear_router(
             chat, TranscribirAudio(whisper, ajustes), SintetizarVoz(piper), ConsultarEstado(ajustes, piper), cliente_actual

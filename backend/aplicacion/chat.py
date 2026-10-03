@@ -3,7 +3,7 @@ import logging
 from collections.abc import Iterator
 from dataclasses import replace
 
-from ..dominio.errores import DemasiadasPeticiones, ErrorDeDominio
+from ..dominio.errores import DemasiadasPeticiones, ErrorDeAccesoDenegado, ErrorDeDominio
 from ..dominio.modelos import Cliente, Mensaje
 from .agente import MARCA_AUTOMATICA, Agente
 from .eventos import Aviso, Delta, ErrorChat, EventoChat, Fin, OperacionPorConfirmar
@@ -87,6 +87,8 @@ class ServicioChat:
         Las comprobaciones se hacen AQUÍ (no dentro del generador) para que un rechazo llegue al cliente
         como un error HTTP con su código (413, 429...) antes de abrir el streaming.
         """
+        if cliente.es_admin:
+            raise ErrorDeAccesoDenegado("El perfil de administración no tiene cuenta: entra con un cliente para usar el chat.")
         texto = validar_mensaje(texto, self._presupuesto)
         espera = self._limitador.permitir(cliente.id, self._reloj.ahora())
         if espera:

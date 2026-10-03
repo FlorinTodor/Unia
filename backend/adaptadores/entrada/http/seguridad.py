@@ -1,10 +1,11 @@
 """Autenticación en la entrada HTTP: sesión por cookie `HttpOnly` + `SameSite=Strict`."""
 from collections.abc import Callable
 
-from fastapi import Response, Security
+from fastapi import Depends, Response, Security
 from fastapi.security import APIKeyCookie
 
 from ....aplicacion.casos_uso.acceso import IdentificarCliente
+from ....dominio.errores import ErrorDeAccesoDenegado
 from ....dominio.modelos import Cliente
 
 COOKIE_SESION = "sesion"
@@ -23,6 +24,17 @@ def crear_dependencia(identificar: IdentificarCliente) -> Callable[..., Cliente]
         return identificar(token)
 
     return cliente_actual
+
+
+def exigir_admin(cliente_actual: Callable[..., Cliente]) -> Callable[..., Cliente]:
+    """Dependencia: como `cliente_actual`, pero solo deja pasar al administrador (si no, 403)."""
+
+    def admin_actual(cliente: Cliente = Depends(cliente_actual)) -> Cliente:
+        if not cliente.es_admin:
+            raise ErrorDeAccesoDenegado("Solo el administrador puede cambiar los ajustes de la IA.")
+        return cliente
+
+    return admin_actual
 
 
 def poner_cookie(respuesta: Response, token: str, segura: bool) -> None:

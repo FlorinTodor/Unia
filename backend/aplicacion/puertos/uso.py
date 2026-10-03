@@ -14,6 +14,10 @@ class RegistroUso(Protocol):
 
     def ultimos(self, cliente_id: int, limite: int = 10) -> list[dict]: ...
 
+    def reiniciar_dia(self, cliente_id: int, dia: date) -> int:
+        """Borra el gasto de ese día (solo para pruebas y demos). Devuelve los tokens liberados."""
+        ...
+
 
 class LimitadorPeticiones(Protocol):
     def permitir(self, cliente_id: int, ahora: datetime) -> int | None:

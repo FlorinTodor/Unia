@@ -46,7 +46,7 @@ def consultar(bd, cliente, sql):
 def test_cuatro_clientes_con_datos_distintos(bd):
     con = bd.abrir(solo_lectura=True)
     clientes = con.execute("SELECT id, usuario FROM clientes ORDER BY id").fetchall()
-    assert [c["usuario"] for c in clientes] == ["alex", "ana", "marta", "jose"]
+    assert [c["usuario"] for c in clientes] == ["alex", "ana", "marta", "jose", "admin"]
     saldos = {f["cliente_id"]: f["saldo"] for f in con.execute("SELECT cliente_id, saldo FROM cuenta")}
     assert len(set(saldos.values())) == 4
     for cid in saldos:

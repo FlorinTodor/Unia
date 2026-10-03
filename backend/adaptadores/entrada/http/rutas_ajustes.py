@@ -1,16 +1,17 @@
-"""Panel ⚙️ Ajustes: alta/baja de claves, modelos, proveedor activo e IA local."""
+"""Panel ⚙️ Ajustes: alta/baja de claves, modelos, proveedor activo e IA local. Solo para el administrador."""
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
 from ....aplicacion.casos_uso.ajustes import GestionAjustes
 from ....dominio.modelos import Cliente
-from . import esquemas, presentadores
+from . import esquemas, presentadores, seguridad
 
 
 def crear_router(ajustes: GestionAjustes, cliente_actual: Callable[..., Cliente]) -> APIRouter:
     router = APIRouter(
-        prefix="/ajustes", tags=["ajustes"], dependencies=[Depends(cliente_actual)], responses=esquemas.NO_AUTENTICADO
+        prefix="/ajustes", tags=["ajustes"], dependencies=[Depends(seguridad.exigir_admin(cliente_actual))],
+        responses={**esquemas.NO_AUTENTICADO, 403: {"model": esquemas.ErrorOut, "description": "Solo el administrador."}},
     )
     vista = presentadores.vista_ajustes
 

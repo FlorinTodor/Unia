@@ -703,6 +703,134 @@
         ]
       }
     },
+    "/api/admin/uso": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Gasto de tokens de hoy por cliente",
+        "operationId": "listar_api_admin_uso_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UsoClienteOut"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Api Admin Uso Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/admin/uso/{usuario}/reiniciar": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Reiniciar los tokens de hoy de un cliente",
+        "description": "Borra el gasto de hoy de ese cliente (queda auditado). Pensado para pruebas y demos.",
+        "operationId": "reiniciar_api_admin_uso__usuario__reiniciar_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Usuario"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsoClienteOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (o no es del cliente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ajustes": {
       "get": {
         "tags": [
@@ -724,6 +852,16 @@
           },
           "401": {
             "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
             "content": {
               "application/json": {
                 "schema": {
@@ -771,6 +909,16 @@
           },
           "401": {
             "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
             "content": {
               "application/json": {
                 "schema": {
@@ -838,6 +986,16 @@
           },
           "401": {
             "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
             "content": {
               "application/json": {
                 "schema": {
@@ -928,6 +1086,16 @@
               }
             }
           },
+          "403": {
+            "description": "Solo el administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
           "404": {
             "description": "El recurso no existe (o no es del cliente).",
             "content": {
@@ -993,6 +1161,16 @@
               }
             }
           },
+          "403": {
+            "description": "Solo el administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1036,6 +1214,16 @@
           },
           "401": {
             "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1110,6 +1298,16 @@
               }
             }
           },
+          "403": {
+            "description": "Solo el administrador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1172,6 +1370,16 @@
           },
           "401": {
             "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo el administrador.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1783,6 +1991,12 @@
           "nombre": {
             "type": "string",
             "title": "Nombre"
+          },
+          "es_admin": {
+            "type": "boolean",
+            "title": "Es Admin",
+            "description": "Solo el administrador puede ver y cambiar los ajustes de la IA.",
+            "default": false
           }
         },
         "type": "object",
@@ -2499,6 +2713,34 @@
         ],
         "title": "TranscripcionOut"
       },
+      "UsoClienteOut": {
+        "properties": {
+          "usuario": {
+            "type": "string",
+            "title": "Usuario"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tokens_hoy": {
+            "type": "integer",
+            "title": "Tokens Hoy"
+          },
+          "limite_dia": {
+            "type": "integer",
+            "title": "Limite Dia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario",
+          "nombre",
+          "tokens_hoy",
+          "limite_dia"
+        ],
+        "title": "UsoClienteOut"
+      },
       "UsoOut": {
         "properties": {
           "tokens_hoy": {
@@ -2670,6 +2912,10 @@
     {
       "name": "uso",
       "description": "Gasto de tokens de la IA frente a los límites por cliente."
+    },
+    {
+      "name": "admin",
+      "description": "Solo el perfil admin: gasto de tokens por cliente y su reinicio (pruebas y demos)."
     }
   ]
 }

@@ -93,7 +93,8 @@
       "fichero": "aplicacion/puertos/seguridad.py",
       "metodos": [
         "buscar_por_usuario(usuario: str) → tuple[Cliente, str] | None",
-        "obtener(cliente_id: int) → Cliente | None"
+        "obtener(cliente_id: int) → Cliente | None",
+        "listar() → list[Cliente]"
       ],
       "adaptador": "RepositorioClientesSqlite",
       "fichero_adaptador": "salida/sqlite/repositorios.py",
@@ -193,7 +194,8 @@
       "metodos": [
         "registrar(cliente_id: int, proveedor: str, modelo: str, uso: Uso, momento: datetime) → None",
         "tokens_del_dia(cliente_id: int, dia: date) → int",
-        "ultimos(cliente_id: int, limite: int=10) → list[dict]"
+        "ultimos(cliente_id: int, limite: int=10) → list[dict]",
+        "reiniciar_dia(cliente_id: int, dia: date) → int"
       ],
       "adaptador": "UsoSqlite",
       "fichero_adaptador": "salida/sqlite/uso.py",
@@ -370,6 +372,26 @@
       ],
       "doc": "",
       "usado_por": "GET /api/uso"
+    },
+    {
+      "caso": "UsoDeCliente",
+      "fichero": "aplicacion/casos_uso/uso.py",
+      "puertos": [],
+      "doc": "",
+      "usado_por": "—"
+    },
+    {
+      "caso": "AdministrarUso",
+      "fichero": "aplicacion/casos_uso/uso.py",
+      "puertos": [
+        "RepositorioClientes",
+        "RegistroUso",
+        "PresupuestoUso",
+        "Reloj",
+        "Auditoria"
+      ],
+      "doc": "Vista del administrador: gasto de tokens de cada cliente y reinicio del día (para pruebas y demos).",
+      "usado_por": "—"
     },
     {
       "caso": "TranscribirAudio",
@@ -586,6 +608,33 @@
     },
     {
       "metodo": "GET",
+      "ruta": "/api/admin/uso",
+      "etiqueta": "admin",
+      "resumen": "Gasto de tokens de hoy por cliente",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "lista de UsoClienteOut",
+      "errores": [
+        "401",
+        "403"
+      ]
+    },
+    {
+      "metodo": "POST",
+      "ruta": "/api/admin/uso/{usuario}/reiniciar",
+      "etiqueta": "admin",
+      "resumen": "Reiniciar los tokens de hoy de un cliente",
+      "auth": true,
+      "peticion": "",
+      "respuesta": "UsoClienteOut",
+      "errores": [
+        "401",
+        "403",
+        "404"
+      ]
+    },
+    {
+      "metodo": "GET",
       "ruta": "/ajustes",
       "etiqueta": "ajustes",
       "resumen": "Ajustes actuales",
@@ -593,7 +642,8 @@
       "peticion": "",
       "respuesta": "AjustesOut",
       "errores": [
-        "401"
+        "401",
+        "403"
       ]
     },
     {
@@ -606,6 +656,7 @@
       "respuesta": "PruebaClaveOut",
       "errores": [
         "401",
+        "403",
         "404"
       ]
     },
@@ -619,6 +670,7 @@
       "respuesta": "AjustesConMensajeOut",
       "errores": [
         "401",
+        "403",
         "404"
       ]
     },
@@ -632,6 +684,7 @@
       "respuesta": "AjustesOut",
       "errores": [
         "401",
+        "403",
         "404"
       ]
     },
@@ -644,7 +697,8 @@
       "peticion": "",
       "respuesta": "AjustesOut",
       "errores": [
-        "401"
+        "401",
+        "403"
       ]
     },
     {
@@ -657,6 +711,7 @@
       "respuesta": "AjustesOut",
       "errores": [
         "401",
+        "403",
         "404"
       ]
     },
@@ -669,7 +724,8 @@
       "peticion": "PeticionOllama",
       "respuesta": "AjustesOut",
       "errores": [
-        "401"
+        "401",
+        "403"
       ]
     },
     {
@@ -681,7 +737,8 @@
       "peticion": "",
       "respuesta": "EstadoOllamaOut",
       "errores": [
-        "401"
+        "401",
+        "403"
       ]
     },
     {
@@ -746,24 +803,24 @@
   "tests": {
     "test_acceso.py": 8,
     "test_agente.py": 29,
-    "test_arquitectura.py": 69,
-    "test_bizum_otp.py": 18,
+    "test_arquitectura.py": 70,
+    "test_bizum_otp.py": 19,
     "test_chat.py": 9,
     "test_dominio.py": 15,
     "test_errores_http.py": 38,
-    "test_http.py": 45,
+    "test_http.py": 48,
     "test_persistencia.py": 7,
     "test_seguridad_chat.py": 5,
     "test_sqlite.py": 35,
     "test_texto.py": 6,
-    "test_uso.py": 21,
+    "test_uso.py": 25,
     "test_uso_http.py": 6
   },
   "ficheros": {
     "adaptadores/entrada": [
       {
         "fichero": "backend/adaptadores/entrada/http/app.py",
-        "lineas": 98,
+        "lineas": 99,
         "doc": "Construcción de la aplicación FastAPI: routers, manejo de errores, cabeceras de seguridad y frontend."
       },
       {
@@ -773,7 +830,7 @@
       },
       {
         "fichero": "backend/adaptadores/entrada/http/esquemas.py",
-        "lineas": 232,
+        "lineas": 240,
         "doc": "Modelos de petición y respuesta de la API (lo que aparece en OpenAPI / Swagger)."
       },
       {
@@ -782,9 +839,14 @@
         "doc": "Conversión de objetos de la aplicación a las respuestas JSON de la API."
       },
       {
+        "fichero": "backend/adaptadores/entrada/http/rutas_admin.py",
+        "lineas": 30,
+        "doc": "Administración (solo perfil admin): gasto de tokens por cliente y reinicio del día, para pruebas y demos."
+      },
+      {
         "fichero": "backend/adaptadores/entrada/http/rutas_ajustes.py",
-        "lineas": 63,
-        "doc": "Panel ⚙️ Ajustes: alta/baja de claves, modelos, proveedor activo e IA local."
+        "lineas": 64,
+        "doc": "Panel ⚙️ Ajustes: alta/baja de claves, modelos, proveedor activo e IA local. Solo para el administrador."
       },
       {
         "fichero": "backend/adaptadores/entrada/http/rutas_auth.py",
@@ -813,7 +875,7 @@
       },
       {
         "fichero": "backend/adaptadores/entrada/http/seguridad.py",
-        "lineas": 37,
+        "lineas": 49,
         "doc": "Autenticación en la entrada HTTP: sesión por cookie `HttpOnly` + `SameSite=Strict`."
       },
       {
@@ -900,7 +962,7 @@
       },
       {
         "fichero": "backend/adaptadores/salida/sqlite/esquema.py",
-        "lineas": 179,
+        "lineas": 204,
         "doc": "Esquema de la base de datos (varios clientes) y carga inicial con datos ficticios."
       },
       {
@@ -910,17 +972,17 @@
       },
       {
         "fichero": "backend/adaptadores/salida/sqlite/perfiles.py",
-        "lineas": 156,
+        "lineas": 168,
         "doc": "Los cuatro clientes ficticios de la demo, con vidas financieras distintas."
       },
       {
         "fichero": "backend/adaptadores/salida/sqlite/repositorios.py",
-        "lineas": 115,
+        "lineas": 128,
         "doc": "Implementaciones SQLite de los puertos bancarios. Cada consulta filtra por `cliente_id`."
       },
       {
         "fichero": "backend/adaptadores/salida/sqlite/uso.py",
-        "lineas": 46,
+        "lineas": 59,
         "doc": "Registro de uso de tokens en SQLite: sobrevive a los reinicios y permite ver el gasto por cliente y día."
       },
       {
@@ -937,7 +999,7 @@
     "aplicacion": [
       {
         "fichero": "backend/aplicacion/agente.py",
-        "lineas": 283,
+        "lineas": 298,
         "doc": "Agente conversacional: bucle de tool calling con streaming y cadena de fallback."
       },
       {
@@ -957,7 +1019,7 @@
       },
       {
         "fichero": "backend/aplicacion/casos_uso/bizum.py",
-        "lineas": 153,
+        "lineas": 166,
         "doc": "Bizum con confirmación OTP en dos pasos."
       },
       {
@@ -977,7 +1039,7 @@
       },
       {
         "fichero": "backend/aplicacion/casos_uso/uso.py",
-        "lineas": 39,
+        "lineas": 72,
         "doc": "Consulta del gasto de tokens del cliente (medidor de la interfaz y endpoint `/api/uso`)."
       },
       {
@@ -987,7 +1049,7 @@
       },
       {
         "fichero": "backend/aplicacion/chat.py",
-        "lineas": 155,
+        "lineas": 158,
         "doc": "Servicio de chat: sesiones, compactación del historial y un turno de conversación."
       },
       {
@@ -1047,12 +1109,12 @@
       },
       {
         "fichero": "backend/aplicacion/puertos/seguridad.py",
-        "lineas": 71,
+        "lineas": 75,
         "doc": "Puertos de seguridad: identidad, contraseñas, sesiones, OTP y auditoría."
       },
       {
         "fichero": "backend/aplicacion/puertos/uso.py",
-        "lineas": 19,
+        "lineas": 25,
         "doc": "Puertos del control de uso: contabilidad de tokens y limitador de peticiones."
       },
       {
@@ -1069,7 +1131,7 @@
     "composicion.py": [
       {
         "fichero": "backend/composicion.py",
-        "lineas": 156,
+        "lineas": 159,
         "doc": "Raíz de composición: el ÚNICO lugar donde se conectan puertos con adaptadores."
       }
     ],
@@ -1091,7 +1153,7 @@
       },
       {
         "fichero": "backend/dominio/modelos.py",
-        "lineas": 92,
+        "lineas": 93,
         "doc": "Entidades del negocio bancario y de la conversación."
       },
       {
@@ -1123,6 +1185,11 @@
       }
     ],
     "frontend/api": [
+      {
+        "fichero": "frontend/js/api/admin.js",
+        "lineas": 5,
+        "doc": "Adaptador de la administración (solo perfil admin): tokens por cliente."
+      },
       {
         "fichero": "frontend/js/api/ajustes.js",
         "lineas": 11,
@@ -1196,7 +1263,7 @@
     "frontend": [
       {
         "fichero": "frontend/js/main.js",
-        "lineas": 167,
+        "lineas": 177,
         "doc": "Raíz de composición del frontend: conecta vistas, casos de uso y adaptadores."
       },
       {
@@ -1242,6 +1309,11 @@
         "doc": "Móvil simulado: donde llegan los SMS con el código OTP. Es un canal aparte del chat, como en la vida real."
       },
       {
+        "fichero": "frontend/js/ui/panel_admin.js",
+        "lineas": 61,
+        "doc": "Vista del administrador: gasto de tokens de cada cliente y reinicio del día (pruebas y demos)."
+      },
+      {
         "fichero": "frontend/js/ui/panel_ajustes.js",
         "lineas": 247,
         "doc": "Panel de ajustes: claves API por proveedor, modelos, IA local (Ollama) y voz."
@@ -1268,7 +1340,7 @@
       },
       {
         "fichero": "frontend/js/ui/vista_login.js",
-        "lineas": 67,
+        "lineas": 68,
         "doc": "Pantalla de acceso: modal que no se puede cerrar hasta iniciar sesión."
       }
     ]

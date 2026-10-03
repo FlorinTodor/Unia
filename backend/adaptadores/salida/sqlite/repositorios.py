@@ -98,18 +98,31 @@ class RepositorioClientesSqlite:
         con = self._bd.abrir(solo_lectura=True)
         try:
             f = con.execute(
-                "SELECT id, usuario, nombre, telefono, hash_contrasena FROM clientes WHERE usuario = ?", (usuario,)
+                "SELECT id, usuario, nombre, telefono, hash_contrasena, "
+                "id IN (SELECT cliente_id FROM administradores) AS es_admin FROM clientes WHERE usuario = ?", (usuario,)
             ).fetchone()
         finally:
             con.close()
-        return (Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"]), f["hash_contrasena"]) if f else None
+        return (Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"], bool(f["es_admin"])), f["hash_contrasena"]) if f else None
+
+    def listar(self) -> list[Cliente]:
+        con = self._bd.abrir(solo_lectura=True)
+        try:
+            filas = con.execute(
+                "SELECT id, usuario, nombre, telefono FROM clientes "
+                "WHERE id NOT IN (SELECT cliente_id FROM administradores) ORDER BY id"
+            ).fetchall()
+        finally:
+            con.close()
+        return [Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"]) for f in filas]
 
     def obtener(self, cliente_id: int) -> Cliente | None:
         con = self._bd.abrir(solo_lectura=True)
         try:
             f = con.execute(
-                "SELECT id, usuario, nombre, telefono FROM clientes WHERE id = ?", (cliente_id,)
+                "SELECT id, usuario, nombre, telefono, id IN (SELECT cliente_id FROM administradores) AS es_admin "
+                "FROM clientes WHERE id = ?", (cliente_id,)
             ).fetchone()
         finally:
             con.close()
-        return Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"]) if f else None
+        return Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"], bool(f["es_admin"])) if f else None

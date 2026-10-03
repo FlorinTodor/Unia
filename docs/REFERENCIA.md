@@ -14,7 +14,7 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | `Reloj` | `aplicacion/puertos/infraestructura.py` | `hoy() → date`<br>`ahora() → datetime` | `RelojSistema` (`salida/reloj.py`) | `RelojFijo` |
 | `SondaProveedores` | `aplicacion/puertos/infraestructura.py` | `listar_modelos(proveedor: str, api_key: str ∣ None=None) → list[str]`<br>`estado_ollama(url: str) → EstadoOllama` | `SondaOpenAI` (`salida/llm/sonda.py`) | `SondaFalsa` |
 | `ProveedorLLM` | `aplicacion/puertos/llm.py` | `completar(modelo: ModeloRef, mensajes: Sequence[Mensaje], herramientas: Sequence[EsquemaHerramienta] ∣ None, max_tokens: int ∣ None=None) → Iterator[EventoLLM]` | `ProveedorLLMOpenAI` (`salida/llm/openai_compat.py`) | `LLMGuionizado` |
-| `RepositorioClientes` | `aplicacion/puertos/seguridad.py` | `buscar_por_usuario(usuario: str) → tuple[Cliente, str] ∣ None`<br>`obtener(cliente_id: int) → Cliente ∣ None` | `RepositorioClientesSqlite` (`salida/sqlite/repositorios.py`) | `ClientesFalsos (test_acceso)` |
+| `RepositorioClientes` | `aplicacion/puertos/seguridad.py` | `buscar_por_usuario(usuario: str) → tuple[Cliente, str] ∣ None`<br>`obtener(cliente_id: int) → Cliente ∣ None`<br>`listar() → list[Cliente]` | `RepositorioClientesSqlite` (`salida/sqlite/repositorios.py`) | `ClientesFalsos (test_acceso)` |
 | `Hasheador` | `aplicacion/puertos/seguridad.py` | `hashear(contrasena: str) → str`<br>`verificar(contrasena: str, hash_guardado: str) → bool`<br>`gastar_tiempo(contrasena: str) → None` | `HasheadorScrypt` (`salida/seguridad/hasheador.py`) | `(el real, es rápido de crear)` |
 | `SesionesAutenticadas` | `aplicacion/puertos/seguridad.py` | `crear(cliente_id: int) → str`<br>`cliente_de(token: str) → int ∣ None`<br>`cerrar(token: str) → None` | `SesionesAutenticadasSqlite` (`salida/persistencia/sqlite_estado.py`) | `SesionesAutenticadasEnMemoria` |
 | `RegistroIntentos` | `aplicacion/puertos/seguridad.py` | `obtener(usuario: str) → EstadoIntentos`<br>`guardar(usuario: str, estado: EstadoIntentos) → None` | `IntentosEnMemoria` (`salida/persistencia/memoria_seguridad.py`) | `IntentosEnMemoria` |
@@ -23,12 +23,12 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | `CanalOTP` | `aplicacion/puertos/seguridad.py` | `enviar(cliente_id: int, texto: str) → None` | `MovilSqlite` (`salida/persistencia/sqlite_estado.py`) | `MovilFalso` |
 | `BandejaMovil` | `aplicacion/puertos/seguridad.py` | `mensajes(cliente_id: int) → list[dict]` | `MovilSqlite` (`salida/persistencia/sqlite_estado.py`) | `MovilFalso` |
 | `Auditoria` | `aplicacion/puertos/seguridad.py` | `registrar(cliente_id: int ∣ None, accion: str, detalle: str, resultado: str) → None`<br>`ultimos(cliente_id: int, limite: int=20) → list[dict]` | `AuditoriaSqlite` (`salida/sqlite/auditoria.py`) | `AuditoriaEnMemoria` |
-| `RegistroUso` | `aplicacion/puertos/uso.py` | `registrar(cliente_id: int, proveedor: str, modelo: str, uso: Uso, momento: datetime) → None`<br>`tokens_del_dia(cliente_id: int, dia: date) → int`<br>`ultimos(cliente_id: int, limite: int=10) → list[dict]` | `UsoSqlite` (`salida/sqlite/uso.py`) | `UsoEnMemoria` |
+| `RegistroUso` | `aplicacion/puertos/uso.py` | `registrar(cliente_id: int, proveedor: str, modelo: str, uso: Uso, momento: datetime) → None`<br>`tokens_del_dia(cliente_id: int, dia: date) → int`<br>`ultimos(cliente_id: int, limite: int=10) → list[dict]`<br>`reiniciar_dia(cliente_id: int, dia: date) → int` | `UsoSqlite` (`salida/sqlite/uso.py`) | `UsoEnMemoria` |
 | `LimitadorPeticiones` | `aplicacion/puertos/uso.py` | `permitir(cliente_id: int, ahora: datetime) → int ∣ None` | `LimitadorEnMemoria` (`salida/persistencia/limitador.py`) | `LimitadorEnMemoria` |
 | `Transcriptor` | `aplicacion/puertos/voz.py` | `transcribir(audio: bytes, nombre_fichero: str) → str` | `TranscriptorWhisper` (`salida/voz/whisper.py`) | `TranscriptorFalso (test_http)` |
 | `Sintetizador` | `aplicacion/puertos/voz.py` | `disponible() → bool`<br>`sintetizar(texto: str) → bytes` | `SintetizadorPiper` (`salida/voz/piper.py`) | `SintetizadorFalso (test_http)` |
 
-## Casos de uso (15)
+## Casos de uso (17)
 
 | Caso de uso | Fichero | Puertos que usa | Lo llama |
 |---|---|---|---|
@@ -45,6 +45,8 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | `ConsultarEstado` | `aplicacion/casos_uso/estado.py` | `RepositorioAjustes`, `Sintetizador` | GET /estado |
 | `LeerMensajesMovil` | `aplicacion/casos_uso/movil.py` | `BandejaMovil` | GET /movil/mensajes |
 | `ConsultarUso` | `aplicacion/casos_uso/uso.py` | `RegistroUso`, `PresupuestoUso`, `Reloj` | GET /api/uso |
+| `UsoDeCliente` | `aplicacion/casos_uso/uso.py` | — | — |
+| `AdministrarUso` | `aplicacion/casos_uso/uso.py` | `RepositorioClientes`, `RegistroUso`, `PresupuestoUso`, `Reloj`, `Auditoria` | — |
 | `TranscribirAudio` | `aplicacion/casos_uso/voz.py` | `Transcriptor`, `RepositorioAjustes` | POST /stt |
 | `SintetizarVoz` | `aplicacion/casos_uso/voz.py` | `Sintetizador` | POST /tts |
 
@@ -58,7 +60,7 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | `consultar_movimientos` | lectura | `aplicacion/herramientas/movimientos.py` | Analizando tus movimientos… |
 | `generar_grafico` | lectura | `aplicacion/herramientas/grafico.py` | Generando gráfico… |
 
-## Endpoints (24)
+## Endpoints (26)
 
 | Método | Ruta | Auth | Petición | Respuesta | Errores |
 |---|---|---|---|---|---|
@@ -74,34 +76,36 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | POST | `/operaciones/{id_operacion}/cancelar` | sí | — | OkOut | 401, 404, 409 |
 | GET | `/movil/mensajes` | sí | — | lista de SmsOut | 401 |
 | GET | `/api/uso` | sí | — | UsoOut | 401 |
-| GET | `/ajustes` | sí | — | AjustesOut | 401 |
-| POST | `/ajustes/probar` | sí | PeticionProbar | PruebaClaveOut | 401, 404 |
-| POST | `/ajustes/claves` | sí | PeticionClave | AjustesConMensajeOut | 401, 404 |
-| PATCH | `/ajustes/claves/{proveedor}` | sí | PeticionModelos | AjustesOut | 401, 404 |
-| DELETE | `/ajustes/claves/{proveedor}` | sí | — | AjustesOut | 401 |
-| POST | `/ajustes/activar` | sí | PeticionActivar | AjustesOut | 401, 404 |
-| PUT | `/ajustes/ollama` | sí | PeticionOllama | AjustesOut | 401 |
-| GET | `/ajustes/ollama/estado` | sí | — | EstadoOllamaOut | 401 |
+| GET | `/api/admin/uso` | sí | — | lista de UsoClienteOut | 401, 403 |
+| POST | `/api/admin/uso/{usuario}/reiniciar` | sí | — | UsoClienteOut | 401, 403, 404 |
+| GET | `/ajustes` | sí | — | AjustesOut | 401, 403 |
+| POST | `/ajustes/probar` | sí | PeticionProbar | PruebaClaveOut | 401, 403, 404 |
+| POST | `/ajustes/claves` | sí | PeticionClave | AjustesConMensajeOut | 401, 403, 404 |
+| PATCH | `/ajustes/claves/{proveedor}` | sí | PeticionModelos | AjustesOut | 401, 403, 404 |
+| DELETE | `/ajustes/claves/{proveedor}` | sí | — | AjustesOut | 401, 403 |
+| POST | `/ajustes/activar` | sí | PeticionActivar | AjustesOut | 401, 403, 404 |
+| PUT | `/ajustes/ollama` | sí | PeticionOllama | AjustesOut | 401, 403 |
+| GET | `/ajustes/ollama/estado` | sí | — | EstadoOllamaOut | 401, 403 |
 | POST | `/chat` | sí | PeticionChat | — | 400, 401, 413, 429 |
 | POST | `/stt` | sí | — | TranscripcionOut | 401, 413, 415, 429, 502, 503, 504 |
 | POST | `/tts` | sí | PeticionTTS | — | 401, 503 |
 | GET | `/estado` | sí | — | EstadoOut | 401 |
 
-## Tests (311)
+## Tests (320)
 
 | Fichero | Pruebas |
 |---|---|
 | `tests/test_acceso.py` | 8 |
 | `tests/test_agente.py` | 29 |
-| `tests/test_arquitectura.py` | 69 |
-| `tests/test_bizum_otp.py` | 18 |
+| `tests/test_arquitectura.py` | 70 |
+| `tests/test_bizum_otp.py` | 19 |
 | `tests/test_chat.py` | 9 |
 | `tests/test_dominio.py` | 15 |
 | `tests/test_errores_http.py` | 38 |
-| `tests/test_http.py` | 45 |
+| `tests/test_http.py` | 48 |
 | `tests/test_persistencia.py` | 7 |
 | `tests/test_seguridad_chat.py` | 5 |
 | `tests/test_sqlite.py` | 35 |
 | `tests/test_texto.py` | 6 |
-| `tests/test_uso.py` | 21 |
+| `tests/test_uso.py` | 25 |
 | `tests/test_uso_http.py` | 6 |

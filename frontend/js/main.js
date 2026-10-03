@@ -13,6 +13,7 @@ import { MedidorUso } from "./ui/medidor_uso.js";
 import { Movil } from "./ui/movil.js";
 import { PanelCuenta } from "./ui/panel_cuenta.js";
 import { iniciarPanelAjustes } from "./ui/panel_ajustes.js";
+import { PanelAdmin } from "./ui/panel_admin.js";
 import { Sugerencias } from "./ui/sugerencias.js";
 import { VistaChat } from "./ui/vista_chat.js";
 import { VistaLogin } from "./ui/vista_login.js";
@@ -108,6 +109,7 @@ btnMic.addEventListener("click", alternarGrabacion);
 
 // ------------------------------------------------------------------ ajustes
 
+const panelAdmin = new PanelAdmin();
 const ajustes = iniciarPanelAjustes({ alCambiar: actualizarEstado, alCerrar: () => entrada.focus() });
 
 // ------------------------------------------------------------------ acceso
@@ -122,9 +124,17 @@ async function entrarComo(cliente) {
   login.ocultar();
   $("usuario-actual").textContent = cliente.nombre;
   $("usuario-avatar").textContent = cliente.nombre.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-  panelCuenta.cargar();
   document.body.classList.add("con-sesion");
+  document.body.classList.toggle("es-admin", Boolean(cliente.es_admin));
   conversacion.reiniciar();
+  if (cliente.es_admin) {
+    // el administrador no tiene cuenta ni chat: solo configura la IA
+    panelAdmin.mostrar();
+    const estadoAdmin = await actualizarEstado();
+    if (estadoAdmin && !estadoAdmin.configurado) ajustes.abrir();
+    return;
+  }
+  panelCuenta.cargar();
   movil.sembrar();
   vista.saludo(cliente.nombre);
   obtenerUso()
@@ -134,7 +144,6 @@ async function entrarComo(cliente) {
     })
     .catch(() => {});
   const estado = await actualizarEstado();
-  if (estado && !estado.configurado) ajustes.abrir();
   entrada.focus();
 }
 
@@ -146,7 +155,8 @@ function salirDeLaSesion(mensaje = "") {
   medidor.ocultar();
   panelCuenta.limpiar();
   conversacion.reiniciar();
-  document.body.classList.remove("con-sesion");
+  document.body.classList.remove("con-sesion", "es-admin");
+  panelAdmin.ocultar();
   $("usuario-actual").textContent = "";
   login.mostrar(mensaje);
 }
