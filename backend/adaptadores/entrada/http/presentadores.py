@@ -1,8 +1,34 @@
 """Conversión de objetos de la aplicación a las respuestas JSON de la API."""
 from ....aplicacion.casos_uso.estado import EstadoSistema
+from ....aplicacion.casos_uso.uso import ResumenUso
 from ....dominio.ajustes import Ajustes, enmascarar
-from ....dominio.modelos import ComprobanteBizum, Cuenta, ResultadoConsulta
+from ....dominio.modelos import Cliente, ComprobanteBizum, Cuenta, ResultadoConsulta
+from ....dominio.operaciones import OperacionPendiente
 from ....dominio.proveedores import CATALOGO, ModeloRef
+
+
+def cliente(c: Cliente) -> dict:
+    return {"usuario": c.usuario, "nombre": c.nombre}
+
+
+def operacion_pendiente(o: OperacionPendiente) -> dict:
+    """Nunca incluye el código ni su huella."""
+    return {
+        "id": o.id,
+        "destinatario": o.destinatario,
+        "importe": o.importe,
+        "concepto": o.concepto,
+        "alertas": list(o.alertas),
+        "caduca": o.caduca.isoformat(),
+    }
+
+
+def uso(r: ResumenUso) -> dict:
+    return {
+        "tokens_hoy": r.tokens_hoy, "limite_dia": r.limite_dia, "restante": r.restante, "porcentaje": r.porcentaje,
+        "por_turno": r.por_turno, "peticiones_por_minuto": r.peticiones_por_minuto,
+        "max_caracteres_mensaje": r.max_caracteres_mensaje, "ultimos": r.ultimos,
+    }
 
 
 def cuenta(c: Cuenta) -> dict:

@@ -1,0 +1,232 @@
+"""Modelos de petición y respuesta de la API (lo que aparece en OpenAPI / Swagger)."""
+from pydantic import BaseModel, Field
+
+
+class ErrorOut(BaseModel):
+    detail: str = Field(description="Motivo del error, ya redactado para mostrarlo al usuario.")
+    errores: list[dict] | None = Field(default=None, description="Solo en 400/422: `[{campo, motivo}]`.")
+    contactos_disponibles: list[str] | None = Field(default=None, description="Solo si un contacto Bizum no existe (404).")
+
+
+# ------------------------------------------------------------------ acceso
+
+class PeticionLogin(BaseModel):
+    usuario: str = Field(description="Usuario (no distingue mayúsculas).")
+    contrasena: str
+    model_config = {"json_schema_extra": {"examples": [{"usuario": "alex", "contrasena": "alex2026"}]}}
+
+
+class ClienteOut(BaseModel):
+    usuario: str
+    nombre: str
+
+
+class OkOut(BaseModel):
+    ok: bool = True
+
+
+# ------------------------------------------------------------------ banco
+
+class CuentaOut(BaseModel):
+    iban: str
+    titular: str
+    saldo: float = Field(description="Saldo en euros.")
+
+
+class ContactoOut(BaseModel):
+    nombre: str
+    telefono: str
+
+
+class ConsultaOut(BaseModel):
+    ok: bool = True
+    columnas: list[str]
+    filas: list[list] = Field(description="Cada fila es una lista de valores en el orden de `columnas`.")
+    num_filas: int
+    truncado: bool = Field(description="True si hay más filas que el tope de 60.")
+
+
+class PeticionBizum(BaseModel):
+    destinatario: str = Field(description="Nombre (o parte) o teléfono de un contacto del cliente.")
+    importe: float = Field(description="Euros. Máximo 1.000 por operación y 1.500 al día.")
+    concepto: str = ""
+    model_config = {"json_schema_extra": {"examples": [{"destinatario": "María", "importe": 25, "concepto": "cena"}]}}
+
+
+class OperacionOut(BaseModel):
+    id: str
+    destinatario: str
+    importe: float
+    concepto: str
+    alertas: list[str] = Field(description="Avisos para el cliente (destinatario nuevo, importe alto...).")
+    caduca: str = Field(description="Instante (ISO 8601) hasta el que vale el código.")
+
+
+class BizumPendienteOut(BaseModel):
+    ok: bool = True
+    estado: str = Field(description="Siempre `pendiente_de_confirmacion`: el dinero NO se ha movido.")
+    operacion: OperacionOut
+
+
+class PeticionCodigo(BaseModel):
+    codigo: str = Field(description="Código de 6 dígitos recibido en el móvil simulado.")
+    model_config = {"json_schema_extra": {"examples": [{"codigo": "123456"}]}}
+
+
+class ComprobanteOut(BaseModel):
+    ok: bool = True
+    destinatario: str
+    telefono: str
+    importe: float
+    concepto: str
+    nuevo_saldo: float
+
+
+class SmsOut(BaseModel):
+    remitente: str
+    texto: str = Field(description="Incluye el código de confirmación. Solo se entrega por este canal.")
+    hora: str
+
+
+# ------------------------------------------------------------------ chat, voz y estado
+
+class PeticionChat(BaseModel):
+    session_id: str = Field(description="Identificador de la conversación (lo elige el cliente). Es privado de cada usuario.")
+    mensaje: str
+    model_config = {"json_schema_extra": {"examples": [{"session_id": "demo-1", "mensaje": "¿Cuánto gasté en restaurantes en junio?"}]}}
+
+
+class PeticionTTS(BaseModel):
+    texto: str = Field(description="Hasta 1.200 caracteres; los números se leen como palabras.")
+
+
+class TranscripcionOut(BaseModel):
+    texto: str
+
+
+class EstadoOut(BaseModel):
+    ok: bool = True
+    proveedor: str | None
+    modelo: str | None
+    cadena_fallback: list[str] = Field(description="Modelos en orden de uso si el principal falla.")
+    voz_disponible: bool = Field(description="¿Hay una clave con Whisper para transcribir voz?")
+    tts_servidor: bool = Field(description="¿Está instalada la voz neuronal Piper?")
+    configurado: bool
+
+
+# ------------------------------------------------------------------ uso de la IA
+
+class UsoReciente(BaseModel):
+    momento: str
+    modelo: str
+    entrada: int = Field(description="Tokens enviados al modelo.")
+    salida: int = Field(description="Tokens generados por el modelo (incluye su razonamiento).")
+    estimado: bool = Field(description="True si el proveedor no informó y el dato es una aproximación.")
+
+
+class UsoOut(BaseModel):
+    tokens_hoy: int
+    limite_dia: int = Field(description="Tokens que puede gastar el cliente al día. Se renueva a medianoche.")
+    restante: int
+    porcentaje: float
+    por_turno: int = Field(description="Tope de tokens de una sola pregunta (con todas sus rondas).")
+    peticiones_por_minuto: int
+    max_caracteres_mensaje: int
+    ultimos: list[UsoReciente]
+
+
+# ------------------------------------------------------------------ ajustes
+
+class ClaveOut(BaseModel):
+    proveedor: str
+    nombre: str
+    mascara: str = Field(description="La clave API nunca sale del servidor; solo sus últimos 4 caracteres.")
+    modelo: str | None
+    modelo_respaldo: str | None
+    modelos: list[str]
+
+
+class ProveedorOut(BaseModel):
+    id: str
+    nombre: str
+    url_claves: str
+    prefijo: str
+    nota: str
+    modelo: str
+    modelo_respaldo: str
+
+
+class OllamaOut(BaseModel):
+    url: str
+    modelo: str
+    fallback_local: bool
+
+
+class AjustesOut(BaseModel):
+    activo: str | None
+    configurado: bool
+    claves: list[ClaveOut]
+    catalogo: list[ProveedorOut]
+    ollama: OllamaOut
+    voz_entrada: str | None
+    proveedor: str | None
+    modelo: str | None
+    cadena_fallback: list[str]
+
+
+class AjustesConMensajeOut(AjustesOut):
+    mensaje: str
+
+
+class PeticionProbar(BaseModel):
+    proveedor: str
+    api_key: str
+
+
+class PruebaClaveOut(BaseModel):
+    ok: bool
+    mensaje: str
+    modelos: list[str]
+
+
+class PeticionClave(BaseModel):
+    proveedor: str
+    api_key: str
+    modelo: str | None = None
+    modelo_respaldo: str | None = None
+
+
+class PeticionModelos(BaseModel):
+    modelo: str | None = None
+    modelo_respaldo: str | None = Field(default=None, description='Cadena vacía = sin modelo de respaldo.')
+
+
+class PeticionActivar(BaseModel):
+    proveedor: str = Field(description="Id de un proveedor con clave, o `ollama`.")
+
+
+class PeticionOllama(BaseModel):
+    url: str | None = None
+    modelo: str | None = None
+    fallback_local: bool | None = None
+
+
+class EstadoOllamaOut(BaseModel):
+    ok: bool
+    mensaje: str
+    modelos: list[str]
+
+
+# respuestas de error comunes (se reutilizan en cada ruta). Mapa completo en errores_http.py.
+NO_AUTENTICADO = {401: {"model": ErrorOut, "description": "No hay sesión válida: inicia sesión en `POST /auth/login`."}}
+PETICION_INVALIDA = {400: {"model": ErrorOut, "description": "El cuerpo no es un JSON válido o está vacío."}}
+VALIDACION = {422: {"model": ErrorOut, "description": "Datos no válidos o regla de negocio incumplida."}}
+NO_ENCONTRADO = {404: {"model": ErrorOut, "description": "El recurso no existe (o no es del cliente)."}}
+CONFLICTO = {409: {"model": ErrorOut, "description": "Choca con el estado actual (saldo, tope diario, operación ya procesada)."}}
+CADUCADO = {410: {"model": ErrorOut, "description": "El código ha caducado."}}
+BLOQUEADO = {423: {"model": ErrorOut, "description": "Demasiados intentos con el código: operación cancelada."}}
+LIMITE = {429: {"model": ErrorOut, "description": "Límite de uso superado. La cabecera `Retry-After` indica los segundos de espera."}}
+PROVEEDOR = {
+    502: {"model": ErrorOut, "description": "Falla el servicio externo (IA o voz)."},
+    504: {"model": ErrorOut, "description": "El servicio externo no responde a tiempo."},
+}

@@ -1,40 +1,55 @@
-"""API bancaria ficticia (REST): saldo, contactos, Bizum y movimientos."""
-from fastapi import APIRouter
-from pydantic import BaseModel
+"""API bancaria ficticia (REST): saldo, contactos, Bizum y movimientos del cliente autenticado."""
+from collections.abc import Callable
 
-from ....aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, EnviarBizum, ListarContactos
-from ....dominio.errores import ErrorDeDominio
-from . import presentadores
+from fastapi import APIRouter, Depends, Query
 
-
-class PeticionBizum(BaseModel):
-    destinatario: str
-    importe: float
-    concepto: str = ""
+from ....aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, ListarContactos
+from ....aplicacion.casos_uso.bizum import SolicitarBizum
+from ....dominio.modelos import Cliente
+from . import esquemas, presentadores
 
 
 def crear_router(
-    saldo: ConsultarSaldo, contactos: ListarContactos, bizum: EnviarBizum, movimientos: ConsultarMovimientos
+    saldo: ConsultarSaldo,
+    contactos: ListarContactos,
+    bizum: SolicitarBizum,
+    movimientos: ConsultarMovimientos,
+    cliente_actual: Callable[..., Cliente],
 ) -> APIRouter:
-    router = APIRouter(prefix="/api/banco", tags=["banco"])
+    router = APIRouter(prefix="/api/banco", tags=["banco"], responses=esquemas.NO_AUTENTICADO)
 
-    @router.get("/saldo")
-    def obtener_saldo():
-        return presentadores.cuenta(saldo())
+    @router.get("/saldo", response_model=esquemas.CuentaOut, summary="Saldo de la cuenta")
+    def obtener_saldo(cliente: Cliente = Depends(cliente_actual)):
+        return presentadores.cuenta(saldo(cliente))
 
-    @router.get("/contactos")
-    def obtener_contactos():
-        return [{"nombre": c.nombre, "telefono": c.telefono} for c in contactos()]
+    @router.get("/contactos", response_model=list[esquemas.ContactoOut], summary="Contactos Bizum del cliente")
+    def obtener_contactos(cliente: Cliente = Depends(cliente_actual)):
+        return [{"nombre": c.nombre, "telefono": c.telefono} for c in contactos(cliente)]
 
-    @router.post("/bizum")
-    def enviar_bizum(peticion: PeticionBizum):
-        try:
-            return presentadores.comprobante_bizum(bizum(peticion.destinatario, peticion.importe, peticion.concepto))
-        except ErrorDeDominio as e:  # los rechazos de negocio son una respuesta válida, no un fallo HTTP
-            return {"ok": False, "error": e.mensaje, **e.datos}
+    @router.post(
+        "/bizum", response_model=esquemas.BizumPendienteOut, summary="Iniciar un Bizum (pendiente de código OTP)",
+        description=(
+            "**No mueve dinero.** Valida el importe, el contacto, el saldo y el tope diario, crea una operación "
+            "pendiente y envía un código de 6 dígitos al móvil simulado (`GET /movil/mensajes`). Para ejecutarla "
+            "hay que llamar a `POST /operaciones/{id}/confirmar` con ese código."
+        ),
+        responses={
+            **esquemas.VALIDACION, **esquemas.NO_ENCONTRADO,
+            409: {"model": esquemas.ErrorOut, "description": "Saldo insuficiente o tope diario superado."},
+        },
+    )
+    def solicitar_bizum(peticion: esquemas.PeticionBizum, cliente: Cliente = Depends(cliente_actual)):
+        operacion = bizum(cliente, peticion.destinatario, peticion.importe, peticion.concepto)
+        return {"ok": True, "estado": "pendiente_de_confirmacion", "operacion": presentadores.operacion_pendiente(operacion)}
 
-    @router.get("/movimientos")
-    def obtener_movimientos(limite: int = 50):
-        return presentadores.resultado_consulta(movimientos.ultimos(limite))
+    @router.get(
+        "/movimientos", response_model=esquemas.ConsultaOut, summary="Últimos movimientos",
+        description="Más recientes primero. Máximo 60 filas.",
+    )
+    def obtener_movimientos(
+        limite: int = Query(50, ge=1, le=60, description="Cuántos movimientos devolver."),
+        cliente: Cliente = Depends(cliente_actual),
+    ):
+        return presentadores.resultado_consulta(movimientos.ultimos(cliente, limite))
 
     return router
