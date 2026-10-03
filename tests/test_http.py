@@ -410,7 +410,7 @@ def test_con_docs_activados_swagger_y_openapi_estan_disponibles_con_su_propia_cs
 
 def test_la_especificacion_openapi_esta_completa_y_declara_la_cookie_de_sesion(tmp_path, bd_base):
     spec = app_con_docs(tmp_path, bd_base).cliente().get("/openapi.json").json()
-    assert spec["info"]["title"] == "Habla con tu dinero" and spec["openapi"].startswith("3.")
+    assert spec["info"]["title"] == "Unia · API" and spec["openapi"].startswith("3.")
     assert spec["components"]["securitySchemes"]["APIKeyCookie"] == {
         "type": "apiKey", "in": "cookie", "name": "sesion",
         "description": "Sesión iniciada con `POST /auth/login` (la pone el servidor).",

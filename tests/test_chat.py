@@ -45,6 +45,7 @@ def test_primer_mensaje_crea_sesion_con_system_prompt_con_fecha_y_titular():
     assert list(chat.enviar(ALEX, "s1", "hola")) == [Delta("Hola"), UsoConsumido(150, 150, 80_000), Fin("Hola")]
     system = sesiones.obtener("1:s1")[0]
     assert system.rol == "system" and "2026-10-03" in system.contenido and "Alex García" in system.contenido
+    assert "Te llamas Unia" in system.contenido
 
 
 def test_la_sesion_conserva_el_historial_entre_turnos():
