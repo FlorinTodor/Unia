@@ -58,7 +58,7 @@ class ConsultorFalso:
 class AjustesEnMemoria:
     def __init__(self, ajustes: Ajustes | None = None):
         self.ajustes = ajustes or Ajustes(
-            activo="groq", claves={"groq": ConfigClave("gsk_x", "modelo-a", "modelo-b", ["modelo-a", "modelo-b"])},
+            activo="groq", claves={"groq": ConfigClave("clave-falsa-groq", "modelo-a", "modelo-b", ["modelo-a", "modelo-b"])},
             fallback_local=False,
         )
 

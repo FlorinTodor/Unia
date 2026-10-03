@@ -157,11 +157,11 @@ def test_estado(cliente):
 
 def test_ajustes_nunca_exponen_la_clave(cliente):
     cuerpo = cliente.get("/ajustes").text
-    assert "gsk_x" not in cuerpo and "••••" in cuerpo
+    assert "clave-falsa-groq" not in cuerpo and "••••" in cuerpo
 
 
 def test_ajustes_flujo_completo(cliente):
-    añadida = cliente.post("/ajustes/claves", json={"proveedor": "openai", "api_key": "sk-clave-larga-123"}).json()
+    añadida = cliente.post("/ajustes/claves", json={"proveedor": "openai", "api_key": "clave-falsa-de-prueba"}).json()
     assert {c["proveedor"] for c in añadida["claves"]} == {"groq", "openai"} and "válida" in añadida["mensaje"]
     assert cliente.post("/ajustes/activar", json={"proveedor": "openai"}).json()["activo"] == "openai"
     patch = cliente.patch("/ajustes/claves/openai", json={"modelo": "otro"}).json()

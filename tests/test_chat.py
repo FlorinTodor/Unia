@@ -65,8 +65,8 @@ def test_caracteres_invisibles_se_eliminan_de_la_salida():
 
 
 def test_error_inesperado_llega_como_mensaje_generico_sin_filtrar_detalles():
-    chat, sesiones = servicio(LLMGuionizado(RuntimeError("clave=gsk_secreta")))
+    chat, sesiones = servicio(LLMGuionizado(RuntimeError("clave=secreto-de-prueba")))
     eventos = list(chat.enviar("s", "x"))
     assert len(eventos) == 1 and isinstance(eventos[0], ErrorChat)
-    assert "gsk_secreta" not in eventos[0].mensaje
+    assert "secreto-de-prueba" not in eventos[0].mensaje
     assert sesiones.obtener("s") is not None  # la sesión se guarda aunque falle

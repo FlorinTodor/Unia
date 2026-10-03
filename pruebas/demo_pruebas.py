@@ -110,7 +110,7 @@ def main():
     t = time.perf_counter()
     pr = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": CLAVES["groq"].api_key}).json()
     registrar("Ajustes", "Validar clave Groq (sin gastar cuota)", pr.get("ok"), pr.get("mensaje", ""), round((time.perf_counter() - t) * 1000))
-    malo = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": "gsk_clave_falsa_123456"}).json()
+    malo = cli.post("/ajustes/probar", json={"proveedor": "groq", "api_key": "clave-falsa-para-probar"}).json()
     registrar("Ajustes", "Clave falsa rechazada con mensaje claro", not malo.get("ok"), malo.get("mensaje", ""))
 
     # ── API bancaria ficticia ────────────────────────────────────────────
