@@ -24,12 +24,16 @@ from .adaptadores.salida.llm.openai_compat import ProveedorLLMOpenAI
 from .adaptadores.salida.llm.sonda import SondaOpenAI
 from .adaptadores.salida.persistencia.ajustes_json import AjustesJson
 from .adaptadores.salida.persistencia.limitador import LimitadorEnMemoria
-from .adaptadores.salida.persistencia.memoria_seguridad import IntentosEnMemoria, MovilSimulado, OperacionesEnMemoria
-from .adaptadores.salida.persistencia.sesiones_memoria import SesionesEnMemoria
+from .adaptadores.salida.persistencia.memoria_seguridad import IntentosEnMemoria
+from .adaptadores.salida.persistencia.sqlite_estado import (
+    MovilSqlite,
+    OperacionesSqlite,
+    SesionesAutenticadasSqlite,
+    SesionesChatSqlite,
+)
 from .adaptadores.salida.reloj import RelojSistema
 from .adaptadores.salida.seguridad.codigos import GeneradorCodigosSeguro
 from .adaptadores.salida.seguridad.hasheador import HasheadorScrypt
-from .adaptadores.salida.seguridad.sesiones_auth import SesionesAutenticadasEnMemoria
 from .adaptadores.salida.sqlite import esquema
 from .adaptadores.salida.sqlite.auditoria import AuditoriaSqlite
 from .adaptadores.salida.sqlite.conexion import BaseDeDatos
@@ -99,13 +103,13 @@ def crear_aplicacion() -> FastAPI:
     sonda = SondaOpenAI(fabrica)
     piper = SintetizadorPiper()
     whisper = TranscriptorWhisper(ajustes, fabrica)
-    sesiones_chat = SesionesEnMemoria()
+    sesiones_chat = SesionesChatSqlite(bd)  # el estado sobrevive a los reinicios (ver persistencia/sqlite_estado.py)
     hasheador = HasheadorScrypt()
-    sesiones_auth = SesionesAutenticadasEnMemoria(reloj)
+    sesiones_auth = SesionesAutenticadasSqlite(bd, reloj)
     intentos = IntentosEnMemoria()
-    operaciones = OperacionesEnMemoria()
+    operaciones = OperacionesSqlite(bd)
     codigos = GeneradorCodigosSeguro()
-    movil = MovilSimulado(reloj)  # canal OTP y bandeja de entrada del móvil: el mismo objeto
+    movil = MovilSqlite(bd, reloj)  # canal OTP y bandeja de entrada del móvil: el mismo objeto
 
     # ── casos de uso (aplicación) ────────────────────────────────────────
     consultar_saldo = ConsultarSaldo(cuentas)

@@ -27,7 +27,7 @@ CSP_DOCS = (
 )
 RUTAS_DOCS = ("/docs", "/redoc", "/openapi.json")
 
-DESCRIPCION_API = """API del asistente bancario conversacional «Habla con tu dinero» (Reto Unicaja · UGR).
+DESCRIPCION_API = """API de Unia, el asistente bancario conversacional de Unicaja (Reto Unicaja · UGR: «Habla con tu dinero»).
 
 **Autenticación.** Todo menos el login exige la cookie de sesión `sesion` (`HttpOnly`, `SameSite=Strict`).
 En Swagger: ejecuta `POST /auth/login` con una cuenta de demostración y las demás peticiones usarán la cookie.
@@ -59,7 +59,7 @@ def crear_app(
 
     # por defecto no se publica el mapa de la API (/docs, /redoc, /openapi.json); se activa con DOCS_API=1
     app = FastAPI(
-        title="Habla con tu dinero", version="1.0.0", description=DESCRIPCION_API, openapi_tags=ETIQUETAS,
+        title="Unia · API", version="1.0.0", description=DESCRIPCION_API, openapi_tags=ETIQUETAS,
         lifespan=ciclo_de_vida,
         docs_url="/docs" if documentar else None,
         redoc_url="/redoc" if documentar else None,
@@ -80,7 +80,10 @@ def crear_app(
         respuesta.headers["X-Content-Type-Options"] = "nosniff"
         respuesta.headers["X-Frame-Options"] = "DENY"
         respuesta.headers["Referrer-Policy"] = "no-referrer"
-        if not peticion.url.path.startswith("/static"):
+        if peticion.url.path.startswith("/static"):
+            # se guarda, pero el navegador pregunta siempre si cambió (ETag): así no sirve JS ni CSS viejos tras una actualización
+            respuesta.headers["Cache-Control"] = "no-cache"
+        else:
             respuesta.headers["Cache-Control"] = "no-store"  # nada sensible se queda en la caché del navegador
         return respuesta
 

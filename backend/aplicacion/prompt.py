@@ -12,7 +12,7 @@ Tabla contactos_bizum(nombre, telefono)
 
 
 def construir_system_prompt(hoy: date, titular: str) -> str:
-    return f"""Eres el asistente financiero conversacional del banco (proyecto Reto Unicaja-UGR).
+    return f"""Te llamas Unia y eres el asistente financiero conversacional de Unicaja (proyecto Reto Unicaja-UGR).
 Ayudas al usuario a "hablar con su dinero": consultar saldo, analizar sus movimientos,
 enviar Bizum y visualizar sus finanzas con gráficos.
 

@@ -64,6 +64,39 @@ CREATE TABLE IF NOT EXISTS uso_ia (
     estimado INTEGER NOT NULL        -- 1 si el proveedor no informó y se calculó
 );
 CREATE INDEX IF NOT EXISTS idx_uso_cliente ON uso_ia(cliente_id, momento);
+
+-- estado que debe sobrevivir a un reinicio del servidor (ver persistencia/sqlite_estado.py)
+CREATE TABLE IF NOT EXISTS sesiones_auth (
+    huella TEXT PRIMARY KEY,         -- sha256 del token: el token en claro nunca se guarda
+    cliente_id INTEGER NOT NULL,
+    caduca TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS operaciones_pendientes (
+    id TEXT PRIMARY KEY,
+    cliente_id INTEGER NOT NULL,
+    destinatario TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    importe REAL NOT NULL,
+    concepto TEXT NOT NULL,
+    huella TEXT NOT NULL,            -- huella del código OTP, nunca el código
+    creada TEXT NOT NULL,
+    caduca TEXT NOT NULL,
+    alertas TEXT NOT NULL,           -- JSON
+    intentos_restantes INTEGER NOT NULL,
+    estado TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sms_movil (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id INTEGER NOT NULL,
+    momento TEXT NOT NULL,
+    hora TEXT NOT NULL,
+    texto TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sesiones_chat (
+    clave TEXT PRIMARY KEY,          -- «cliente:sesión»
+    mensajes TEXT NOT NULL,          -- JSON
+    actualizada TEXT NOT NULL
+);
 """
 
 
