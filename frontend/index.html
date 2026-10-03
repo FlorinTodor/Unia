@@ -10,34 +10,69 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js"></script>
 </head>
 <body>
+  <a class="saltar" href="#entrada">Saltar al cuadro de mensaje</a>
+  <div id="anuncios" class="solo-lector" aria-live="polite" aria-atomic="true"></div>
   <div class="app">
     <header>
       <div class="logo">💬💶</div>
       <div class="titulos">
         <h1>Habla con tu dinero</h1>
         <p id="info-proveedor">Asistente financiero conversacional</p>
+        <div class="medidor-uso" hidden>
+          <span id="uso-tokens" class="uso-tokens"></span>
+          <span class="uso-pista"><span id="uso-barra" class="uso-barra" data-nivel="bajo"></span></span>
+        </div>
       </div>
+      <span id="usuario-actual" class="usuario-actual"></span>
       <label class="tts-toggle" title="Leer las respuestas en voz alta">
         <input type="checkbox" id="tts-check">
         <span>🔊 Voz</span>
       </label>
+      <button type="button" id="btn-movil" class="btn-ajustes" title="Mi móvil: aquí llegan los códigos de confirmación" aria-label="Mi móvil">📱</button>
       <button type="button" id="btn-ajustes" class="btn-ajustes" title="Ajustes: claves API, modelos e IA local" aria-label="Ajustes">⚙️</button>
+      <button type="button" id="btn-salir" class="btn-secundario" title="Cerrar sesión">Salir</button>
     </header>
 
-    <main id="chat">
-      <div class="mensaje asistente">
-        <div class="burbuja">¡Hola, Alex! 👋 Soy tu asistente financiero. Puedes <b>escribirme o hablarme</b>: consulta tu saldo, tus gastos («¿cuánto gasté en restaurantes en junio?»), envía un Bizum o pídeme un gráfico de tus finanzas.</div>
-      </div>
-    </main>
+    <main id="chat" role="log" aria-live="off" aria-label="Conversación con el asistente"></main>
 
     <footer>
       <form id="formulario">
-        <button type="button" id="btn-mic" title="Hablar (pulsa para grabar, pulsa de nuevo para enviar)">🎤</button>
-        <input id="entrada" type="text" placeholder="Escribe o pulsa el micrófono…" autocomplete="off" autofocus>
-        <button type="submit" id="btn-enviar" title="Enviar">➤</button>
+        <button type="button" id="btn-mic" title="Hablar (pulsa para grabar, pulsa de nuevo para enviar)" aria-label="Hablar con el asistente: pulsa para grabar y vuelve a pulsar para enviar">🎤</button>
+        <input id="entrada" type="text" placeholder="Escribe o pulsa el micrófono…" aria-label="Escribe tu mensaje al asistente" autocomplete="off" autofocus>
+        <button type="submit" id="btn-enviar" title="Enviar" aria-label="Enviar mensaje">➤</button>
       </form>
     </footer>
   </div>
+  <aside id="movil" class="movil" hidden aria-label="Mi móvil: mensajes SMS">
+    <div class="movil-cabecera">
+      <b>📱 Mi móvil</b>
+      <button type="button" class="btn-cerrar" id="btn-cerrar-movil" aria-label="Cerrar el móvil">✕</button>
+    </div>
+    <p class="texto-mini">Mensajes SMS simulados. Aquí llega el código para confirmar operaciones, por un canal distinto al chat.</p>
+    <label class="casilla"><input type="checkbox" id="movil-leer"> 🔊 Leer los SMS en voz alta</label>
+    <p class="texto-mini">Útil si no puedes mirar la pantalla. El código se dice cifra a cifra.</p>
+    <div id="movil-mensajes"></div>
+    <div id="movil-anuncio" class="solo-lector" aria-live="assertive" aria-atomic="true"></div>
+  </aside>
+
+  <dialog id="panel-login" aria-labelledby="titulo-login">
+    <h2 id="titulo-login">💬💶 Habla con tu dinero</h2>
+    <p class="texto-suave">Inicia sesión para ver tus cuentas y hablar con tu asistente.</p>
+    <form id="formulario-login" autocomplete="off">
+      <label for="login-usuario">Usuario</label>
+      <input id="login-usuario" type="text" autocomplete="username" spellcheck="false" required>
+      <label for="login-contrasena">Contraseña</label>
+      <input id="login-contrasena" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="mensaje-estado error" role="alert"></p>
+      <button type="submit" id="btn-login" class="btn-primario">Entrar</button>
+    </form>
+    <section class="demo-cuentas">
+      <h3>Cuentas de demostración</h3>
+      <p class="texto-mini">Clientes ficticios con datos distintos. Pulsa uno para rellenar el acceso.</p>
+      <div id="cuentas-demo" class="cuentas-demo"></div>
+    </section>
+  </dialog>
+
   <dialog id="panel-ajustes" aria-labelledby="titulo-ajustes">
     <div class="ajustes-cabecera">
       <h2 id="titulo-ajustes">⚙️ Ajustes</h2>

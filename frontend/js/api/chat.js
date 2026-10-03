@@ -1,13 +1,15 @@
 /* Adaptador del chat: POST /chat y lectura del flujo SSE como un iterador asíncrono de eventos. */
+import { comprobarSesion, errorDeRespuesta } from "./http.js";
 
-/** Emite objetos `{tipo, dato, etiqueta?}` conforme llegan: delta, herramienta, aviso, grafico, fin, error. */
+/** Emite objetos `{tipo, dato, etiqueta?}` conforme llegan: delta, herramienta, aviso, grafico, operacion, fin, error. */
 export async function* enviarMensaje(sessionId, mensaje) {
   const respuesta = await fetch("/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, mensaje }),
   });
-  if (!respuesta.ok) throw new Error(`Error del servidor (${respuesta.status})`);
+  comprobarSesion(respuesta);
+  if (!respuesta.ok) throw await errorDeRespuesta(respuesta); // 413, 422, 429...: el servidor explica el motivo
 
   const lector = respuesta.body.getReader();
   const decodificador = new TextDecoder();

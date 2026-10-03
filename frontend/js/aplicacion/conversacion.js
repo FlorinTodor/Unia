@@ -6,12 +6,24 @@ export class Conversacion {
   #ocupada = false;
 
   /**
-   * @param vista    VistaChat
-   * @param hablar   (texto) => void — lee la respuesta en voz alta si el usuario lo activó
+   * @param vista          VistaChat
+   * @param hablar         (texto) => void — lee la respuesta en voz alta si el usuario lo activó
+   * @param alOperacion    (datos) => void — llega una operación por confirmar (se abre el móvil con el código)
+   * @param alResolverOperacion () => void — la operación terminó (confirmada, cancelada...): refresca el saldo, etc.
+   * @param alUso          ({tokens_turno, tokens_hoy, limite_dia}) => void — gasto de tokens al terminar la consulta
    */
-  constructor(vista, hablar) {
+  constructor(vista, hablar, { alOperacion = () => {}, alResolverOperacion = () => {}, alUso = () => {} } = {}) {
     this.vista = vista;
     this.hablar = hablar;
+    this.alOperacion = alOperacion;
+    this.alResolverOperacion = alResolverOperacion;
+    this.alUso = alUso;
+  }
+
+  /** Nueva sesión de chat (al cambiar de usuario no se arrastra nada de la anterior). */
+  reiniciar() {
+    this.#sessionId = crypto.randomUUID();
+    this.#ocupada = false;
   }
 
   get ocupada() {
@@ -41,6 +53,11 @@ export class Conversacion {
           vista.aviso(dato);
         } else if (tipo === "grafico") {
           vista.grafico(dato);
+        } else if (tipo === "uso") {
+          this.alUso(dato);
+        } else if (tipo === "operacion") {
+          vista.operacion(dato, this.alResolverOperacion);
+          this.alOperacion(dato);
         } else if (tipo === "fin") {
           quitarEstados();
           const contenido = dato || acumulado;
@@ -49,12 +66,16 @@ export class Conversacion {
             burbuja.classList.remove("cursor-escribiendo");
             vista.pintarTexto(burbuja, contenido);
           }
-          if (contenido) this.hablar(contenido);
+          if (contenido) {
+            vista.anunciar(contenido);
+            this.hablar(contenido);
+          }
         } else if (tipo === "error") {
           quitarEstados();
           burbuja ??= vista.burbujaEnStreaming();
           burbuja.classList.remove("cursor-escribiendo");
           vista.pintarTexto(burbuja, dato, { error: true });
+          vista.anunciar(`Error. ${dato}`);
         }
       }
     } catch (e) {

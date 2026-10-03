@@ -1,5 +1,6 @@
 /* Vista del chat: burbujas, estados de herramienta, avisos y tarjetas de gráfico. */
 import { escaparHtml, renderizarMarkdown } from "./dom.js";
+import { crearTarjetaOperacion } from "./tarjeta_operacion.js";
 
 export class VistaChat {
   #chat;
@@ -81,6 +82,36 @@ export class VistaChat {
       lienzo.textContent = "No se pudo renderizar el gráfico: " + e.message;
     }
     this.#scrollAlFinal();
+  }
+
+  /** Tarjeta para confirmar una operación con el código del móvil (o con la huella). */
+  operacion(datos, alTerminar) {
+    const tarjeta = crearTarjetaOperacion(datos, alTerminar);
+    this.#chat.appendChild(tarjeta);
+    this.#scrollAlFinal();
+    // el foco va al campo del código: con lector de pantalla se oye el resumen y se puede teclear sin buscar nada
+    requestAnimationFrame(() => tarjeta.querySelector("input")?.focus());
+  }
+
+  /** Texto para lectores de pantalla (región `aria-live`): se anuncia la respuesta ya terminada, no cada fragmento. */
+  anunciar(texto) {
+    const region = document.getElementById("anuncios");
+    if (!region) return;
+    region.textContent = "";
+    // el cambio de contenido en dos pasos asegura que se vuelva a leer aunque el texto se repita
+    setTimeout(() => (region.textContent = texto.replace(/[*`#_|]/g, " ").replace(/\s+/g, " ").trim()), 50);
+  }
+
+  saludo(nombre) {
+    this.#chat.replaceChildren();
+    this.crearBurbuja("asistente").innerHTML =
+      `¡Hola, ${escaparHtml(nombre.split(' ')[0])}! 👋 Soy tu asistente financiero. Puedes <b>escribirme o hablarme</b>: ` +
+      "consulta tu saldo, tus gastos («¿cuánto gasté en restaurantes en junio?»), " +
+      "envía un Bizum o pídeme un gráfico de tus finanzas.";
+  }
+
+  limpiar() {
+    this.#chat.replaceChildren();
   }
 
   alFinal() {

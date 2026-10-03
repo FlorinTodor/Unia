@@ -51,3 +51,9 @@ export async function leerEnVozAlta(texto) {
 
 // algunos navegadores cargan las voces en diferido
 if ("speechSynthesis" in window) speechSynthesis.getVoices();
+
+/** Lee un SMS en voz alta; los códigos de 6 dígitos se dicen cifra a cifra («5, 8, 5, 9, 2, 1») para poder anotarlos. */
+export function leerSms(texto) {
+  const conCifras = texto.replace(/\b\d{6}\b/g, (codigo) => codigo.split("").join(", "));
+  return leerEnVozAlta(conCifras);
+}
