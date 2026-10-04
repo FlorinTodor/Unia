@@ -37,6 +37,7 @@ class ConsultarMovimientos:
         except ConsultaNoPermitida as e:
             self._auditoria.registrar(cliente.id, "consulta_rechazada", sql[:300], e.mensaje)
             raise
+        self._auditoria.registrar(cliente.id, "consulta_sql", limpia[:300], f"{len(resultado.filas)} filas")  # también las correctas
         return resultado
 
     def ultimos(self, cliente: Cliente, limite: int = 50) -> ResultadoConsulta:

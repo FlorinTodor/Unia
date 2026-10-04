@@ -230,3 +230,151 @@ def test_una_base_de_una_version_anterior_se_regenera(bd):
     con = bd.abrir(solo_lectura=True)
     assert con.execute("PRAGMA user_version").fetchone()[0] == esquema.VERSION_ESQUEMA
     con.close()
+
+
+def test_consulta_que_no_termina_se_corta_por_tiempo(bd, monkeypatch):
+    # producto de 3 copias de movimientos (~5 s sin corte, así que falla rápido si falta el timeout): debe cortarse a los 0,2 s (incidencia 48)
+    from backend.adaptadores.salida.sqlite import consultor
+    monkeypatch.setattr(consultor, "SEGUNDOS_MAXIMOS_CONSULTA", 0.2)
+    sql = "SELECT COUNT(*) FROM movimientos a, movimientos b, movimientos c"
+    with pytest.raises(ConsultaNoPermitida, match="tarda demasiado"):
+        consultar(bd, ALEX, sql)
+
+
+# ------------------------------------------------------------------ administrador sin contraseña por defecto
+
+def _hash_admin(bd):
+    con = bd.abrir(solo_lectura=True)
+    try:
+        f = con.execute("SELECT hash_contrasena FROM clientes WHERE usuario = 'admin'").fetchone()
+    finally:
+        con.close()
+    return f[0] if f else None
+
+
+def test_sin_contrasena_admin_el_administrador_no_se_crea(tmp_path, monkeypatch):
+    monkeypatch.delenv("CONTRASENA_ADMIN")
+    bd = BaseDeDatos(tmp_path / "sin_admin.db")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert _hash_admin(bd) is None
+    assert RepositorioClientesSqlite(bd).buscar_por_usuario("alex") is not None  # los clientes siguen igual
+
+
+def test_sin_contrasena_admin_se_inutiliza_el_administrador_existente(bd, monkeypatch):
+    assert HASHEADOR.verificar("clave-de-prueba-del-administrador", _hash_admin(bd))
+    monkeypatch.delenv("CONTRASENA_ADMIN")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert not HASHEADOR.verificar("", _hash_admin(bd))
+    assert not HASHEADOR.verificar("clave-de-prueba-del-administrador", _hash_admin(bd))
+
+
+def test_el_hash_del_administrador_se_rehace_si_cambia_la_contrasena(bd, monkeypatch):
+    # base creada con la antigua contraseña por defecto (admin2026) o con otra anterior
+    con = bd.abrir()
+    with con:
+        con.execute("UPDATE clientes SET hash_contrasena = ? WHERE usuario = 'admin'", (HASHEADOR.hashear("admin2026"),))
+    con.close()
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert not HASHEADOR.verificar("admin2026", _hash_admin(bd))
+    assert HASHEADOR.verificar("clave-de-prueba-del-administrador", _hash_admin(bd))
+    monkeypatch.setenv("CONTRASENA_ADMIN", "otra-clave-distinta")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert HASHEADOR.verificar("otra-clave-distinta", _hash_admin(bd))
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT length(randomblob(900000000))",
+    "SELECT length(zeroblob(900000000))",
+    "SELECT printf('%1000000000d', 1)",
+    "SELECT format('%1000000000d', 1)",
+    "SELECT length(replace(hex(zeroblob(50000)), '0', hex(zeroblob(50000))))",
+])
+def test_el_sql_del_llm_no_puede_agotar_la_memoria(bd, sql):
+    """M-1: `length(randomblob(900000000))` reservaba ~900 MB con un SELECT inocente."""
+    with pytest.raises(ConsultaNoPermitida):
+        consultar(bd, ANA, sql)
+
+
+def test_un_sql_demasiado_largo_se_rechaza(bd):
+    with pytest.raises(ConsultaNoPermitida):
+        consultar(bd, ANA, "SELECT 1 WHERE 1 IN (" + ",".join(["1"] * 8000) + ")")
+
+
+def test_buscar_contacto_no_trata_porcentaje_ni_guion_bajo_como_comodines(bd):
+    """B-3: buscar «%» devolvía el primer contacto, y «_» cualquiera de una letra."""
+    agenda = RepositorioContactosSqlite(bd)
+    assert agenda.buscar(ALEX.id, "%") is None
+    assert agenda.buscar(ALEX.id, "_") is None
+    assert agenda.buscar(ALEX.id, "María") is not None  # la búsqueda normal sigue funcionando
+
+
+def test_hex_anidado_por_muchas_columnas_y_filas_se_rechaza(bd):
+    """Alto-1: `hex(hex(..))` × 50 columnas × 60 filas reservaba cientos de MB."""
+    columnas = ",".join(["hex(hex(c))"] * 50)
+    with pytest.raises(ConsultaNoPermitida):
+        consultar(bd, ANA, f"SELECT {columnas} FROM (SELECT concepto AS c FROM movimientos)")
+
+
+def test_un_resultado_demasiado_grande_se_aborta_leyendo_fila_a_fila(bd):
+    cte = "WITH RECURSIVE r(s,n) AS (SELECT 'ab',1 UNION ALL SELECT s||s, n+1 FROM r WHERE n<10)"
+    columnas = ",".join(["a.s"] * 30)
+    with pytest.raises(ConsultaNoPermitida, match="demasiado grande"):
+        consultar(bd, ANA, f"{cte} SELECT {columnas} FROM r a, r b WHERE a.n = 10")
+
+
+def test_cte_recursiva_con_agregado_funciona_sin_abrir_tablas_ajenas(bd):
+    """Alto-1b: el autorizador denegaba la lectura de la CTE al agregar."""
+    cte = "WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<5)"
+    assert consultar(bd, ANA, f"{cte} SELECT count(*) FROM r").filas == [[5]]
+    for sql in ("SELECT * FROM sqlite_master", "WITH sqlite_master AS (SELECT 1) SELECT * FROM sqlite_schema"):
+        with pytest.raises(ConsultaNoPermitida):
+            consultar(bd, ANA, sql)
+
+
+def test_contrasena_de_cliente_en_el_entorno_rige_tambien_en_bases_ya_sembradas(bd, monkeypatch):
+    """Medio-2: `CONTRASENA_<USUARIO>` solo se aplicaba al sembrar."""
+    def hash_de(usuario):
+        con = bd.abrir()
+        try:
+            return con.execute("SELECT hash_contrasena FROM clientes WHERE usuario = ?", (usuario,)).fetchone()[0]
+        finally:
+            con.close()
+    antes = hash_de("alex")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)  # sin variable: nada cambia
+    assert hash_de("alex") == antes
+    monkeypatch.setenv("CONTRASENA_ALEX", "nueva-clave-de-alex")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert HASHEADOR.verificar("nueva-clave-de-alex", hash_de("alex"))
+    assert not HASHEADOR.verificar(CONTRASENA_ALEX, hash_de("alex"))
+    assert HASHEADOR.verificar("ana2026", hash_de("ana"))  # los demás, intactos
+
+
+def test_contrasena_de_admin_corta_no_crea_al_administrador(bd, monkeypatch):
+    """B-f: una contraseña de admin de pocos caracteres no se acepta."""
+    monkeypatch.delenv("CONTRASENA_ADMIN")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    monkeypatch.setenv("CONTRASENA_ADMIN", "corta123")
+    esquema.inicializar(bd, RelojFijo(), HASHEADOR)
+    assert not HASHEADOR.verificar("corta123", _hash_admin(bd) or "")
+
+
+def test_hash_inutilizado_gasta_el_mismo_tiempo_que_un_usuario_inexistente(monkeypatch):
+    """B-d: el admin deshabilitado (hash «!») respondía al instante y delataba que existe."""
+    from backend.adaptadores.salida.seguridad import hasheador as modulo
+    llamadas = []
+    original = modulo._derivar
+    monkeypatch.setattr(modulo, "_derivar", lambda *a: llamadas.append(1) or original(*a))
+    assert HASHEADOR.verificar("x", "!") is False
+    assert len(llamadas) == 1
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT fts3_tokenizer('simple')",
+    "SELECT load_extension('/tmp/x.so')",
+    "SELECT sqlite_compileoption_get(0)",
+    "SELECT sqlite_compileoption_used('THREADSAFE')",
+])
+def test_funciones_internas_de_sqlite_vetadas_al_sql_del_llm(bd, sql):
+    """Medio-4: `fts3_tokenizer` y compañía son superficie de SQLite que una consulta de movimientos no necesita."""
+    with pytest.raises(ConsultaNoPermitida):
+        consultar(bd, ANA, sql)

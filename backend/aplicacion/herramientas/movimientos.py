@@ -35,7 +35,7 @@ def crear(consultar_movimientos: ConsultarMovimientos, max_caracteres: int = 6_0
             "consultar_movimientos",
             "Ejecuta una consulta SQL (SQLite, solo SELECT) sobre el histórico de "
             "movimientos para responder preguntas sobre gastos, ingresos, categorías, "
-            "comercios o fechas.",
+            "comercios o fechas. Para redondear usa ROUND(x, 2): printf y format no están permitidos.",
             {
                 "type": "object",
                 "properties": {"sql": {"type": "string", "description": "Consulta SELECT en dialecto SQLite"}},
