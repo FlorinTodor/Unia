@@ -8,4 +8,4 @@ export const cambiarModelo = (proveedor, campos) => pedirJson("PATCH", `/ajustes
 export const borrarClave = (proveedor) => pedirJson("DELETE", `/ajustes/claves/${proveedor}`);
 export const activarProveedor = (proveedor) => pedirJson("POST", "/ajustes/activar", { proveedor });
 export const configurarOllama = (campos) => pedirJson("PUT", "/ajustes/ollama", campos);
-export const estadoOllama = (url) => pedirJson("GET", `/ajustes/ollama/estado?url=${encodeURIComponent(url)}`);
+export const estadoOllama = () => pedirJson("GET", "/ajustes/ollama/estado");

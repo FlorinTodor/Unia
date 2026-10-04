@@ -34,11 +34,13 @@ class SondaOpenAI:
     def estado_ollama(self, url: str) -> EstadoOllama:
         base = url.rstrip("/").removesuffix("/v1")
         try:
-            r = httpx.get(f"{base}/api/tags", timeout=3)
+            r = httpx.get(f"{base}/api/tags", timeout=3, follow_redirects=False)
             r.raise_for_status()
+            modelos = sorted(m["name"] for m in r.json().get("models", []))
         except httpx.HTTPError:
             return EstadoOllama(False, "Ollama no responde. Arráncalo con «ollama serve».", [])
-        modelos = sorted(m["name"] for m in r.json().get("models", []))
+        except (ValueError, KeyError, TypeError, AttributeError):  # respuesta que no es el JSON de Ollama
+            return EstadoOllama(False, "Ollama respondió algo inesperado.", [])
         if not modelos:
             return EstadoOllama(True, "Ollama funciona, pero no tiene modelos: «ollama pull qwen3:8b».", [])
         return EstadoOllama(True, f"Ollama en marcha · {len(modelos)} modelos instalados.", modelos)

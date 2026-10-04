@@ -203,7 +203,7 @@ export function iniciarPanelAjustes({ alCambiar, alCerrar }) {
     estadoOllama.textContent = "Comprobando…";
     estadoOllama.className = "texto-mini";
     try {
-      const r = await api.estadoOllama(inputOllamaUrl.value);
+      const r = await api.estadoOllama();
       estadoOllama.textContent = r.mensaje;
       estadoOllama.className = `texto-mini ${r.ok ? "ok" : "error"}`;
       rellenarSelect(selOllama, r.modelos, vista.ollama.modelo);

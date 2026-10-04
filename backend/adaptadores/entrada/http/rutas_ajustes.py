@@ -9,8 +9,9 @@ from . import esquemas, presentadores, seguridad
 
 
 def crear_router(ajustes: GestionAjustes, cliente_actual: Callable[..., Cliente]) -> APIRouter:
+    admin_actual = seguridad.exigir_admin(cliente_actual)
     router = APIRouter(
-        prefix="/ajustes", tags=["ajustes"], dependencies=[Depends(seguridad.exigir_admin(cliente_actual))],
+        prefix="/ajustes", tags=["ajustes"], dependencies=[Depends(admin_actual)],
         responses={**esquemas.NO_AUTENTICADO, 403: {"model": esquemas.ErrorOut, "description": "Solo el administrador."}},
     )
     vista = presentadores.vista_ajustes
@@ -31,34 +32,34 @@ def crear_router(ajustes: GestionAjustes, cliente_actual: Callable[..., Cliente]
     @router.post("/claves", response_model=esquemas.AjustesConMensajeOut, summary="Añadir o reemplazar una clave",
                  description="Solo se guarda si el proveedor la acepta. La primera clave se activa sola.",
                  responses={**esquemas.VALIDACION, **esquemas.NO_ENCONTRADO})
-    def anadir_clave(peticion: esquemas.PeticionClave):
+    def anadir_clave(peticion: esquemas.PeticionClave, admin: Cliente = Depends(admin_actual)):
         resultado, mensaje = ajustes.anadir_clave(
-            peticion.proveedor, peticion.api_key, peticion.modelo, peticion.modelo_respaldo
+            admin, peticion.proveedor, peticion.api_key, peticion.modelo, peticion.modelo_respaldo
         )
         return {**vista(resultado), "mensaje": mensaje}
 
     @router.patch("/claves/{proveedor}", response_model=esquemas.AjustesOut, summary="Cambiar los modelos de una clave",
                   responses=esquemas.NO_ENCONTRADO)
-    def cambiar_modelos(proveedor: str, peticion: esquemas.PeticionModelos):
-        return vista(ajustes.cambiar_modelos(proveedor, peticion.modelo, peticion.modelo_respaldo))
+    def cambiar_modelos(proveedor: str, peticion: esquemas.PeticionModelos, admin: Cliente = Depends(admin_actual)):
+        return vista(ajustes.cambiar_modelos(admin, proveedor, peticion.modelo, peticion.modelo_respaldo))
 
     @router.delete("/claves/{proveedor}", response_model=esquemas.AjustesOut, summary="Borrar una clave")
-    def borrar_clave(proveedor: str):
-        return vista(ajustes.borrar_clave(proveedor))
+    def borrar_clave(proveedor: str, admin: Cliente = Depends(admin_actual)):
+        return vista(ajustes.borrar_clave(admin, proveedor))
 
     @router.post("/activar", response_model=esquemas.AjustesOut, summary="Elegir el proveedor principal",
                  responses=esquemas.NO_ENCONTRADO)
-    def activar(peticion: esquemas.PeticionActivar):
-        return vista(ajustes.activar(peticion.proveedor))
+    def activar(peticion: esquemas.PeticionActivar, admin: Cliente = Depends(admin_actual)):
+        return vista(ajustes.activar(admin, peticion.proveedor))
 
     @router.put("/ollama", response_model=esquemas.AjustesOut, summary="Configurar la IA local (Ollama)")
-    def guardar_ollama(peticion: esquemas.PeticionOllama):
-        return vista(ajustes.configurar_ollama(peticion.url, peticion.modelo, peticion.fallback_local))
+    def guardar_ollama(peticion: esquemas.PeticionOllama, admin: Cliente = Depends(admin_actual)):
+        return vista(ajustes.configurar_ollama(admin, peticion.url, peticion.modelo, peticion.fallback_local))
 
     @router.get("/ollama/estado", response_model=esquemas.EstadoOllamaOut, summary="Comprobar si Ollama responde")
-    def estado_ollama(url: str | None = None):
-        """Comprueba si Ollama responde y qué modelos tiene descargados."""
-        e = ajustes.estado_ollama(url)
+    def estado_ollama():
+        """Comprueba si Ollama responde (en la URL guardada) y qué modelos tiene descargados."""
+        e = ajustes.estado_ollama()
         return {"ok": e.ok, "mensaje": e.mensaje, "modelos": e.modelos}
 
     return router
