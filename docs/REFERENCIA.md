@@ -103,7 +103,7 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | POST | `/tts` | sí | PeticionTTS | — | 401, 429, 503 |
 | GET | `/estado` | sí | — | EstadoOut | 401 |
 
-## Tests (693)
+## Tests (729)
 
 | Fichero | Pruebas |
 |---|---|
@@ -117,6 +117,7 @@ Generada por `pruebas/generar_referencia.py` leyendo el código. No se edita a m
 | `tests/test_errores_http.py` | 44 |
 | `tests/test_graficos.py` | 29 |
 | `tests/test_http.py` | 80 |
+| `tests/test_inyeccion.py` | 36 |
 | `tests/test_ollama_seguro.py` | 3 |
 | `tests/test_persistencia.py` | 8 |
 | `tests/test_seguridad_chat.py` | 6 |

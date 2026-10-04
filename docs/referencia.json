@@ -937,6 +937,7 @@
     "test_errores_http.py": 44,
     "test_graficos.py": 29,
     "test_http.py": 80,
+    "test_inyeccion.py": 36,
     "test_ollama_seguro.py": 3,
     "test_persistencia.py": 8,
     "test_seguridad_chat.py": 6,
@@ -1189,7 +1190,7 @@
       },
       {
         "fichero": "backend/aplicacion/chat.py",
-        "lineas": 215,
+        "lineas": 242,
         "doc": "Servicio de chat: sesiones, compactación del historial y un turno de conversación."
       },
       {
@@ -1269,7 +1270,7 @@
       },
       {
         "fichero": "backend/aplicacion/texto.py",
-        "lineas": 261,
+        "lineas": 292,
         "doc": "Tratamiento de texto puro: limpieza de la salida del modelo y preparación para voz."
       }
     ],

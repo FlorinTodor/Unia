@@ -60,7 +60,7 @@ backend/
     proveedores.py             # catálogo (Groq, Gemini, OpenAI…) y modelos Whisper
   aplicacion/
     agente.py                  # bucle de tool calling + fallback + reintentos (sin SDK)
-    chat.py                    # ServicioChat: sesión, compactación, saneado, errores
+    chat.py                    # ServicioChat: sesión, compactación, saneado, errores, respuesta fija ante inyección de prompt
     prompt.py                  # system prompt (14 normas)
     texto.py                   # limpiar invisibles, normalizar números para voz
     eventos.py                 # Delta, HerramientaEnUso, Aviso, Grafico, OperacionPorConfirmar, TarjetaMostrada, Fin, ErrorChat
@@ -251,7 +251,7 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 | Tarjetas | `casos_uso/tarjetas.py`, `dominio/reglas.py` | **bloquear no pide OTP** (es lo seguro y lo urgente; auditado como `tarjeta_bloqueada`); **desbloquear sí** (operación pendiente + SMS + confirmación fuera del LLM). Bloquear cancela los desbloqueos pendientes de esa tarjeta, con el mismo cerrojo por cliente que confirmar/cancelar (`casos_uso/cerrojos.py`) y un `UPDATE` condicional. La tarjeta la elige el servidor (`elegir_tarjeta`), todo método recibe el cliente de la sesión y el SQL del LLM no ve la tabla (DECISIONES nº 20) |
 | Móvil simulado | `salida/persistencia/memoria_seguridad.MovilSimulado` | el único camino del código: `GET /movil/mensajes` (📱 en la interfaz), nunca el chat |
 | Riesgo | `dominio/reglas.py` | tope por operación 1.000 €, diario 1.500 €; avisos de destinatario nuevo e importe ≥ 300 € |
-| Auditoría | `salida/sqlite/auditoria.py` | login, OTP, Bizum solicitado/ejecutado/cancelado, consultas SQL (correctas y rechazadas) y cambios de ajustes |
+| Auditoría | `salida/sqlite/auditoria.py` | login, intentos de saltarse las normas (`intento_inyeccion`), OTP, Bizum solicitado/ejecutado/cancelado, consultas SQL (correctas y rechazadas) y cambios de ajustes |
 | Datos en disco | `salida/sqlite/esquema.py` | `data/banco.db` con permisos 600; conversaciones purgadas (7 días, 50 por cliente) |
 | Navegador | `entrada/http/app.py` | CSP `script-src 'self'` (Chart.js, marked y DOMPurify en `frontend/vendor/`), HSTS, `X-Frame-Options: DENY`, `nosniff`, `no-store`; cookie `Secure` por HTTPS; sin `/docs` |
 
