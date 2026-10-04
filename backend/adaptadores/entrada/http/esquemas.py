@@ -11,8 +11,8 @@ class ErrorOut(BaseModel):
 # ------------------------------------------------------------------ acceso
 
 class PeticionLogin(BaseModel):
-    usuario: str = Field(description="Usuario (no distingue mayúsculas).")
-    contrasena: str
+    usuario: str = Field(max_length=64, description="Usuario (no distingue mayúsculas).")
+    contrasena: str = Field(max_length=256)
     model_config = {"json_schema_extra": {"examples": [{"usuario": "alex", "contrasena": "<su contraseña>"}]}}
 
 
@@ -48,9 +48,9 @@ class ConsultaOut(BaseModel):
 
 
 class PeticionBizum(BaseModel):
-    destinatario: str = Field(description="Nombre (o parte) o teléfono de un contacto del cliente.")
-    importe: float = Field(description="Euros. Máximo 1.000 por operación y 1.500 al día.")
-    concepto: str = ""
+    destinatario: str = Field(max_length=100, description="Nombre (o parte) o teléfono de un contacto del cliente.")
+    importe: float = Field(allow_inf_nan=False, description="Euros. Máximo 1.000 por operación y 1.500 al día.")
+    concepto: str = Field("", max_length=140)
     model_config = {"json_schema_extra": {"examples": [{"destinatario": "María", "importe": 25, "concepto": "cena"}]}}
 
 
@@ -70,7 +70,7 @@ class BizumPendienteOut(BaseModel):
 
 
 class PeticionCodigo(BaseModel):
-    codigo: str = Field(description="Código de 6 dígitos recibido en el móvil simulado.")
+    codigo: str = Field(pattern=r"^\d{6}$", description="Código de 6 dígitos recibido en el móvil simulado.")
     model_config = {"json_schema_extra": {"examples": [{"codigo": "123456"}]}}
 
 
@@ -92,13 +92,16 @@ class SmsOut(BaseModel):
 # ------------------------------------------------------------------ chat, voz y estado
 
 class PeticionChat(BaseModel):
-    session_id: str = Field(description="Identificador de la conversación (lo elige el cliente). Es privado de cada usuario.")
-    mensaje: str
+    session_id: str = Field(
+        pattern=r"^[A-Za-z0-9_-]{1,64}$",
+        description="Identificador de la conversación (lo elige el cliente; letras, cifras, `_` y `-`, máx. 64). Es privado de cada usuario.",
+    )
+    mensaje: str = Field(max_length=20_000, description="El tope real (`MAX_CARACTERES_MENSAJE`) responde 413; esto solo acota el cuerpo.")
     model_config = {"json_schema_extra": {"examples": [{"session_id": "demo-1", "mensaje": "¿Cuánto gasté en restaurantes en junio?"}]}}
 
 
 class PeticionTTS(BaseModel):
-    texto: str = Field(description="Hasta 1.200 caracteres; los números se leen como palabras.")
+    texto: str = Field(max_length=5_000, description="Hasta 1.200 caracteres; los números se leen como palabras.")
 
 
 class TranscripcionOut(BaseModel):
@@ -187,8 +190,8 @@ class AjustesConMensajeOut(AjustesOut):
 
 
 class PeticionProbar(BaseModel):
-    proveedor: str
-    api_key: str
+    proveedor: str = Field(max_length=32)
+    api_key: str = Field(max_length=512)
 
 
 class PruebaClaveOut(BaseModel):
@@ -198,24 +201,24 @@ class PruebaClaveOut(BaseModel):
 
 
 class PeticionClave(BaseModel):
-    proveedor: str
-    api_key: str
-    modelo: str | None = None
-    modelo_respaldo: str | None = None
+    proveedor: str = Field(max_length=32)
+    api_key: str = Field(max_length=512)
+    modelo: str | None = Field(default=None, max_length=128)
+    modelo_respaldo: str | None = Field(default=None, max_length=128)
 
 
 class PeticionModelos(BaseModel):
-    modelo: str | None = None
-    modelo_respaldo: str | None = Field(default=None, description='Cadena vacía = sin modelo de respaldo.')
+    modelo: str | None = Field(default=None, max_length=128)
+    modelo_respaldo: str | None = Field(default=None, max_length=128, description='Cadena vacía = sin modelo de respaldo.')
 
 
 class PeticionActivar(BaseModel):
-    proveedor: str = Field(description="Id de un proveedor con clave, o `ollama`.")
+    proveedor: str = Field(max_length=32, description="Id de un proveedor con clave, o `ollama`.")
 
 
 class PeticionOllama(BaseModel):
-    url: str | None = None
-    modelo: str | None = None
+    url: str | None = Field(default=None, max_length=200)
+    modelo: str | None = Field(default=None, max_length=128)
     fallback_local: bool | None = None
 
 

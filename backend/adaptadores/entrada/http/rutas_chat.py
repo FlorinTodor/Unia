@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import Response, StreamingResponse
 
 from ....aplicacion.casos_uso.estado import ConsultarEstado
-from ....aplicacion.casos_uso.voz import SintetizarVoz, TranscribirAudio
+from ....aplicacion.casos_uso.voz import MAX_BYTES_AUDIO, SintetizarVoz, TranscribirAudio
 from ....aplicacion.chat import ServicioChat
 from ....dominio.errores import ErrorTipoNoSoportado
 from ....dominio.modelos import Cliente
@@ -71,11 +71,13 @@ def crear_router(
             503: {"model": esquemas.ErrorOut, "description": "No hay clave con voz (Groq u OpenAI)."},
         },
     )
-    async def stt(audio: UploadFile):
+    async def stt(audio: UploadFile, cliente: Cliente = Depends(cliente_actual)):
         if audio.content_type and not audio.content_type.startswith(("audio/", "video/webm", "application/octet-stream")):
             raise ErrorTipoNoSoportado("El fichero debe ser un audio (webm, wav, mp3...).")
-        contenido = await audio.read()
-        return {"texto": transcribir(contenido, audio.filename or "audio.webm")}
+        # el middleware `LimiteSubidaAudio` ya acotó la subida (sesión, Content-Length y bytes reales); un byte de más
+        # basta para que el caso de uso rechace el audio por grande
+        contenido = await audio.read(MAX_BYTES_AUDIO + 1)
+        return {"texto": transcribir(cliente, contenido, audio.filename or "audio.webm")}
 
     @router.post(
         "/tts", tags=["voz"], summary="Sintetizar voz en el servidor (Piper)",
@@ -83,12 +85,12 @@ def crear_router(
         response_class=Response,
         responses={
             200: {"description": "Audio WAV.", "content": {"audio/wav": {}}},
-            **esquemas.VALIDACION,
+            **esquemas.VALIDACION, **esquemas.LIMITE,
             503: {"model": esquemas.ErrorOut, "description": "Falta el modelo de voz Piper."},
         },
     )
-    def tts(peticion: esquemas.PeticionTTS):
-        return Response(content=sintetizar(peticion.texto), media_type="audio/wav")
+    def tts(peticion: esquemas.PeticionTTS, cliente: Cliente = Depends(cliente_actual)):
+        return Response(content=sintetizar(cliente, peticion.texto), media_type="audio/wav")
 
     @router.get("/estado", tags=["estado"], response_model=esquemas.EstadoOut, summary="Estado del asistente",
                 description="Modelo en uso, cadena de respaldo y disponibilidad de la voz.")
