@@ -1,7 +1,7 @@
 """Autenticación en la entrada HTTP: sesión por cookie `HttpOnly` + `SameSite=Strict`."""
 from collections.abc import Callable
 
-from fastapi import Depends, Response, Security
+from fastapi import Depends, Request, Response, Security
 from fastapi.security import APIKeyCookie
 
 from ....aplicacion.casos_uso.acceso import IdentificarCliente
@@ -35,6 +35,17 @@ def exigir_admin(cliente_actual: Callable[..., Cliente]) -> Callable[..., Client
         return cliente
 
     return admin_actual
+
+
+def cookie_segura(solicitud: Request, configurada: bool | None) -> bool:
+    """¿Lleva la cookie el atributo `Secure`? `COOKIE_SEGURA=1/0` lo fuerza; sin configurar, depende de cómo llegó la petición.
+
+    Por HTTPS (directo o tras un proxy que envíe `X-Forwarded-Proto: https`) siempre es segura; por
+    http://localhost de desarrollo no, para no romper el login donde un `Secure` no se guardaría.
+    """
+    if configurada is not None:
+        return configurada
+    return solicitud.url.scheme == "https" or solicitud.headers.get("x-forwarded-proto", "").lower() == "https"
 
 
 def poner_cookie(respuesta: Response, token: str, segura: bool) -> None:

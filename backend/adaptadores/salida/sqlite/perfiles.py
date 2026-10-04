@@ -1,4 +1,5 @@
 """Los cuatro clientes ficticios de la demo, con vidas financieras distintas."""
+import logging
 import os
 from dataclasses import dataclass
 
@@ -168,12 +169,35 @@ ADMIN = _Administrador()
 
 
 ANIO_DEMO = 2026
+MIN_CARACTERES_ADMIN = 12  # el administrador cambia claves de API y reinicia el gasto: no admite una contraseña corta
+
+_log = logging.getLogger(__name__)
+
+
+def contrasena_admin() -> str | None:
+    """Contraseña del administrador: SOLO de `CONTRASENA_ADMIN`. Sin ella el administrador no existe (no hay valor por defecto)."""
+    contrasena = (os.getenv("CONTRASENA_ADMIN") or "").strip()
+    if contrasena and len(contrasena) < MIN_CARACTERES_ADMIN:
+        _log.warning("CONTRASENA_ADMIN tiene menos de %d caracteres: se ignora y el administrador no se crea.", MIN_CARACTERES_ADMIN)
+        return None
+    return contrasena or None
+
+
+def contrasena_configurada(usuario: str) -> str | None:
+    """`CONTRASENA_<USUARIO>` si está definida (los clientes sin ella usan el valor de demostración)."""
+    return os.getenv(f"CONTRASENA_{usuario.upper()}") or None
 
 
 def contrasena_demo(usuario: str) -> str:
     """Contraseña con la que se siembra la base de datos (que solo guarda su hash).
 
-    No hay contraseñas escritas en el código: se toma de `CONTRASENA_<USUARIO>` (p. ej. en `.env`) y, si no
-    existe, es el usuario seguido del año de la demo. Cámbiala con la variable de entorno al desplegar.
+    No hay contraseñas escritas en el código. Clientes: `CONTRASENA_<USUARIO>` (p. ej. en `.env`) y, si no
+    existe, el usuario seguido del año de la demo. Administrador: solo `CONTRASENA_ADMIN`, sin valor por defecto
+    (lanza `RuntimeError` si falta). Cámbialas con la variable de entorno al desplegar.
     """
-    return os.getenv(f"CONTRASENA_{usuario.upper()}") or f"{usuario}{ANIO_DEMO}"
+    if usuario == ADMIN.usuario:
+        contrasena = contrasena_admin()
+        if contrasena is None:
+            raise RuntimeError("Falta CONTRASENA_ADMIN: el administrador no tiene contraseña por defecto.")
+        return contrasena
+    return contrasena_configurada(usuario) or f"{usuario}{ANIO_DEMO}"

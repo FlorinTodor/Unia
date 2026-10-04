@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Protocol
 
-from ...dominio.acceso import EstadoIntentos
+from ...dominio.acceso import EstadoIntentos, ReservaIntento
 from ...dominio.modelos import Cliente
 from ...dominio.operaciones import OperacionPendiente
 
@@ -40,9 +40,14 @@ class SesionesAutenticadas(Protocol):
 
 
 class RegistroIntentos(Protocol):
-    def obtener(self, usuario: str) -> EstadoIntentos: ...
+    def reservar(self, limites: dict[str, int], ahora: datetime, conservar_ventana: frozenset[str] = frozenset()) -> ReservaIntento:
+        """Comprueba el bloqueo y cuenta un fallo provisional en cada clave, EN UN SOLO PASO atómico (antes de verificar
+        la contraseña): así los intentos en paralelo no pueden pasar todos por scrypt antes de que salte el bloqueo."""
+        ...
 
-    def guardar(self, usuario: str, estado: EstadoIntentos) -> None: ...
+    def devolver(self, reserva: ReservaIntento, reiniciar: str) -> None:
+        """La contraseña era correcta: se borra el contador de `reiniciar` y se devuelve el intento a las demás claves."""
+        ...
 
 
 class RepositorioOperaciones(Protocol):

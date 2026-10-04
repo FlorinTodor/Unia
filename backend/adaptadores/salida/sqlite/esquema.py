@@ -1,13 +1,15 @@
 """Esquema de la base de datos (varios clientes) y carga inicial con datos ficticios."""
+import os
 from datetime import date, timedelta
 
 from ....aplicacion.puertos.infraestructura import Reloj
 from ....aplicacion.puertos.seguridad import Hasheador
 from .conexion import BaseDeDatos
 from .generador import generar_movimientos
-from .perfiles import ADMIN, PERFILES, contrasena_demo
+from .perfiles import ADMIN, PERFILES, contrasena_admin, contrasena_configurada, contrasena_demo
 
 VERSION_ESQUEMA = 2  # súbela al cambiar el esquema o el historial: la base se regenera sola
+HASH_INUTILIZABLE = "!"  # no es un hash válido: `verificar` siempre devuelve False
 ANOS_HISTORIAL = 2  # para poder comparar «este año» con «el año pasado»
 
 DDL = """
@@ -129,8 +131,10 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
     """
     bd.ruta.parent.mkdir(parents=True, exist_ok=True)
     if bd.ruta.exists() and not forzar and _esquema_actual(bd):
+        _restringir_permisos(bd)
         _crear_tablas_complementarias(bd)
         _asegurar_administrador(bd, hasheador)
+        _alinear_contrasenas_de_clientes(bd, hasheador)
         desplazar_fechas(bd, reloj)
         return
     bd.ruta.unlink(missing_ok=True)
@@ -159,25 +163,63 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
         )
     con.commit()
     con.close()
+    _restringir_permisos(bd)
     _asegurar_administrador(bd, hasheador)
 
 
-def _asegurar_administrador(bd: BaseDeDatos, hasheador: Hasheador) -> None:
-    """Crea el perfil de administrador si falta (también en bases ya existentes, sin regenerarlas).
+def _restringir_permisos(bd: BaseDeDatos) -> None:
+    """La base guarda hashes, saldos y movimientos: solo la lee y escribe quien ejecuta el servidor (600)."""
+    try:
+        os.chmod(bd.ruta, 0o600)
+    except OSError:  # sistemas de ficheros sin permisos POSIX (p. ej. Windows): no es un error de la aplicación
+        pass
 
-    No tiene cuenta ni movimientos: solo puede entrar en los ajustes de la IA.
+
+def _asegurar_administrador(bd: BaseDeDatos, hasheador: Hasheador) -> None:
+    """Deja el perfil de administrador acorde con `CONTRASENA_ADMIN` (también en bases ya existentes).
+
+    No tiene cuenta ni movimientos: solo puede entrar en los ajustes de la IA. Sin `CONTRASENA_ADMIN` no se crea
+    y, si ya existía, se inutiliza su hash y se cierran sus sesiones. Con ella, se crea o se vuelve a hashear si la
+    contraseña cambió (p. ej. la antigua por defecto) y se cierran sus sesiones.
+    """
+    contrasena = contrasena_admin()
+    con = bd.abrir()
+    try:
+        with con:
+            fila = con.execute("SELECT id, hash_contrasena FROM clientes WHERE usuario = ?", (ADMIN.usuario,)).fetchone()
+            if contrasena is None:
+                if fila is not None:
+                    con.execute("UPDATE clientes SET hash_contrasena = ? WHERE id = ?", (HASH_INUTILIZABLE, fila["id"]))
+                    con.execute("DELETE FROM sesiones_auth WHERE cliente_id = ?", (fila["id"],))
+                return
+            if fila is None:
+                nuevo_id = con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM clientes").fetchone()[0]
+                con.execute(
+                    "INSERT INTO clientes (id, usuario, nombre, telefono, hash_contrasena) VALUES (?,?,?,?,?)",
+                    (nuevo_id, ADMIN.usuario, ADMIN.nombre, ADMIN.telefono, hasheador.hashear(contrasena)),
+                )
+                con.execute("INSERT INTO administradores (cliente_id) VALUES (?)", (nuevo_id,))
+            elif not hasheador.verificar(contrasena, fila["hash_contrasena"]):
+                con.execute("UPDATE clientes SET hash_contrasena = ? WHERE id = ?", (hasheador.hashear(contrasena), fila["id"]))
+                con.execute("DELETE FROM sesiones_auth WHERE cliente_id = ?", (fila["id"],))
+    finally:
+        con.close()
+
+
+def _alinear_contrasenas_de_clientes(bd: BaseDeDatos, hasheador: Hasheador) -> None:
+    """`CONTRASENA_<USUARIO>` también rige en bases ya sembradas: si cambió, se rehace el hash y se cierran sus sesiones.
+
+    Sin la variable no se toca nada (la contraseña sigue siendo la que se sembró: usuario+año o la que fuera).
     """
     con = bd.abrir()
     try:
         with con:
-            if con.execute("SELECT 1 FROM clientes WHERE usuario = ?", (ADMIN.usuario,)).fetchone():
-                return
-            nuevo_id = con.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM clientes").fetchone()[0]
-            con.execute(
-                "INSERT INTO clientes (id, usuario, nombre, telefono, hash_contrasena) VALUES (?,?,?,?,?)",
-                (nuevo_id, ADMIN.usuario, ADMIN.nombre, ADMIN.telefono, hasheador.hashear(contrasena_demo(ADMIN.usuario))),
-            )
-            con.execute("INSERT INTO administradores (cliente_id) VALUES (?)", (nuevo_id,))
+            for perfil in PERFILES:
+                contrasena = contrasena_configurada(perfil.usuario)
+                fila = con.execute("SELECT id, hash_contrasena FROM clientes WHERE usuario = ?", (perfil.usuario,)).fetchone()
+                if contrasena and fila is not None and not hasheador.verificar(contrasena, fila["hash_contrasena"]):
+                    con.execute("UPDATE clientes SET hash_contrasena = ? WHERE id = ?", (hasheador.hashear(contrasena), fila["id"]))
+                    con.execute("DELETE FROM sesiones_auth WHERE cliente_id = ?", (fila["id"],))
     finally:
         con.close()
 

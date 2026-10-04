@@ -1,5 +1,8 @@
 """Acceso: login con contraseña, sesión por cookie y bloqueo temporal tras intentos fallidos."""
-from ...dominio.acceso import EstadoIntentos
+import threading
+from datetime import datetime
+
+from ...dominio.acceso import MAX_FALLOS, MAX_FALLOS_IP, clave_inexistente, clave_origen, clave_usuario
 from ...dominio.errores import CredencialesInvalidas, CuentaBloqueada, NoAutenticado
 from ...dominio.modelos import Cliente
 from ..puertos.infraestructura import Reloj
@@ -31,19 +34,41 @@ class IniciarSesion:
         self._intentos = intentos
         self._reloj = reloj
         self._auditoria = auditoria
+        # clave → fin del bloqueo ya auditado: contra una cuenta bloqueada se puede insistir miles de veces y cada
+        # petición llenaba la auditoría; se registra una sola vez por clave y bloqueo
+        self._bloqueos_auditados: dict[str, datetime] = {}
+        self._cerrojo_auditoria = threading.Lock()
 
-    def __call__(self, usuario: str, contrasena: str) -> tuple[str, Cliente]:
+    def _auditar_bloqueo(self, usuario: str, clave: str, hasta: datetime, ahora: datetime) -> None:
+        with self._cerrojo_auditoria:
+            for k in [k for k, fin in self._bloqueos_auditados.items() if fin <= ahora]:
+                del self._bloqueos_auditados[k]  # caducados: el siguiente bloqueo de esa clave vuelve a registrarse
+            if self._bloqueos_auditados.get(clave) == hasta:
+                return
+            self._bloqueos_auditados[clave] = hasta
+        self._auditoria.registrar(None, "login_bloqueado", usuario, "cuenta u origen bloqueados temporalmente")
+
+    def __call__(self, usuario: str, contrasena: str, origen: str | None = None) -> tuple[str, Cliente]:
         usuario = usuario.strip().lower()
         ahora = self._reloj.ahora()
-        estado = self._intentos.obtener(usuario)
-        if estado.bloqueado(ahora):
-            self._auditoria.registrar(None, "login_bloqueado", usuario, "cuenta bloqueada temporalmente")
+        encontrado = self._clientes.buscar_por_usuario(usuario)
+        k_usuario = clave_usuario(usuario) if encontrado else clave_inexistente(usuario)
+        k_origen = clave_origen(origen) if origen else None
+        # El intento se RESERVA antes de verificar (scrypt tarda ~0,1 s): si se leyera el contador antes y se guardara
+        # después, 40 peticiones en paralelo pasarían todas por scrypt antes de que saltara el bloqueo. La reserva cuenta
+        # un fallo provisional en cada clave y se devuelve si la contraseña resulta correcta.
+        limites = {k_usuario: MAX_FALLOS}
+        if k_origen:  # adivinar contraseñas de muchos usuarios desde un mismo sitio también se frena
+            limites[k_origen] = MAX_FALLOS_IP
+        reserva = self._intentos.reservar(limites, ahora, frozenset({k_origen}) if k_origen else frozenset())
+        if reserva.bloqueo is not None:
+            bloqueo = reserva.bloqueo
+            self._auditar_bloqueo(usuario, reserva.clave_bloqueada, bloqueo.bloqueado_hasta, ahora)
             raise CuentaBloqueada(
-                f"Demasiados intentos. Vuelve a probar en {estado.minutos_restantes(ahora)} min.",
-                reintentar_en=estado.minutos_restantes(ahora) * 60,
+                f"Demasiados intentos. Vuelve a probar en {bloqueo.minutos_restantes(ahora)} min.",
+                reintentar_en=bloqueo.minutos_restantes(ahora) * 60,
             )
 
-        encontrado = self._clientes.buscar_por_usuario(usuario)
         if encontrado is None:
             self._hasheador.gastar_tiempo(contrasena)
             valido = False
@@ -51,20 +76,29 @@ class IniciarSesion:
             valido = self._hasheador.verificar(contrasena, encontrado[1])
 
         if not valido:
-            nuevo = estado.tras_fallo(ahora)
-            self._intentos.guardar(usuario, nuevo)
+            nuevo = reserva.provisionales[k_usuario]
+            por_origen = False
+            if k_origen and not nuevo.bloqueado(ahora):
+                nuevo, por_origen = reserva.provisionales[k_origen], True
             self._auditoria.registrar(
                 encontrado[0].id if encontrado else None, "login_fallido", usuario, "credenciales incorrectas"
             )
             if nuevo.bloqueado(ahora):
+                # si lo bloqueado es el origen, la cuenta de este usuario no tiene nada: el mensaje no lo sugiere
+                texto = (
+                    f"Demasiados intentos. Vuelve a probar en {nuevo.minutos_restantes(ahora)} min." if por_origen
+                    else f"Demasiados intentos. Cuenta bloqueada {nuevo.minutos_restantes(ahora)} min por seguridad."
+                )
                 raise CuentaBloqueada(
-                    f"Demasiados intentos. Cuenta bloqueada {nuevo.minutos_restantes(ahora)} min por seguridad.",
+                    texto,
                     reintentar_en=nuevo.minutos_restantes(ahora) * 60,
                 )
             raise CredencialesInvalidas(MENSAJE_CREDENCIALES)
 
         cliente = encontrado[0]
-        self._intentos.guardar(usuario, EstadoIntentos())
+        # solo se reinicia el contador del usuario: el del origen caduca por ventana (se le devuelve el intento reservado).
+        # Si un acierto lo borrara, un atacante con una cuenta propia lo reiniciaría a voluntad.
+        self._intentos.devolver(reserva, k_usuario)
         self._auditoria.registrar(cliente.id, "login_ok", usuario, "ok")
         return self._sesiones.crear(cliente.id), cliente
 

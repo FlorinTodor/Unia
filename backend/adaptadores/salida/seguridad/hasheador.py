@@ -25,6 +25,7 @@ class HasheadorScrypt:
             _, n, r, p, sal, esperado = hash_guardado.split("$")
             derivado = _derivar(contrasena, base64.b64decode(sal), int(n), int(r), int(p))
         except (ValueError, TypeError):
+            self.gastar_tiempo(contrasena)  # hash inutilizado (admin sin contraseña): tarda lo mismo que un usuario inexistente
             return False
         return hmac.compare_digest(derivado, base64.b64decode(esperado))  # tiempo constante
 
