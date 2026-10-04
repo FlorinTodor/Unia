@@ -4,7 +4,7 @@ from collections import OrderedDict
 from datetime import datetime
 
 from ....dominio.acceso import EstadoIntentos, ReservaIntento
-from ....dominio.operaciones import OperacionPendiente
+from ....dominio.operaciones import EstadoOperacion, OperacionPendiente
 from ....aplicacion.puertos.infraestructura import Reloj
 
 
@@ -82,6 +82,9 @@ class OperacionesEnMemoria:
 
     def obtener(self, id_operacion: str) -> OperacionPendiente | None:
         return self._operaciones.get(id_operacion)
+
+    def pendientes_de(self, cliente_id: int) -> list[OperacionPendiente]:
+        return [o for o in self._operaciones.values() if o.cliente_id == cliente_id and o.estado is EstadoOperacion.PENDIENTE]
 
 
 class MovilSimulado:

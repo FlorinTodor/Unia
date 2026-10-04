@@ -13,7 +13,7 @@ from ..dominio.uso import MARCA_AUTOMATICA, PresupuestoUso, comprobar_cuota_diar
 from .puertos.infraestructura import Reloj, RepositorioSesiones
 from .puertos.seguridad import RepositorioOperaciones
 from .puertos.uso import LimitadorPeticiones, RegistroUso
-from ..dominio.operaciones import EstadoOperacion
+from ..dominio.operaciones import EstadoOperacion, TipoOperacion
 from ..dominio.reglas import euros
 from .texto import limpiar_invisibles
 
@@ -190,15 +190,17 @@ class ServicioChat:
             if operacion.estado == EstadoOperacion.PENDIENTE:
                 pendientes.append(id_operacion)  # sigue esperando: se mirará en el próximo turno
                 continue
+            if operacion.tipo is TipoOperacion.DESBLOQUEO_TARJETA:
+                descripcion, hecho, no_hecho = f"desbloqueo de la tarjeta {operacion.destinatario}", "la tarjeta YA está desbloqueada", "la tarjeta sigue bloqueada"
+            else:
+                descripcion, hecho, no_hecho = f"Bizum de {euros(operacion.importe)} a {operacion.destinatario}", "el dinero YA se ha enviado", "no se ha enviado nada"
             resultado = {
-                EstadoOperacion.CONFIRMADA: "CONFIRMADA por el cliente: el dinero YA se ha enviado",
-                EstadoOperacion.CANCELADA: "CANCELADA: no se ha enviado nada",
-                EstadoOperacion.CADUCADA: "CADUCADA: no se ha enviado nada",
-                EstadoOperacion.BLOQUEADA: "BLOQUEADA por demasiados códigos erróneos: no se ha enviado nada",
+                EstadoOperacion.CONFIRMADA: f"CONFIRMADA por el cliente: {hecho}",
+                EstadoOperacion.CANCELADA: f"CANCELADA: {no_hecho}",
+                EstadoOperacion.CADUCADA: f"CADUCADA: {no_hecho}",
+                EstadoOperacion.BLOQUEADA: f"BLOQUEADA por demasiados códigos erróneos: {no_hecho}",
             }[operacion.estado]
-            avisos.append(Mensaje.usuario(
-                f"{MARCA_AUTOMATICA} Resultado del Bizum de {euros(operacion.importe)} a {operacion.destinatario}: {resultado}."
-            ))
+            avisos.append(Mensaje.usuario(f"{MARCA_AUTOMATICA} Resultado del {descripcion}: {resultado}."))
         if pendientes:
             self._seguimiento[clave] = pendientes
         return avisos

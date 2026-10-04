@@ -39,6 +39,14 @@ class ContactoOut(BaseModel):
     telefono: str
 
 
+class TarjetaOut(BaseModel):
+    marca: str
+    tipo: str = Field(description="`débito` o `crédito`.")
+    ultimos4: str = Field(description="Solo los 4 últimos dígitos: el número completo no existe en el sistema.")
+    estado: str = Field(description="`activa` o `bloqueada`.")
+    bloqueada_el: str | None = Field(description="Instante (ISO 8601) del bloqueo, o null si está activa.")
+
+
 class ConsultaOut(BaseModel):
     ok: bool = True
     columnas: list[str]
@@ -61,6 +69,7 @@ class OperacionOut(BaseModel):
     concepto: str
     alertas: list[str] = Field(description="Avisos para el cliente (destinatario nuevo, importe alto...).")
     caduca: str = Field(description="Instante (ISO 8601) hasta el que vale el código.")
+    tipo: str = Field("bizum", description="`bizum` o `desbloqueo_tarjeta` (en este, `destinatario` es la tarjeta e `importe` 0).")
 
 
 class BizumPendienteOut(BaseModel):
@@ -76,11 +85,18 @@ class PeticionCodigo(BaseModel):
 
 class ComprobanteOut(BaseModel):
     ok: bool = True
+    tipo: str = "bizum"
     destinatario: str
     telefono: str
     importe: float
     concepto: str
     nuevo_saldo: float
+
+
+class ComprobanteTarjetaOut(BaseModel):
+    ok: bool = True
+    tipo: str = "desbloqueo_tarjeta"
+    tarjeta: TarjetaOut = Field(description="La tarjeta ya desbloqueada.")
 
 
 class SmsOut(BaseModel):

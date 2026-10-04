@@ -2,6 +2,8 @@
 import math
 import re
 import unicodedata
+from dataclasses import replace
+from datetime import datetime
 from urllib.parse import urlsplit
 
 from .errores import (
@@ -11,8 +13,12 @@ from .errores import (
     LimiteBizumExcedido,
     LimiteDiarioExcedido,
     SaldoInsuficiente,
+    TarjetaAmbigua,
+    TarjetaNoEncontrada,
+    TarjetaYaActiva,
+    TarjetaYaBloqueada,
 )
-from .modelos import Contacto
+from .modelos import Contacto, Tarjeta
 from .uso import contiene_marca_automatica, quitar_invisibles, sustituir_controles
 
 TOPE_BIZUM = 1000.0  # € por operación
@@ -172,3 +178,87 @@ def concepto_dicho_por_el_usuario(concepto: str, lo_que_dijo: str) -> str:
     palabras = _normalizar(concepto).split()
     dicho = set(_normalizar(lo_que_dijo).split())
     return concepto if palabras and all(p in dicho for p in palabras) else ""
+
+
+# ------------------------------------------------------------------ tarjetas
+
+_MARCAS_CONOCIDAS = {"visa": "Visa", "mastercard": "Mastercard", "maestro": "Maestro"}
+_TIPOS_CONOCIDOS = {"debito": "débito", "credito": "crédito", "prepago": "prepago"}
+
+
+def _pedido_de_tarjeta(tarjetas: list[Tarjeta], consulta: str) -> tuple[list[str], set[str], set[str]]:
+    """Lo que el usuario pidió: cifras, marcas y tipos (conocidos o que tenga, aunque no los tenga: pedir una
+    Mastercard a quien solo tiene Visa no debe equivaler a «cualquiera»)."""
+    palabras = set(_normalizar(consulta).split())
+    cifras = re.findall(r"\d{4}", re.sub(r"(?<=\d)[\s•*.-]+(?=\d)", "", consulta))
+    marcas = ({t.marca.casefold() for t in tarjetas} | set(_MARCAS_CONOCIDAS)) & palabras
+    tipos = ({_normalizar(t.tipo) for t in tarjetas} | set(_TIPOS_CONOCIDOS)) & palabras
+    return cifras, marcas, tipos
+
+
+def buscar_tarjetas(tarjetas: list[Tarjeta], consulta: str) -> list[Tarjeta]:
+    """Tarjetas que encajan con lo que dijo el usuario: 4 últimos dígitos, marca («visa») y/o tipo («débito»).
+
+    Las palabras que no discriminan («mi», «tarjeta», «perdida»…) se ignoran: sin ningún dato, encajan todas. Si pide
+    una marca o un tipo que no tiene, no encaja ninguna."""
+    cifras, marcas, tipos = _pedido_de_tarjeta(tarjetas, consulta)
+    return [
+        t for t in tarjetas
+        if (not cifras or t.ultimos4 in cifras)
+        and (not marcas or t.marca.casefold() in marcas)
+        and (not tipos or _normalizar(t.tipo) in tipos)
+    ]
+
+
+def _descripcion_pedida(tarjetas: list[Tarjeta], consulta: str) -> str:
+    """«Mastercard crédito» a partir de lo que se reconoce en la consulta; nunca el texto libre (podría ser un número)."""
+    _, marcas, tipos = _pedido_de_tarjeta(tarjetas, consulta)
+    nombres = {t.marca.casefold(): t.marca for t in tarjetas} | _MARCAS_CONOCIDAS
+    tipos_ = {_normalizar(t.tipo): t.tipo for t in tarjetas} | _TIPOS_CONOCIDOS
+    return " ".join([*(nombres[m] for m in sorted(marcas)), *(tipos_[t] for t in sorted(tipos))])
+
+
+def elegir_tarjeta(tarjetas: list[Tarjeta], consulta: str, *, para_bloquear: bool) -> Tarjeta:
+    """La tarjeta sobre la que actuar (el servidor decide, no el modelo).
+
+    Solo cuentan las que pueden cambiar de estado (activas si se bloquea, bloqueadas si se desbloquea): si el cliente
+    solo tiene una candidata y dice «mi tarjeta», es esa. Varias → `TarjetaAmbigua`; ninguna que encaje →
+    `TarjetaNoEncontrada`; las que encajan ya están en el estado pedido → `TarjetaYaBloqueada` / `TarjetaYaActiva`."""
+    if not tarjetas:
+        raise TarjetaNoEncontrada("No tienes ninguna tarjeta asociada a tu cuenta.")
+    encajan = buscar_tarjetas(tarjetas, consulta)
+    if not encajan:
+        pedida = _descripcion_pedida(tarjetas, consulta)
+        raise TarjetaNoEncontrada(
+            f"No encuentro una tarjeta {pedida} entre las tuyas." if pedida else "No encuentro ninguna tarjeta que encaje con lo que me has dicho.",
+            tarjetas_disponibles=[t.etiqueta for t in tarjetas],
+        )
+    aptas = [t for t in encajan if t.bloqueada != para_bloquear]
+    if len(aptas) == 1:
+        return aptas[0]
+    if aptas:
+        raise TarjetaAmbigua(
+            "Tienes varias tarjetas que encajan: pregunta a cuál se refiere.",
+            tuple(aptas), tarjetas_disponibles=[t.etiqueta for t in aptas],
+        )
+    if para_bloquear:
+        raise TarjetaYaBloqueada(_ya_en_estado(encajan, "bloqueada"), tuple(encajan))
+    raise TarjetaYaActiva(_ya_en_estado(encajan, "activa"), tuple(encajan))
+
+
+def _ya_en_estado(tarjetas: list[Tarjeta], estado: str) -> str:
+    if len(tarjetas) == 1:
+        return f"Tu tarjeta {tarjetas[0].etiqueta} ya estaba {estado}."
+    return f"Tus tarjetas ya estaban {estado}s."
+
+
+def bloquear_tarjeta(tarjeta: Tarjeta, ahora: datetime) -> Tarjeta:
+    if tarjeta.bloqueada:
+        raise TarjetaYaBloqueada(_ya_en_estado([tarjeta], "bloqueada"), (tarjeta,))
+    return replace(tarjeta, bloqueada=True, bloqueada_el=ahora)
+
+
+def desbloquear_tarjeta(tarjeta: Tarjeta) -> Tarjeta:
+    if not tarjeta.bloqueada:
+        raise TarjetaYaActiva(_ya_en_estado([tarjeta], "activa"), (tarjeta,))
+    return replace(tarjeta, bloqueada=False, bloqueada_el=None)

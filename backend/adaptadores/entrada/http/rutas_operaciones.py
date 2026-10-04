@@ -21,10 +21,10 @@ def crear_router(
     router = APIRouter(tags=["operaciones"], responses=esquemas.NO_AUTENTICADO)
 
     @router.post(
-        "/operaciones/{id_operacion}/confirmar", response_model=esquemas.ComprobanteOut,
+        "/operaciones/{id_operacion}/confirmar", response_model=esquemas.ComprobanteOut | esquemas.ComprobanteTarjetaOut,
         summary="Confirmar una operación con su código OTP",
         description=(
-            "Si el código es correcto se ejecuta el Bizum. El código vale 5 minutos, 3 intentos y un solo uso. "
+            "Si el código es correcto se ejecuta la operación (el Bizum o el desbloqueo de la tarjeta). El código vale 5 minutos, 3 intentos y un solo uso. "
             "Una operación de otro cliente responde 404, como si no existiera."
         ),
         responses={
@@ -33,10 +33,10 @@ def crear_router(
         },
     )
     def confirmar_operacion(id_operacion: str, peticion: esquemas.PeticionCodigo, cliente: Cliente = Depends(cliente_actual)):
-        return presentadores.comprobante_bizum(confirmar(cliente, id_operacion, peticion.codigo))
+        return presentadores.comprobante(confirmar(cliente, id_operacion, peticion.codigo))
 
     @router.post(
-        "/operaciones/{id_operacion}/aprobar", response_model=esquemas.ComprobanteOut,
+        "/operaciones/{id_operacion}/aprobar", response_model=esquemas.ComprobanteOut | esquemas.ComprobanteTarjetaOut,
         summary="Aprobar una operación con huella o Face ID (simulado)",
         description=(
             "Alternativa **accesible** al código: quien no puede leer o teclear el OTP (ceguera, motricidad) aprueba "
@@ -46,7 +46,7 @@ def crear_router(
         responses={**esquemas.NO_ENCONTRADO, **esquemas.CONFLICTO, **esquemas.CADUCADO},
     )
     def aprobar_operacion(id_operacion: str, cliente: Cliente = Depends(cliente_actual)):
-        return presentadores.comprobante_bizum(confirmar.aprobar(cliente, id_operacion))
+        return presentadores.comprobante(confirmar.aprobar(cliente, id_operacion))
 
     @router.post(
         "/operaciones/{id_operacion}/cancelar", response_model=esquemas.OkOut, summary="Cancelar una operación pendiente",

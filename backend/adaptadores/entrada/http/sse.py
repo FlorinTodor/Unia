@@ -10,6 +10,7 @@ from ....aplicacion.eventos import (
     Grafico,
     HerramientaEnUso,
     OperacionPorConfirmar,
+    TarjetaMostrada,
     UsoConsumido,
 )
 
@@ -28,7 +29,15 @@ def a_dict(evento: EventoChat) -> dict:
             "tipo": "operacion",
             "dato": {
                 "id": evento.id, "destinatario": evento.destinatario, "importe": evento.importe,
-                "concepto": evento.concepto, "alertas": list(evento.alertas), "caduca": evento.caduca,
+                "concepto": evento.concepto, "alertas": list(evento.alertas), "caduca": evento.caduca, "tipo": evento.tipo,
+            },
+        }
+    if isinstance(evento, TarjetaMostrada):
+        return {
+            "tipo": "tarjeta",
+            "dato": {
+                "marca": evento.marca, "tipo": evento.tipo, "ultimos4": evento.ultimos4,
+                "estado": evento.estado, "bloqueada_el": evento.bloqueada_el,
             },
         }
     if isinstance(evento, UsoConsumido):

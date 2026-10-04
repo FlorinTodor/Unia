@@ -148,3 +148,114 @@ _RE_AFIRMA_GRAFICO = re.compile(r"\*\*gr[aá]fic[oa][^*]*\*\*|aqu[ií] (tienes|e
 
 def afirma_haber_hecho_un_grafico(texto: str) -> bool:
     return bool(_RE_AFIRMA_GRAFICO.search(texto))
+
+
+_TARJETA = r"(?:tarjetas?|visa|mastercard)"
+# solo se analiza el principio del mensaje: acota el coste de las expresiones regulares (un mensaje de 20.000 caracteres
+# no debe tardar segundos) y una orden real de bloqueo cabe de sobra en 500
+_MAX_ANALIZADO = 500
+_DET = r"(?:(?:mi|mis|la|las|el|una?|todas\s+mis)\s+)?"
+# primera persona en tiempo actual o perfecto, con la tarjeta a pocas palabras del verbo (3 como mucho entre medias)
+_RE_PERDIDA_O_ROBO = re.compile(
+    r"\b(?:he\s+perdido|perd[ií]|me\s+(?:han\s+|has\s+)?(?:robad\w+|clonad\w+)|me\s+(?:robaron|clonaron)|extravi[eé])"
+    rf"(?:[\s,]+\w+){{0,3}}?[\s,]+{_DET}{_TARJETA}\b"
+    rf"|\bno\s+encuentro\s+(?:mi|la)\s+{_TARJETA}\b",
+    re.IGNORECASE,
+)
+# imperativo («bloquea(me)», «bloquéala», «congela») o «quiero bloquear»; el infinitivo suelto («bloquear») no cuenta
+_ORDEN = r"(?:bloqu[eé]a(?:me|la|lo|las)?|cong[eé]la(?:me|la|lo|las)?|quiero\s+bloquear(?:me|la|lo)?)"
+_RE_ORDEN_BLOQUEO = re.compile(
+    rf"\b{_ORDEN}\b(?:[\s,]+\w+){{0,5}}?[\s,]+{_TARJETA}\b|\b{_TARJETA}\b(?:[\s,]+\w+){{0,3}}?[\s,]+{_ORDEN}\b",
+    re.IGNORECASE,
+)
+# lo que convierte una frase en pregunta, explicación o hipótesis: ahí el servidor NO bloquea
+_RE_NO_ES_ORDEN = re.compile(
+    r"\bc[oó]mo\b|\bexpl[ií]c\w*|\bse\s+puede\b|\bpuedo\b|\bquiero\s+saber\b|\bqu[eé]\s+pasa\b|\bno\s+s[eé]\b|\bsi\b"
+    r"|\bantes\s+de\b|\bdespu[eé]s\s+de\b|\bcu[aá]nto\b|\bpero\b|\bsin\s+bloquear\b"
+    r"|\bla\s+(?:he\s+)?encontr\w+|\bya\s+la\s+tengo\b|\bapareci\w+"
+    rf"|\b{_TARJETA}\s+no\b|\bno\s+(?:quiero|bloquees|hace\s+falta|he\s+perdido|me\s+(?:han|la))\b"
+    r"|\bdesbloque\w*|\breact[ií]v\w*|\bvolver\s+a\s+usar"
+    r"|\bact[ií]v(?:a|e|o)(?:me|la|lo)?\b|\bactivar\w*|\bactivad[ao]s?\b",
+    re.IGNORECASE,
+)
+_RE_PREGUNTAS = re.compile(r"¿[^?]*(?:\?|$)|[^.!?¿\n]*\?")
+# lo que NO es una orden aunque mencione la pérdida o el bloqueo: otra tarjeta, otra persona, algo aplazado, una
+# rectificación, un hecho antiguo o una cita
+_OTRAS_TARJETAS = r"sanitaria|sim|regalo|transporte|metro|embarque|gimnasio|fidelidad|puntos|descuento|socio|biblioteca|monedero"
+_FAMILIA = (
+    r"madre|padre|hermano|hermana|hijo|hija|mujer|marido|esposa|esposo|pareja|novi[oa]|abuel[oa]|t[ií][oa]|prim[oa]|"
+    r"suegr[oa]|amig[oa]|jefe|jefa|vecin[oa]|compa[ñn]er[oa]|ni[ñn][oa]|sobrin[oa]|cu[ñn]ad[oa]|yerno|nuera"
+)
+_RE_NO_ES_ORDEN_DE_ESTE_CLIENTE = re.compile(
+    rf"\b{_TARJETA}\s+(?:de|del|para)\s+(?!d[eé]bito\b|cr[eé]dito\b)\w+|\b{_TARJETA}\s+(?:{_OTRAS_TARJETAS})\b"
+    rf"|\b(?:mi|su|tu|mis)\s+(?:{_FAMILIA})\b|\b(?:de|del)\s+(?:{_FAMILIA})\b"
+    r"|\bcuando\b|\bma[ñn]ana\b|\bluego\b|\bm[aá]s\s+(?:tarde|adelante)\b|\bdespu[eé]s\b|\besta\s+(?:noche|tarde)\b"
+    r"|\bera\s+(?:una\s+)?(?:prueba|broma)\b|\bprueba\b|\bno\s+lo\s+hagas\b|\bbroma\b|\bmentira\b"
+    r"|\bmejor\s+(?:espera|no|d[eé]jalo)\b|\bd[eé]jalo\b|\bolv[ií]d\w+|\bcancela\w*"
+    r"|\ben\s+(?:19\d\d|20[01]\d|202[0-5])\b|\bhace\s+(?:\w+\s+)?(?:a[ñn]os?|meses|tiempo)\b|\bel\s+a[ñn]o\s+pasado\b"
+    r"|[:«»\"“”]|\b(?:dice|dijo|dicen|dijeron|escribi[oó]|pone)\b",
+    re.IGNORECASE,
+)
+
+
+def pide_bloquear_tarjeta(pregunta: str) -> bool:
+    """¿Dice en primera persona que ha perdido la tarjeta o que se la han robado/clonado, o pide bloquearla?
+
+    Estrecho a propósito (el servidor bloquea de verdad si el modelo no lo hace): las preguntas («¿cómo bloqueo mi
+    tarjeta?», con o sin signos), las explicaciones, las hipótesis («si…»), los desbloqueos, las negaciones, las
+    rectificaciones («pero la encontré») y lo que le pasa a otra persona no cuentan. Las frases que son pregunta se
+    descartan y se mira el resto, así que «he perdido la tarjeta. ¿Qué hago?» sí es una orden."""
+    pregunta = pregunta[:_MAX_ANALIZADO]
+    if _RE_NO_ES_ORDEN.search(pregunta) or _RE_NO_ES_ORDEN_DE_ESTE_CLIENTE.search(pregunta):
+        return False
+    resto = _RE_PREGUNTAS.sub(" ", pregunta)
+    return bool(_RE_PERDIDA_O_ROBO.search(resto) or _RE_ORDEN_BLOQUEO.search(resto))
+
+
+_RE_HABLA_DE_TARJETAS = re.compile(r"\b(?:tarjeta|visa|mastercard|bloquea\w*|bloquear\w*|bloqu[eé]ala|cong[eé]l\w*)\b|••", re.IGNORECASE)
+# datos que solo valen como respuesta a «¿Cuál quieres bloquear?»: 4 dígitos, «débito», «crédito»
+_RE_DATO_SUELTO = re.compile(r"\b\d{4}\b|\b(?:d[eé]bito|cr[eé]dito)\b", re.IGNORECASE)
+_RE_ACLARACION_DE_TARJETA = re.compile(r"¿[^?]{0,200}\b(?:cu[aá]l(?:es)?|tarjeta)\b[^?]{0,200}\?", re.IGNORECASE)
+
+
+def es_aclaracion_de_tarjeta(mensaje_del_asistente: str) -> bool:
+    """¿El asistente acaba de preguntar a qué tarjeta se refiere («¿Cuál quieres bloquear? Tienes…»)?"""
+    return bool(_RE_ACLARACION_DE_TARJETA.search(mensaje_del_asistente[:_MAX_ANALIZADO * 2]))
+
+
+def habla_de_tarjetas(pregunta: str, tras_aclaracion: bool = False) -> bool:
+    """¿La pregunta menciona una tarjeta o un bloqueo? Los 4 dígitos o «débito»/«crédito» sueltos (la respuesta a
+    «¿cuál?»: «la de débito», «la 4821») solo cuentan si el asistente acababa de preguntar cuál."""
+    pregunta = pregunta[:_MAX_ANALIZADO]
+    return bool(_RE_HABLA_DE_TARJETAS.search(pregunta) or (tras_aclaracion and _RE_DATO_SUELTO.search(pregunta)))
+
+
+_RE_NUMERO_LARGO = re.compile(r"\d(?:[\s\-./_–—•*]{0,3}\d){11,}")
+
+
+def enmascarar_numeros_largos(texto: str) -> str:
+    """Oculta las secuencias de 12 o más dígitos con cualquier separador corriente (espacios, NBSP, puntos, guiones,
+    barras…): un número de tarjeta no debe quedar auditado."""
+    return _RE_NUMERO_LARGO.sub("[número oculto]", texto)
+
+
+_RE_ULTIMOS4 = re.compile(r"(?:terminad[ao]|acabad[ao]|acaba|que\s+acaba)\s+en\s+(\d{4})\b|(?<![*•])(?:•{2,}+|\*{2,}+)\s*(\d{4})\b", re.IGNORECASE)
+_RE_DUDA_O_NEGACION = re.compile(r"\bno\b|\bni\b|\bsalvo\b|\bexcepto\b|\bmenos\b|\bsi\b|\bo\s+(?:la|el)\b|\bcualquiera\b", re.IGNORECASE)
+_RE_MARCA = re.compile(r"\b(visa|mastercard)\b", re.IGNORECASE)
+_RE_TIPO = re.compile(r"\b(d[eé]bito|cr[eé]dito)\b", re.IGNORECASE)
+
+
+def datos_de_tarjeta(pregunta: str) -> str:
+    """Solo lo que sirve para elegir tarjeta: últimos 4 dígitos (junto a «terminada en»/«••»), marca y tipo.
+
+    Nunca la frase entera (un año o un importe de 4 cifras no es una tarjeta, y «no la de crédito» no es «la de crédito»).
+    Con negación, duda o datos contradictorios devuelve «»: el servidor pregunta cuál en vez de adivinar."""
+    pregunta = pregunta[:_MAX_ANALIZADO]
+    if _RE_DUDA_O_NEGACION.search(pregunta):
+        return ""
+    cifras = {a or b for a, b in _RE_ULTIMOS4.findall(pregunta)}
+    marcas = {m.casefold() for m in _RE_MARCA.findall(pregunta)}
+    tipos = {t.casefold() for t in _RE_TIPO.findall(pregunta)}
+    if len(cifras) > 1 or len(marcas) > 1 or len(tipos) > 1:
+        return ""
+    return " ".join([*marcas, *tipos, *cifras])

@@ -55,6 +55,10 @@ class RepositorioOperaciones(Protocol):
 
     def obtener(self, id_operacion: str) -> OperacionPendiente | None: ...
 
+    def pendientes_de(self, cliente_id: int) -> list[OperacionPendiente]:
+        """Las operaciones de ESE cliente que siguen pendientes de confirmar (de cualquier tipo)."""
+        ...
+
 
 class GeneradorCodigos(Protocol):
     def nuevo_id(self) -> str: ...

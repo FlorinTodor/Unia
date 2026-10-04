@@ -15,7 +15,9 @@ from backend.dominio.modelos import (
     Mensaje,
     Movimiento,
     ResultadoConsulta,
+    Tarjeta,
 )
+from backend.dominio.errores import TarjetaNoEncontrada, TarjetaYaActiva, TarjetaYaBloqueada
 from backend.dominio.proveedores import ModeloRef
 from backend.dominio.uso import PresupuestoUso, Uso
 
@@ -77,6 +79,29 @@ class ContactosEnMemoria:
             (c for c in self.contactos[cliente_id] if nombre_o_telefono.lower() in c.nombre.lower() or c.telefono == nombre_o_telefono),
             None,
         )
+
+
+class TarjetasEnMemoria:
+    """Alex tiene dos tarjetas activas y Ana una; sirve para comprobar el aislamiento entre clientes."""
+
+    def __init__(self):
+        self.tarjetas = {
+            ALEX.id: [Tarjeta(1, "Visa", "débito", "4821"), Tarjeta(2, "Mastercard", "crédito", "1093")],
+            ANA.id: [Tarjeta(3, "Visa", "débito", "7356")],
+        }
+
+    def listar(self, cliente_id: int) -> list[Tarjeta]:
+        return list(self.tarjetas.get(cliente_id, []))
+
+    def guardar_estado(self, cliente_id: int, tarjeta: Tarjeta) -> None:
+        propias = self.tarjetas.get(cliente_id, [])
+        for i, t in enumerate(propias):
+            if t.id == tarjeta.id:
+                if t.bloqueada == tarjeta.bloqueada:  # como el UPDATE condicional de SQLite
+                    raise (TarjetaYaBloqueada if t.bloqueada else TarjetaYaActiva)(f"Tu tarjeta {t.etiqueta} ya estaba {t.estado}.", (t,))
+                propias[i] = tarjeta
+                return
+        raise TarjetaNoEncontrada("No encuentro esa tarjeta.")
 
 
 class ConsultorFalso:

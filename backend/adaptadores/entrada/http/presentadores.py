@@ -2,7 +2,7 @@
 from ....aplicacion.casos_uso.estado import EstadoSistema
 from ....aplicacion.casos_uso.uso import ResumenUso
 from ....dominio.ajustes import Ajustes, enmascarar
-from ....dominio.modelos import Cliente, ComprobanteBizum, Cuenta, ResultadoConsulta
+from ....dominio.modelos import Cliente, ComprobanteBizum, ComprobanteTarjeta, Cuenta, ResultadoConsulta, Tarjeta
 from ....dominio.operaciones import OperacionPendiente
 from ....dominio.proveedores import CATALOGO, ModeloRef
 
@@ -20,6 +20,7 @@ def operacion_pendiente(o: OperacionPendiente) -> dict:
         "concepto": o.concepto,
         "alertas": list(o.alertas),
         "caduca": o.caduca.isoformat(),
+        "tipo": o.tipo.value,
     }
 
 
@@ -35,9 +36,24 @@ def cuenta(c: Cuenta) -> dict:
     return {"iban": c.iban, "titular": c.titular, "saldo": c.saldo}
 
 
+def tarjeta(t: Tarjeta) -> dict:
+    return {
+        "marca": t.marca, "tipo": t.tipo, "ultimos4": t.ultimos4, "estado": t.estado,
+        "bloqueada_el": t.bloqueada_el.isoformat() if t.bloqueada_el else None,
+    }
+
+
+def comprobante(c: ComprobanteBizum | ComprobanteTarjeta) -> dict:
+    """Respuesta de confirmar una operación: depende de qué se ejecutó (Bizum o desbloqueo de tarjeta)."""
+    if isinstance(c, ComprobanteTarjeta):
+        return {"ok": True, "tipo": "desbloqueo_tarjeta", "tarjeta": tarjeta(c.tarjeta)}
+    return comprobante_bizum(c)
+
+
 def comprobante_bizum(c: ComprobanteBizum) -> dict:
     return {
         "ok": True,
+        "tipo": "bizum",
         "destinatario": c.destinatario,
         "telefono": c.telefono,
         "importe": c.importe,

@@ -112,6 +112,32 @@ class ContactoAmbiguo(ErrorDeConflicto):
     """El nombre escrito coincide con varios contactos: hay que elegir (no se adivina)."""
 
 
+# ------------------------------------------------------------------ tarjetas
+
+class TarjetaNoEncontrada(ErrorNoEncontrado):
+    pass
+
+
+class _ConflictoDeTarjetas(ErrorDeConflicto):
+    """Conflicto que afecta a una o varias tarjetas (`tarjetas`: las implicadas, para mostrarlas al cliente)."""
+
+    def __init__(self, mensaje: str, tarjetas: tuple = (), **datos):
+        super().__init__(mensaje, **datos)
+        self.tarjetas = tarjetas
+
+
+class TarjetaAmbigua(_ConflictoDeTarjetas):
+    """Lo escrito encaja con varias tarjetas: hay que elegir (no se adivina cuál bloquear)."""
+
+
+class TarjetaYaBloqueada(_ConflictoDeTarjetas):
+    pass
+
+
+class TarjetaYaActiva(_ConflictoDeTarjetas):
+    pass
+
+
 # ------------------------------------------------------------------ acceso
 
 class NoAutenticado(ErrorDeAutenticacion):

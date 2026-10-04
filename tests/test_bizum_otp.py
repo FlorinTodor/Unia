@@ -14,7 +14,8 @@ from backend.dominio.errores import (
     OperacionYaProcesada,
     SaldoInsuficiente,
 )
-from tests.fakes import ALEX, ANA, AuditoriaEnMemoria, CodigosFijos, ContactosEnMemoria, CuentaEnMemoria, MovilFalso, RelojFijo
+from backend.aplicacion.casos_uso.tarjetas import DesbloquearTarjeta
+from tests.fakes import ALEX, ANA, AuditoriaEnMemoria, CodigosFijos, ContactosEnMemoria, CuentaEnMemoria, MovilFalso, RelojFijo, TarjetasEnMemoria
 
 
 class Escenario:
@@ -27,7 +28,9 @@ class Escenario:
         self.auditoria = AuditoriaEnMemoria()
         self.solicitar = SolicitarBizum(self.cuentas, self.contactos, self.operaciones, CodigosFijos(), self.movil, self.reloj, self.auditoria)
         self.cerrojos = CerrojosPorCliente()
-        self.confirmar = ConfirmarOperacion(self.cuentas, self.operaciones, self.reloj, self.auditoria, self.cerrojos)
+        self.tarjetas = TarjetasEnMemoria()
+        self.desbloquear = DesbloquearTarjeta(self.tarjetas, self.auditoria)
+        self.confirmar = ConfirmarOperacion(self.cuentas, self.operaciones, self.reloj, self.auditoria, self.cerrojos, self.desbloquear)
         self.cancelar = CancelarOperacion(self.operaciones, self.auditoria, self.cerrojos)
 
     def saldo(self, cliente=ALEX):
@@ -198,7 +201,7 @@ def test_confirmaciones_simultaneas_ejecutan_el_bizum_una_sola_vez(tmp_path):
     e = Escenario()
     e.operaciones = OperacionesSqlite(bd)
     e.solicitar = SolicitarBizum(e.cuentas, e.contactos, e.operaciones, CodigosFijos(), e.movil, e.reloj, e.auditoria)
-    e.confirmar = ConfirmarOperacion(e.cuentas, e.operaciones, e.reloj, e.auditoria, e.cerrojos)
+    e.confirmar = ConfirmarOperacion(e.cuentas, e.operaciones, e.reloj, e.auditoria, e.cerrojos, e.desbloquear)
     op = e.solicitar(ALEX, "maría", 10)
 
     def intentar(_):

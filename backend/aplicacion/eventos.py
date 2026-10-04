@@ -34,6 +34,18 @@ class OperacionPorConfirmar:
     concepto: str
     alertas: tuple[str, ...]
     caduca: str  # ISO 8601
+    tipo: str = "bizum"  # «bizum» o «desbloqueo_tarjeta» (en este, `destinatario` es la tarjeta e `importe` 0)
+
+
+@dataclass(frozen=True)
+class TarjetaMostrada:
+    """Una tarjeta del cliente para pintarla (consulta, bloqueo o desbloqueo). Nunca el número completo."""
+
+    marca: str
+    tipo: str  # «débito» / «crédito»
+    ultimos4: str
+    estado: str  # «activa» / «bloqueada»
+    bloqueada_el: str | None  # ISO 8601
 
 
 @dataclass(frozen=True)
@@ -55,4 +67,4 @@ class ErrorChat:
     mensaje: str
 
 
-EventoChat = Delta | HerramientaEnUso | Aviso | Grafico | OperacionPorConfirmar | UsoConsumido | Fin | ErrorChat
+EventoChat = Delta | HerramientaEnUso | Aviso | Grafico | OperacionPorConfirmar | TarjetaMostrada | UsoConsumido | Fin | ErrorChat

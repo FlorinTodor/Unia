@@ -20,6 +20,7 @@ from backend.adaptadores.salida.sqlite.repositorios import (
     RepositorioClientesSqlite,
     RepositorioContactosSqlite,
     RepositorioCuentaSqlite,
+    RepositorioTarjetasSqlite,
 )
 from backend.adaptadores.salida.persistencia.limitador import LimitadorEnMemoria
 from backend.adaptadores.salida.sqlite.uso import UsoSqlite
@@ -32,9 +33,10 @@ from backend.aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSa
 from backend.aplicacion.casos_uso.bizum import CancelarOperacion, CerrojosPorCliente, ConfirmarOperacion, SolicitarBizum
 from backend.aplicacion.casos_uso.estado import ConsultarEstado
 from backend.aplicacion.casos_uso.movil import LeerMensajesMovil
+from backend.aplicacion.casos_uso.tarjetas import BloquearTarjeta, ConsultarTarjetas, DesbloquearTarjeta, SolicitarDesbloqueoTarjeta
 from backend.aplicacion.casos_uso.voz import SintetizarVoz, TranscribirAudio
 from backend.aplicacion.chat import ServicioChat
-from backend.aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo
+from backend.aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo, tarjetas
 from backend.aplicacion.herramientas.registro import RegistroHerramientas
 from backend.dominio.ajustes import Ajustes, ConfigClave
 from backend.adaptadores.entrada.http import rutas_uso
@@ -76,6 +78,7 @@ class App:
         self.movil = MovilFalso()
         self.auditoria = AuditoriaSqlite(self.bd, self.reloj)
         cuentas, agenda, clientes = RepositorioCuentaSqlite(self.bd), RepositorioContactosSqlite(self.bd), RepositorioClientesSqlite(self.bd)
+        repo_tarjetas = RepositorioTarjetasSqlite(self.bd)
         ajustes = ajustes or AjustesEnMemoria()
         self.sintetizador = sintetizador or SintetizadorFalso()
         operaciones = OperacionesEnMemoria()
@@ -83,9 +86,12 @@ class App:
         c_saldo, c_contactos = ConsultarSaldo(cuentas), ListarContactos(agenda)
         c_movs = ConsultarMovimientos(ConsultorMovimientosSqlite(self.bd), self.auditoria)
         solicitar = SolicitarBizum(cuentas, agenda, operaciones, CodigosFijos(), self.movil, self.reloj, self.auditoria)
+        cerrojos = CerrojosPorCliente()
         registro = RegistroHerramientas([
             saldo.crear(c_saldo), contactos.crear(c_contactos), bizum.crear(solicitar),
             movimientos.crear(c_movs), grafico.crear(),
+            *tarjetas.crear(ConsultarTarjetas(repo_tarjetas), BloquearTarjeta(repo_tarjetas, self.reloj, self.auditoria, operaciones, cerrojos),
+                            SolicitarDesbloqueoTarjeta(repo_tarjetas, operaciones, CodigosFijos(), self.movil, self.reloj, self.auditoria)),
         ])
         self.presupuesto = presupuesto or PresupuestoUso()
         self.limitador_voz = LimitadorEnMemoria(self.presupuesto.peticiones_por_minuto * 3)
@@ -95,16 +101,15 @@ class App:
             agente, SesionesEnMemoria(), self.reloj, self.uso, LimitadorEnMemoria(self.presupuesto.peticiones_por_minuto),
             self.presupuesto, operaciones,
         )
-        cerrojos = CerrojosPorCliente()
         identificar = IdentificarCliente(sesiones_auth, clientes)
         actual = crear_dependencia(identificar)
         routers = [
             rutas_auth.crear_router(
                 IniciarSesion(clientes, HASHEADOR, sesiones_auth, IntentosEnMemoria(), self.reloj, self.auditoria),
                 CerrarSesion(sesiones_auth, self.auditoria), actual, False),
-            rutas_banco.crear_router(c_saldo, c_contactos, solicitar, c_movs, actual),
+            rutas_banco.crear_router(c_saldo, c_contactos, solicitar, c_movs, ConsultarTarjetas(repo_tarjetas), actual),
             rutas_operaciones.crear_router(
-                ConfirmarOperacion(cuentas, operaciones, self.reloj, self.auditoria, cerrojos),
+                ConfirmarOperacion(cuentas, operaciones, self.reloj, self.auditoria, cerrojos, DesbloquearTarjeta(repo_tarjetas, self.auditoria)),
                 CancelarOperacion(operaciones, self.auditoria, cerrojos), LeerMensajesMovil(self.movil), actual),
             rutas_uso.crear_router(ConsultarUso(self.uso, self.presupuesto, self.reloj), actual),
             rutas_ajustes.crear_router(GestionAjustes(ajustes, SondaFalsa(), auditoria=self.auditoria), actual),
@@ -667,3 +672,60 @@ def test_la_auditoria_de_una_url_de_ollama_rechazada_no_guarda_usuario_ni_clave(
     filas = [tuple(f) for f in con.execute("SELECT detalle FROM auditoria WHERE accion = 'ajustes_ollama_rechazado'")]
     con.close()
     assert filas and "SECRETO" not in repr(filas) and "usuario" not in repr(filas) and "ajeno.example:8080" in repr(filas)
+
+
+# ------------------------------------------------------------------ tarjetas
+
+def test_cada_cliente_ve_solo_sus_tarjetas(app):
+    alex, ana = app.cliente("alex"), app.cliente("ana")
+    assert [t["ultimos4"] for t in alex.get("/api/banco/tarjetas").json()] == ["4821", "1093"]
+    assert [t["ultimos4"] for t in ana.get("/api/banco/tarjetas").json()] == ["7356"]
+    assert app.cliente().get("/api/banco/tarjetas").status_code == 401
+
+
+def test_chat_bloquear_tarjeta_llega_como_evento_tarjeta_y_no_pide_codigo(tmp_path, bd_base):
+    llm = LLMGuionizado(llamada("bloquear_tarjeta", json.dumps({"tarjeta": "débito"})))
+    a = App(tmp_path, bd_base, llm)
+    c = a.cliente("alex")
+    r = c.post("/chat", json={"session_id": "t", "mensaje": "he perdido la tarjeta de débito"})
+    ev = eventos(r)
+    assert [e["tipo"] for e in ev] == ["herramienta", "tarjeta", "uso", "fin"]
+    tarjeta = next(e for e in ev if e["tipo"] == "tarjeta")["dato"]
+    assert (tarjeta["marca"], tarjeta["tipo"], tarjeta["ultimos4"], tarjeta["estado"]) == ("Visa", "débito", "4821", "bloqueada")
+    assert tarjeta["bloqueada_el"] and "••4821" in ev[-1]["dato"]
+    assert [t["estado"] for t in c.get("/api/banco/tarjetas").json()] == ["bloqueada", "activa"]
+    assert a.movil.sms == {}  # bloquear no genera código
+
+
+def test_desbloqueo_por_chat_exige_el_otp_y_solo_su_dueno_lo_confirma(tmp_path, bd_base):
+    llm = LLMGuionizado(llamada("bloquear_tarjeta"), llamada("desbloquear_tarjeta"))
+    a = App(tmp_path, bd_base, llm)
+    ana, alex = a.cliente("ana"), a.cliente("alex")
+    ana.post("/chat", json={"session_id": "t", "mensaje": "bloquea mi tarjeta"})
+    r = ana.post("/chat", json={"session_id": "t", "mensaje": "desbloquea mi tarjeta"})
+    ev = eventos(r)
+    op = next(e for e in ev if e["tipo"] == "operacion")["dato"]
+    assert op["tipo"] == "desbloqueo_tarjeta" and op["destinatario"] == "Visa débito ••7356" and op["importe"] == 0
+    assert "123456" not in r.text and ev[-1]["dato"].startswith("He preparado el desbloqueo")
+    assert ana.get("/api/banco/tarjetas").json()[0]["estado"] == "bloqueada"  # sigue bloqueada hasta confirmar
+    # un código erróneo no desbloquea; otro cliente no ve ni confirma la operación
+    assert ana.post(f"/operaciones/{op['id']}/confirmar", json={"codigo": "000000"}).status_code == 422
+    assert alex.post(f"/operaciones/{op['id']}/confirmar", json={"codigo": "123456"}).status_code == 404
+    assert ana.get("/api/banco/tarjetas").json()[0]["estado"] == "bloqueada"
+    confirmada = ana.post(f"/operaciones/{op['id']}/confirmar", json={"codigo": "123456"})
+    assert confirmada.status_code == 200
+    cuerpo = confirmada.json()
+    assert cuerpo["tipo"] == "desbloqueo_tarjeta" and cuerpo["tarjeta"]["estado"] == "activa" and cuerpo["tarjeta"]["bloqueada_el"] is None
+    assert ana.get("/api/banco/tarjetas").json()[0]["estado"] == "activa"
+    assert ana.post(f"/operaciones/{op['id']}/confirmar", json={"codigo": "123456"}).status_code == 409  # ya procesada
+
+
+def test_desbloqueo_con_huella_y_bizum_siguen_respondiendo_su_propio_comprobante(tmp_path, bd_base):
+    llm = LLMGuionizado(llamada("bloquear_tarjeta"), llamada("desbloquear_tarjeta"))
+    a = App(tmp_path, bd_base, llm)
+    c = a.cliente("ana")
+    c.post("/chat", json={"session_id": "t", "mensaje": "bloquea mi tarjeta"})
+    op = next(e for e in eventos(c.post("/chat", json={"session_id": "t", "mensaje": "desbloquéala"})) if e["tipo"] == "operacion")["dato"]
+    assert c.post(f"/operaciones/{op['id']}/aprobar").json()["tipo"] == "desbloqueo_tarjeta"
+    b = c.post("/api/banco/bizum", json={"destinatario": "Mamá", "importe": 5}).json()["operacion"]
+    assert b["tipo"] == "bizum" and c.post(f"/operaciones/{b['id']}/confirmar", json={"codigo": "123456"}).json()["tipo"] == "bizum"

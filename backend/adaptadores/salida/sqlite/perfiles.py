@@ -156,6 +156,14 @@ JOSE = Perfil(
 
 PERFILES = (ALEX, ANA, MARTA, JOSE)
 
+# Tarjetas ficticias de cada cliente (marca, tipo, últimos 4 dígitos): sembrado fijo, sin azar.
+TARJETAS_DEMO: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "alex": (("Visa", "débito", "4821"), ("Mastercard", "crédito", "1093")),
+    "ana": (("Visa", "débito", "7356"),),
+    "marta": (("Visa", "débito", "3317"), ("Mastercard", "crédito", "8052")),
+    "jose": (("Mastercard", "débito", "5509"),),
+}
+
 
 class _Administrador:
     """Perfil de gestión: configura la IA (claves, modelos, Ollama). Sin cuenta bancaria."""

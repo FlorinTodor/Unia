@@ -3,7 +3,7 @@ entre clientes la garantiza quien implementa el puerto, no quien lo llama."""
 from datetime import date
 from typing import Protocol
 
-from ...dominio.modelos import Contacto, Cuenta, Movimiento, ResultadoConsulta
+from ...dominio.modelos import Contacto, Cuenta, Movimiento, ResultadoConsulta, Tarjeta
 
 
 class RepositorioCuenta(Protocol):
@@ -32,4 +32,14 @@ class ConsultorMovimientos(Protocol):
     def ejecutar_select(self, cliente_id: int, sql: str, limite: int) -> ResultadoConsulta:
         """Ejecuta una consulta YA validada. La implementación debe ser de solo lectura y
         mostrar únicamente los datos de ese cliente (aunque el SQL intente otra cosa)."""
+        ...
+
+
+class RepositorioTarjetas(Protocol):
+    def listar(self, cliente_id: int) -> list[Tarjeta]: ...
+
+    def guardar_estado(self, cliente_id: int, tarjeta: Tarjeta) -> None:
+        """Persiste `bloqueada` y `bloqueada_el` como una TRANSICIÓN atómica: solo cambia si la tarjeta de ESE cliente está
+        ahora en el estado contrario. Si no es suya, `TarjetaNoEncontrada`; si ya estaba así (otro hilo se adelantó),
+        `TarjetaYaBloqueada` / `TarjetaYaActiva`."""
         ...

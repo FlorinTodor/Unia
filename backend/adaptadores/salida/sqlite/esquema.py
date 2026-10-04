@@ -6,7 +6,7 @@ from ....aplicacion.puertos.infraestructura import Reloj
 from ....aplicacion.puertos.seguridad import Hasheador
 from .conexion import BaseDeDatos
 from .generador import generar_movimientos
-from .perfiles import ADMIN, PERFILES, contrasena_admin, contrasena_configurada, contrasena_demo
+from .perfiles import ADMIN, PERFILES, TARJETAS_DEMO, contrasena_admin, contrasena_configurada, contrasena_demo
 
 VERSION_ESQUEMA = 2  # súbela al cambiar el esquema o el historial: la base se regenera sola
 HASH_INUTILIZABLE = "!"  # no es un hash válido: `verificar` siempre devuelve False
@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS operaciones_pendientes (
     caduca TEXT NOT NULL,
     alertas TEXT NOT NULL,           -- JSON
     intentos_restantes INTEGER NOT NULL,
-    estado TEXT NOT NULL
+    estado TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'bizum',   -- qué se ejecuta al confirmar (bizum, desbloqueo_tarjeta)
+    referencia TEXT NOT NULL DEFAULT ''   -- sobre qué (id de la tarjeta)
 );
 CREATE TABLE IF NOT EXISTS sms_movil (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,6 +103,16 @@ CREATE TABLE IF NOT EXISTS sesiones_chat (
     clave TEXT PRIMARY KEY,          -- «cliente:sesión»
     mensajes TEXT NOT NULL,          -- JSON
     actualizada TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tarjetas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+    marca TEXT NOT NULL,
+    tipo TEXT NOT NULL,              -- débito / crédito
+    ultimos4 TEXT NOT NULL,          -- el número completo no existe en el sistema
+    bloqueada INTEGER NOT NULL DEFAULT 0,
+    bloqueada_el TEXT,               -- ISO 8601
+    UNIQUE (cliente_id, ultimos4)
 );
 """
 
@@ -119,6 +131,29 @@ def _crear_tablas_complementarias(bd: BaseDeDatos) -> None:
     con = bd.abrir()
     try:
         con.executescript(DDL_COMPLEMENTARIO)
+        # `CREATE TABLE IF NOT EXISTS` no añade columnas a una tabla que ya existe: se añaden aparte, solo si faltan
+        columnas = {f["name"] for f in con.execute("PRAGMA table_info(operaciones_pendientes)")}
+        for nombre, definicion in (("tipo", "TEXT NOT NULL DEFAULT 'bizum'"), ("referencia", "TEXT NOT NULL DEFAULT ''")):
+            if nombre not in columnas:
+                con.execute(f"ALTER TABLE operaciones_pendientes ADD COLUMN {nombre} {definicion}")
+        con.commit()
+    finally:
+        con.close()
+
+
+def _sembrar_tarjetas(bd: BaseDeDatos) -> None:
+    """Da sus tarjetas de demostración a cada cliente que aún no tiene ninguna (idempotente: también en bases ya existentes)."""
+    con = bd.abrir()
+    try:
+        with con:
+            for usuario, tarjetas in TARJETAS_DEMO.items():
+                fila = con.execute("SELECT id FROM clientes WHERE usuario = ?", (usuario,)).fetchone()
+                if fila is None or con.execute("SELECT 1 FROM tarjetas WHERE cliente_id = ?", (fila["id"],)).fetchone():
+                    continue
+                con.executemany(
+                    "INSERT INTO tarjetas (cliente_id, marca, tipo, ultimos4) VALUES (?,?,?,?)",
+                    [(fila["id"], *t) for t in tarjetas],
+                )
     finally:
         con.close()
 
@@ -133,6 +168,7 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
     if bd.ruta.exists() and not forzar and _esquema_actual(bd):
         _restringir_permisos(bd)
         _crear_tablas_complementarias(bd)
+        _sembrar_tarjetas(bd)
         _asegurar_administrador(bd, hasheador)
         _alinear_contrasenas_de_clientes(bd, hasheador)
         desplazar_fechas(bd, reloj)
@@ -164,6 +200,7 @@ def inicializar(bd: BaseDeDatos, reloj: Reloj, hasheador: Hasheador, forzar: boo
     con.commit()
     con.close()
     _restringir_permisos(bd)
+    _sembrar_tarjetas(bd)
     _asegurar_administrador(bd, hasheador)
 
 

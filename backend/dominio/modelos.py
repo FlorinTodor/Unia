@@ -1,6 +1,6 @@
 """Entidades del negocio bancario y de la conversación."""
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 
@@ -53,6 +53,33 @@ class ComprobanteBizum:
     importe: float
     concepto: str
     nuevo_saldo: float
+
+
+@dataclass(frozen=True)
+class Tarjeta:
+    """Tarjeta ficticia del cliente. Solo se guardan los 4 últimos dígitos: el número completo no existe en el sistema."""
+
+    id: int
+    marca: str  # «Visa», «Mastercard»
+    tipo: str  # «débito» o «crédito»
+    ultimos4: str
+    bloqueada: bool = False
+    bloqueada_el: datetime | None = None
+
+    @property
+    def etiqueta(self) -> str:
+        return f"{self.marca} {self.tipo} ••{self.ultimos4}"
+
+    @property
+    def estado(self) -> str:
+        return "bloqueada" if self.bloqueada else "activa"
+
+
+@dataclass(frozen=True)
+class ComprobanteTarjeta:
+    """Resultado de confirmar el desbloqueo de una tarjeta (la operación pendiente de OTP)."""
+
+    tarjeta: Tarjeta
 
 
 # ------------------------------------------------------------------ conversación

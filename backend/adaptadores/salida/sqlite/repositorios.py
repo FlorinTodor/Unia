@@ -1,7 +1,8 @@
 """Implementaciones SQLite de los puertos bancarios. Cada consulta filtra por `cliente_id`."""
-from datetime import date
+from datetime import date, datetime
 
-from ....dominio.modelos import Cliente, Contacto, Cuenta, Movimiento
+from ....dominio.errores import TarjetaNoEncontrada, TarjetaYaActiva, TarjetaYaBloqueada
+from ....dominio.modelos import Cliente, Contacto, Cuenta, Movimiento, Tarjeta
 from .conexion import BaseDeDatos
 
 
@@ -131,3 +132,45 @@ class RepositorioClientesSqlite:
         finally:
             con.close()
         return Cliente(f["id"], f["usuario"], f["nombre"], f["telefono"], bool(f["es_admin"])) if f else None
+
+
+class RepositorioTarjetasSqlite:
+    def __init__(self, bd: BaseDeDatos):
+        self._bd = bd
+
+    def listar(self, cliente_id: int) -> list[Tarjeta]:
+        con = self._bd.abrir(solo_lectura=True)
+        try:
+            filas = con.execute(
+                "SELECT id, marca, tipo, ultimos4, bloqueada, bloqueada_el FROM tarjetas WHERE cliente_id = ? ORDER BY id",
+                (cliente_id,),
+            ).fetchall()
+        finally:
+            con.close()
+        return [
+            Tarjeta(f["id"], f["marca"], f["tipo"], f["ultimos4"], bool(f["bloqueada"]),
+                    datetime.fromisoformat(f["bloqueada_el"]) if f["bloqueada_el"] else None)
+            for f in filas
+        ]
+
+    def guardar_estado(self, cliente_id: int, tarjeta: Tarjeta) -> None:
+        con = self._bd.abrir()
+        try:
+            with con:
+                # transición condicional: solo cambia si ahora está en el estado contrario (dos peticiones a la vez no se pisan)
+                cambiadas = con.execute(
+                    "UPDATE tarjetas SET bloqueada = ?, bloqueada_el = ? WHERE id = ? AND cliente_id = ? AND bloqueada = ?",
+                    (int(tarjeta.bloqueada), tarjeta.bloqueada_el.isoformat() if tarjeta.bloqueada_el else None, tarjeta.id,
+                     cliente_id, int(not tarjeta.bloqueada)),
+                ).rowcount
+                existe = bool(cambiadas) or con.execute(
+                    "SELECT 1 FROM tarjetas WHERE id = ? AND cliente_id = ?", (tarjeta.id, cliente_id)
+                ).fetchone() is not None
+        finally:
+            con.close()
+        if not cambiadas:
+            if not existe:
+                raise TarjetaNoEncontrada("No encuentro esa tarjeta.")
+            if tarjeta.bloqueada:
+                raise TarjetaYaBloqueada(f"Tu tarjeta {tarjeta.etiqueta} ya estaba bloqueada.", (tarjeta,))
+            raise TarjetaYaActiva(f"Tu tarjeta {tarjeta.etiqueta} ya estaba activa.", (tarjeta,))

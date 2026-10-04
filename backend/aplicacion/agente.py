@@ -18,7 +18,7 @@ from ..dominio.reglas import TOPE_BIZUM, concepto_dicho_por_el_usuario
 from ..dominio.uso import MARCA_AUTOMATICA, FiltroMarcaInicial, PresupuestoUso, Uso, quitar_marca_inicial
 from .casos_uso.graficos import extraer_grafico_del_texto, sugerir_fuente
 from .eventos import Aviso, Delta, EventoChat, Fin, Grafico, HerramientaEnUso, UsoConsumido
-from .herramientas.registro import RegistroHerramientas
+from .herramientas.registro import RegistroHerramientas, Riesgo
 from .texto import afirma_haber_hecho_un_grafico, datos_de_orden_bizum, importes_sin_respaldo, pide_un_bizum, promete_sin_hacer
 from .puertos.infraestructura import Reloj, RepositorioAjustes
 from .puertos.llm import (
@@ -137,11 +137,35 @@ class _Consumo:
         self.nube = Uso()
 
 
+MOTIVO_SIN_ORDEN = "El cliente no ha pedido eso en su último mensaje: no se ejecuta."
+
+
 def _ultima_pregunta(mensajes: list[Mensaje]) -> str:
     """La última pregunta real del usuario (no un aviso [auto])."""
     for m in reversed(mensajes):
         if m.rol == "user" and not (m.contenido or "").startswith(MARCA_AUTOMATICA):
             return m.contenido or ""
+    return ""
+
+
+def _es_aclaracion(texto: str) -> bool:
+    """¿La respuesta del modelo es una pregunta de aclaración (termina en «?» o contiene «¿…?»)?"""
+    t = texto.strip()
+    return t.endswith("?") or bool(re.search(r"¿[^?]*\?", t[:1000]))
+
+
+def _asistente_antes_de_la_pregunta(mensajes: list[Mensaje]) -> str:
+    """Lo último que dijo el asistente antes de la última pregunta real del usuario (para saber si esta responde a un «¿cuál?»)."""
+    ultima = next(
+        (i for i in range(len(mensajes) - 1, -1, -1)
+         if mensajes[i].rol == "user" and not (mensajes[i].contenido or "").startswith(MARCA_AUTOMATICA)),
+        None,
+    )
+    if ultima is None:
+        return ""
+    for m in reversed(mensajes[:ultima]):
+        if m.rol == "assistant" and m.contenido:
+            return m.contenido
     return ""
 
 
@@ -247,6 +271,7 @@ class Agente:
         con_grafico = False
         grafico_llamado = False  # generar_grafico se llamó (aunque fallara, p. ej. periodo vacío): no se vuelve a empujar
         con_espera: set[int] = set()  # posiciones de la cadena a las que ya se esperó una vez
+        proteccion_ejecutada = False  # solo UNA acción de protección (bloquear una tarjeta) por turno
 
         while rondas < MAX_RONDAS:
             partes: list[str] = []
@@ -304,15 +329,11 @@ class Agente:
                 correccion = self._correccion_necesaria(
                     texto, mensajes, con_herramientas, con_grafico or grafico is not None, grafico_llamado
                 )
-                orden = (
-                    datos_de_orden_bizum(_ultima_pregunta(mensajes), TOPE_BIZUM)
-                    if correccion == AVISO_HAZ_EL_BIZUM and empujones >= MAX_EMPUJONES
-                    else None
-                )
-                if orden:
+                llamada_del_servidor = self._llamada_del_servidor(correccion, mensajes, texto) if empujones >= MAX_EMPUJONES else None
+                if llamada_del_servidor:
                     # tras el empujón el modelo sigue sin llamar a la herramienta: la llama el servidor. Solo crea la
-                    # operación PENDIENTE (el OTP sigue siendo imprescindible) y solo si no se ha ejecutado ya ninguna herramienta
-                    llamadas = (LlamadaHerramienta("auto-bizum", "transferencia_bizum", json.dumps(orden, ensure_ascii=False)),)
+                    # operación PENDIENTE (el OTP sigue siendo imprescindible) o ejecuta lo que es seguro (bloquear una tarjeta)
+                    llamadas = (llamada_del_servidor,)
                     texto = ""
                 else:
                     if correccion and empujones < MAX_EMPUJONES:
@@ -344,12 +365,23 @@ class Agente:
 
             mensajes.append(Mensaje.asistente(texto or None, llamadas))
             respuestas_fijas: list[str] = []
+            rechazadas = 0
             for llamada in llamadas:
+                motivo = self._rechazo_de_proteccion(llamada.nombre, mensajes, proteccion_ejecutada)
+                if motivo:
+                    # un modelo engañado no encadena bloqueos ni bloquea sin una orden clara del cliente
+                    mensajes.append(Mensaje.resultado_herramienta(llamada.id, json.dumps({"ok": False, "error": motivo}, ensure_ascii=False)))
+                    if motivo == MOTIVO_SIN_ORDEN and (fijo := self._herramientas.rechazo_final(llamada.nombre)):
+                        respuestas_fijas.append(fijo)  # texto fijo del servidor: el modelo no se entera ni puede contradecirlo
+                    else:
+                        rechazadas += 1
+                    continue
                 yield HerramientaEnUso(llamada.nombre, self._herramientas.etiqueta(llamada.nombre))
                 argumentos = llamada.argumentos
                 if llamada.nombre == "transferencia_bizum":
                     argumentos = _sin_concepto_inventado(argumentos, mensajes)
                 resultado = self._herramientas.ejecutar(llamada.nombre, argumentos, cliente)
+                proteccion_ejecutada = proteccion_ejecutada or self._herramientas.riesgo(llamada.nombre) is Riesgo.PROTECCION
                 con_herramientas = True
                 grafico_llamado = grafico_llamado or llamada.nombre == "generar_grafico"
                 con_grafico = con_grafico or any(isinstance(e, Grafico) for e in resultado.eventos)
@@ -362,8 +394,10 @@ class Agente:
 
             # las herramientas ya saben qué decir: no hace falta otra vuelta al modelo, pero solo si lo saben TODAS
             # (si alguna devuelve datos para el modelo, el modelo tiene que verlos)
-            if respuestas_fijas and len(respuestas_fijas) == len(llamadas):
+            if respuestas_fijas and len(respuestas_fijas) == len(llamadas) - rechazadas:
                 respuesta_fija = respuestas_fijas[-1]
+                if rechazadas:
+                    respuesta_fija += " Solo puedo bloquear una tarjeta por petición: dime cuál quieres bloquear ahora si es otra."
                 final = f"{texto.strip()}\n\n{respuesta_fija}".strip() if texto.strip() else respuesta_fija
                 mensajes.append(Mensaje.asistente(final))
                 yield Fin(final)
@@ -371,14 +405,37 @@ class Agente:
 
         yield from self._respuesta_final_sin_herramientas(cadena[posicion], mensajes, cliente, consumo)
 
-    @staticmethod
+    def _rechazo_de_proteccion(self, nombre: str, mensajes: list[Mensaje], ya_ejecutada: bool) -> str | None:
+        """Por qué NO se ejecuta una herramienta de protección que pide el modelo (None si puede ejecutarse)."""
+        if self._herramientas.riesgo(nombre) is not Riesgo.PROTECCION:
+            return None
+        if ya_ejecutada:
+            return "Ya se ha ejecutado una acción de protección en esta petición: solo se permite una por turno."
+        if not self._herramientas.permite(nombre, _ultima_pregunta(mensajes), _asistente_antes_de_la_pregunta(mensajes)):
+            return MOTIVO_SIN_ORDEN
+        return None
+
+    def _llamada_del_servidor(self, correccion: str | None, mensajes: list[Mensaje], texto: str = "") -> LlamadaHerramienta | None:
+        pregunta = _ultima_pregunta(mensajes)
+        if correccion == AVISO_HAZ_EL_BIZUM:
+            orden = datos_de_orden_bizum(pregunta, TOPE_BIZUM)
+            return LlamadaHerramienta("auto-bizum", "transferencia_bizum", json.dumps(orden, ensure_ascii=False)) if orden else None
+        directa = self._herramientas.orden_directa(pregunta)
+        if directa and _es_aclaracion(texto):
+            return None  # el modelo pregunta («¿te refieres a la del gimnasio?»): el servidor no anula una duda razonable
+        if directa and correccion == directa.aviso:
+            return LlamadaHerramienta(f"auto-{directa.nombre}", directa.nombre, json.dumps(directa.argumentos, ensure_ascii=False))
+        return None
+
     def _correccion_necesaria(
-        texto: str, mensajes: list[Mensaje], con_herramientas: bool, con_grafico: bool, grafico_llamado: bool = False
+        self, texto: str, mensajes: list[Mensaje], con_herramientas: bool, con_grafico: bool, grafico_llamado: bool = False
     ) -> str | None:
         """Detecta respuestas sin respaldo (el modelo promete y no hace, o inventa cifras o gráficos) o vacías."""
         pide_grafico = not con_grafico and not grafico_llamado and _pide_grafico(mensajes)
         if not con_herramientas and pide_un_bizum(_ultima_pregunta(mensajes), TOPE_BIZUM):
             return AVISO_HAZ_EL_BIZUM  # orden de Bizum completa y válida, y el modelo no ha llamado a la herramienta
+        if not con_herramientas and (directa := self._herramientas.orden_directa(_ultima_pregunta(mensajes))):
+            return directa.aviso  # orden inequívoca de otra herramienta (p. ej. «he perdido la tarjeta») sin llamarla
         if not texto.strip():
             if pide_grafico:
                 return aviso_haz_el_grafico(_ultima_pregunta(mensajes))

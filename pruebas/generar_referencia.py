@@ -19,6 +19,7 @@ sys.path.insert(0, str(RAIZ))
 IMPLEMENTACIONES = {
     "RepositorioCuenta": ("RepositorioCuentaSqlite", "salida/sqlite/repositorios.py", "CuentaEnMemoria"),
     "RepositorioContactos": ("RepositorioContactosSqlite", "salida/sqlite/repositorios.py", "ContactosEnMemoria"),
+    "RepositorioTarjetas": ("RepositorioTarjetasSqlite", "salida/sqlite/repositorios.py", "TarjetasEnMemoria"),
     "ConsultorMovimientos": ("ConsultorMovimientosSqlite", "salida/sqlite/consultor.py", "ConsultorFalso"),
     "ProveedorLLM": ("ProveedorLLMOpenAI", "salida/llm/openai_compat.py", "LLMGuionizado"),
     "Transcriptor": ("TranscriptorWhisper", "salida/voz/whisper.py", "TranscriptorFalso (test_http)"),
@@ -46,6 +47,10 @@ USADO_POR = {
     "ListarContactos": "herramienta listar_contactos_bizum · GET /api/banco/contactos",
     "ConsultarMovimientos": "herramienta consultar_movimientos · GET /api/banco/movimientos",
     "SolicitarBizum": "herramienta transferencia_bizum · POST /api/banco/bizum",
+    "ConsultarTarjetas": "herramienta consultar_tarjetas · GET /api/banco/tarjetas",
+    "BloquearTarjeta": "herramienta bloquear_tarjeta (sin OTP, auditado)",
+    "SolicitarDesbloqueoTarjeta": "herramienta desbloquear_tarjeta (operación pendiente de OTP)",
+    "DesbloquearTarjeta": "la ejecuta ConfirmarOperacion al confirmar el desbloqueo",
     "ConfirmarOperacion": "POST /operaciones/{id}/confirmar y /aprobar",
     "CancelarOperacion": "POST /operaciones/{id}/cancelar",
     "IniciarSesion": "POST /auth/login",
@@ -115,15 +120,16 @@ def casos_de_uso():
 
 
 def herramientas():
-    from backend.aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo
+    from backend.aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo, tarjetas
 
     salida = []
-    for modulo, args in ((saldo, (None,)), (contactos, (None,)), (bizum, (None,)), (movimientos, (None,)), (grafico, ())):
-        h = modulo.crear(*args)
-        salida.append({
-            "nombre": h.nombre, "riesgo": h.riesgo.value, "etiqueta": h.etiqueta,
-            "fichero": f"aplicacion/herramientas/{modulo.__name__.rsplit('.', 1)[1]}.py", "descripcion": h.esquema.descripcion,
-        })
+    for modulo, args in ((saldo, (None,)), (contactos, (None,)), (bizum, (None,)), (movimientos, (None,)), (grafico, ()), (tarjetas, (None, None, None))):
+        creadas = modulo.crear(*args)
+        for h in creadas if isinstance(creadas, list) else [creadas]:
+            salida.append({
+                "nombre": h.nombre, "riesgo": h.riesgo.value, "etiqueta": h.etiqueta,
+                "fichero": f"aplicacion/herramientas/{modulo.__name__.rsplit('.', 1)[1]}.py", "descripcion": h.esquema.descripcion,
+            })
     return salida
 
 
@@ -136,7 +142,8 @@ def endpoints():
         for metodo, o in ops.items():
             cuerpo = (o.get("requestBody", {}).get("content", {}).get("application/json", {}).get("schema", {}).get("$ref", "") or "").split("/")[-1]
             ok = o["responses"].get("200", {}).get("content", {}).get("application/json", {}).get("schema", {})
-            respuesta = (ok.get("$ref", "") or "").split("/")[-1] or ("lista de " + ok["items"]["$ref"].split("/")[-1] if ok.get("items", {}).get("$ref") else "")
+            refs = [x["$ref"].split("/")[-1] for x in ok.get("anyOf", []) if "$ref" in x]  # respuesta con varias formas posibles
+            respuesta = (ok.get("$ref", "") or "").split("/")[-1] or " o ".join(refs) or ("lista de " + ok["items"]["$ref"].split("/")[-1] if ok.get("items", {}).get("$ref") else "")
             filas.append({
                 "metodo": metodo.upper(), "ruta": ruta, "etiqueta": o["tags"][0], "resumen": o["summary"],
                 "auth": bool(o.get("security")), "peticion": cuerpo, "respuesta": respuesta or "—",

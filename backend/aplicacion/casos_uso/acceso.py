@@ -6,6 +6,7 @@ from ...dominio.acceso import MAX_FALLOS, MAX_FALLOS_IP, clave_inexistente, clav
 from ...dominio.errores import CredencialesInvalidas, CuentaBloqueada, NoAutenticado
 from ...dominio.modelos import Cliente
 from ..puertos.infraestructura import Reloj
+from ..texto import enmascarar_numeros_largos
 from ..puertos.seguridad import (
     Auditoria,
     Hasheador,
@@ -46,7 +47,7 @@ class IniciarSesion:
             if self._bloqueos_auditados.get(clave) == hasta:
                 return
             self._bloqueos_auditados[clave] = hasta
-        self._auditoria.registrar(None, "login_bloqueado", usuario, "cuenta u origen bloqueados temporalmente")
+        self._auditoria.registrar(None, "login_bloqueado", enmascarar_numeros_largos(usuario)[:80], "cuenta u origen bloqueados temporalmente")
 
     def __call__(self, usuario: str, contrasena: str, origen: str | None = None) -> tuple[str, Cliente]:
         usuario = usuario.strip().lower()
@@ -81,7 +82,7 @@ class IniciarSesion:
             if k_origen and not nuevo.bloqueado(ahora):
                 nuevo, por_origen = reserva.provisionales[k_origen], True
             self._auditoria.registrar(
-                encontrado[0].id if encontrado else None, "login_fallido", usuario, "credenciales incorrectas"
+                encontrado[0].id if encontrado else None, "login_fallido", enmascarar_numeros_largos(usuario)[:80], "credenciales incorrectas"
             )
             if nuevo.bloqueado(ahora):
                 # si lo bloqueado es el origen, la cuenta de este usuario no tiene nada: el mensaje no lo sugiere

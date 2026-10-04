@@ -20,6 +20,13 @@ MINUTOS_CADUCIDAD = 5
 MAX_INTENTOS_CODIGO = 3
 
 
+class TipoOperacion(str, Enum):
+    """Qué ejecuta el servidor cuando el cliente confirma con su código."""
+
+    BIZUM = "bizum"
+    DESBLOQUEO_TARJETA = "desbloqueo_tarjeta"
+
+
 class EstadoOperacion(str, Enum):
     PENDIENTE = "pendiente"
     CONFIRMADA = "confirmada"
@@ -47,13 +54,18 @@ class OperacionPendiente:
     alertas: tuple[str, ...] = ()
     intentos_restantes: int = MAX_INTENTOS_CODIGO
     estado: EstadoOperacion = field(default=EstadoOperacion.PENDIENTE)
+    # Qué se ejecuta al confirmar y sobre qué. En un desbloqueo `destinatario` lleva el nombre de la tarjeta (para la
+    # tarjeta de confirmación), `importe` es 0 y `referencia` el id de la tarjeta.
+    tipo: TipoOperacion = TipoOperacion.BIZUM
+    referencia: str = ""
 
     @staticmethod
     def nueva(id: str, cliente_id: int, destinatario: str, telefono: str, importe: float, concepto: str,
-              codigo: str, ahora: datetime, alertas: tuple[str, ...] = ()) -> "OperacionPendiente":
+              codigo: str, ahora: datetime, alertas: tuple[str, ...] = (),
+              tipo: TipoOperacion = TipoOperacion.BIZUM, referencia: str = "") -> "OperacionPendiente":
         return OperacionPendiente(
             id, cliente_id, destinatario, telefono, importe, concepto, huella_codigo(id, codigo),
-            ahora, ahora + timedelta(minutes=MINUTOS_CADUCIDAD), alertas,
+            ahora, ahora + timedelta(minutes=MINUTOS_CADUCIDAD), alertas, tipo=tipo, referencia=referencia,
         )
 
     def verificar(self, codigo: str, ahora: datetime) -> None:

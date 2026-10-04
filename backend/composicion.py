@@ -44,6 +44,7 @@ from .adaptadores.salida.sqlite.repositorios import (
     RepositorioClientesSqlite,
     RepositorioContactosSqlite,
     RepositorioCuentaSqlite,
+    RepositorioTarjetasSqlite,
 )
 from .adaptadores.salida.voz.piper import SintetizadorPiper
 from .adaptadores.salida.voz.whisper import TranscriptorWhisper
@@ -55,10 +56,11 @@ from .aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, Li
 from .aplicacion.casos_uso.bizum import CancelarOperacion, CerrojosPorCliente, ConfirmarOperacion, SolicitarBizum
 from .aplicacion.casos_uso.estado import ConsultarEstado
 from .aplicacion.casos_uso.movil import LeerMensajesMovil
+from .aplicacion.casos_uso.tarjetas import BloquearTarjeta, ConsultarTarjetas, DesbloquearTarjeta, SolicitarDesbloqueoTarjeta
 from .aplicacion.casos_uso.uso import AdministrarUso, ConsultarUso
 from .aplicacion.casos_uso.voz import SintetizarVoz, TranscribirAudio
 from .aplicacion.chat import ServicioChat
-from .aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo
+from .aplicacion.herramientas import bizum, contactos, grafico, movimientos, saldo, tarjetas
 from .aplicacion.herramientas.registro import RegistroHerramientas
 from .dominio.uso import PresupuestoUso
 
@@ -100,6 +102,7 @@ def crear_aplicacion() -> FastAPI:
     bd = BaseDeDatos()
     cuentas = RepositorioCuentaSqlite(bd)
     agenda = RepositorioContactosSqlite(bd)
+    repo_tarjetas = RepositorioTarjetasSqlite(bd)
     clientes = RepositorioClientesSqlite(bd)
     consultor = ConsultorMovimientosSqlite(bd)
     auditoria = AuditoriaSqlite(bd, reloj)
@@ -125,8 +128,9 @@ def crear_aplicacion() -> FastAPI:
     listar_contactos = ListarContactos(agenda)
     consultar_movimientos = ConsultarMovimientos(consultor, auditoria)
     solicitar_bizum = SolicitarBizum(cuentas, agenda, operaciones, codigos, movil, reloj, auditoria)
-    cerrojos = CerrojosPorCliente()  # confirmar y cancelar comparten cerrojo por cliente
-    confirmar_operacion = ConfirmarOperacion(cuentas, operaciones, reloj, auditoria, cerrojos)
+    cerrojos = CerrojosPorCliente()  # confirmar, cancelar y bloquear una tarjeta comparten cerrojo por cliente
+    consultar_tarjetas = ConsultarTarjetas(repo_tarjetas)
+    confirmar_operacion = ConfirmarOperacion(cuentas, operaciones, reloj, auditoria, cerrojos, DesbloquearTarjeta(repo_tarjetas, auditoria))
     cancelar_operacion = CancelarOperacion(operaciones, auditoria, cerrojos)
     iniciar_sesion = IniciarSesion(clientes, hasheador, sesiones_auth, intentos, reloj, auditoria)
     identificar = IdentificarCliente(sesiones_auth, clientes)
@@ -139,6 +143,10 @@ def crear_aplicacion() -> FastAPI:
         bizum.crear(solicitar_bizum),
         movimientos.crear(consultar_movimientos, presupuesto.max_caracteres_resultado),
         grafico.crear(GenerarGraficoDeFuente(consultar_movimientos, reloj)),
+        *tarjetas.crear(
+            consultar_tarjetas, BloquearTarjeta(repo_tarjetas, reloj, auditoria, operaciones, cerrojos),
+            SolicitarDesbloqueoTarjeta(repo_tarjetas, operaciones, codigos, movil, reloj, auditoria),
+        ),
     ])
     agente = Agente(llm, herramientas, ajustes, uso_ia, presupuesto, reloj)
     chat = ServicioChat(agente, sesiones_chat, reloj, uso_ia, limitador, presupuesto, operaciones)
@@ -153,7 +161,7 @@ def crear_aplicacion() -> FastAPI:
     proxy_de_confianza = os.getenv("PROXY_DE_CONFIANZA") == "1"
     routers = [
         rutas_auth.crear_router(iniciar_sesion, cerrar_sesion, cliente_actual, cookie_segura, proxy_de_confianza),
-        rutas_banco.crear_router(consultar_saldo, listar_contactos, solicitar_bizum, consultar_movimientos, cliente_actual),
+        rutas_banco.crear_router(consultar_saldo, listar_contactos, solicitar_bizum, consultar_movimientos, consultar_tarjetas, cliente_actual),
         rutas_operaciones.crear_router(confirmar_operacion, cancelar_operacion, LeerMensajesMovil(movil), cliente_actual),
         rutas_uso.crear_router(consultar_uso, cliente_actual),
         rutas_admin.crear_router(administrar_uso, cliente_actual),

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ....aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, ListarContactos
 from ....aplicacion.casos_uso.bizum import SolicitarBizum
+from ....aplicacion.casos_uso.tarjetas import ConsultarTarjetas
 from ....dominio.modelos import Cliente
 from . import esquemas, presentadores
 
@@ -14,6 +15,7 @@ def crear_router(
     contactos: ListarContactos,
     bizum: SolicitarBizum,
     movimientos: ConsultarMovimientos,
+    tarjetas: ConsultarTarjetas,
     cliente_actual: Callable[..., Cliente],
 ) -> APIRouter:
     router = APIRouter(prefix="/api/banco", tags=["banco"], responses=esquemas.NO_AUTENTICADO)
@@ -25,6 +27,10 @@ def crear_router(
     @router.get("/contactos", response_model=list[esquemas.ContactoOut], summary="Contactos Bizum del cliente")
     def obtener_contactos(cliente: Cliente = Depends(cliente_actual)):
         return [{"nombre": c.nombre, "telefono": c.telefono} for c in contactos(cliente)]
+
+    @router.get("/tarjetas", response_model=list[esquemas.TarjetaOut], summary="Tarjetas del cliente y su estado")
+    def obtener_tarjetas(cliente: Cliente = Depends(cliente_actual)):
+        return [presentadores.tarjeta(t) for t in tarjetas(cliente)]
 
     @router.post(
         "/bizum", response_model=esquemas.BizumPendienteOut, summary="Iniciar un Bizum (pendiente de código OTP)",

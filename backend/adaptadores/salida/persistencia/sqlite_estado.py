@@ -11,7 +11,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from ....dominio.modelos import LlamadaHerramienta, Mensaje
-from ....dominio.operaciones import EstadoOperacion, OperacionPendiente
+from ....dominio.operaciones import EstadoOperacion, OperacionPendiente, TipoOperacion
 from ....aplicacion.puertos.infraestructura import Reloj
 from ..sqlite.conexion import BaseDeDatos
 
@@ -79,9 +79,10 @@ class OperacionesSqlite:
             with con:
                 con.execute(
                     "INSERT OR REPLACE INTO operaciones_pendientes (id, cliente_id, destinatario, telefono, importe, concepto, "
-                    "huella, creada, caduca, alertas, intentos_restantes, estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "huella, creada, caduca, alertas, intentos_restantes, estado, tipo, referencia) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (o.id, o.cliente_id, o.destinatario, o.telefono, o.importe, o.concepto, o.huella, o.creada.isoformat(),
-                     o.caduca.isoformat(), json.dumps(list(o.alertas), ensure_ascii=False), o.intentos_restantes, o.estado.value),
+                     o.caduca.isoformat(), json.dumps(list(o.alertas), ensure_ascii=False), o.intentos_restantes, o.estado.value,
+                     o.tipo.value, o.referencia),
                 )
         finally:
             con.close()
@@ -92,13 +93,27 @@ class OperacionesSqlite:
             f = con.execute("SELECT * FROM operaciones_pendientes WHERE id = ?", (id_operacion,)).fetchone()
         finally:
             con.close()
-        if f is None:
-            return None
+        return None if f is None else self._leer(f)
+
+    def pendientes_de(self, cliente_id: int) -> list[OperacionPendiente]:
+        con = self._bd.abrir()
+        try:
+            filas = con.execute(
+                "SELECT * FROM operaciones_pendientes WHERE cliente_id = ? AND estado = ?",
+                (cliente_id, EstadoOperacion.PENDIENTE.value),
+            ).fetchall()
+        finally:
+            con.close()
+        return [self._leer(f) for f in filas]
+
+    @staticmethod
+    def _leer(f) -> OperacionPendiente:
         return OperacionPendiente(
             id=f["id"], cliente_id=f["cliente_id"], destinatario=f["destinatario"], telefono=f["telefono"],
             importe=f["importe"], concepto=f["concepto"], huella=f["huella"], creada=datetime.fromisoformat(f["creada"]),
             caduca=datetime.fromisoformat(f["caduca"]), alertas=tuple(json.loads(f["alertas"])),
             intentos_restantes=f["intentos_restantes"], estado=EstadoOperacion(f["estado"]),
+            tipo=TipoOperacion(f["tipo"]), referencia=f["referencia"],
         )
 
 

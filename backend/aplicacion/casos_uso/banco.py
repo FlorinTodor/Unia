@@ -5,6 +5,7 @@ from ...dominio.errores import ConsultaNoPermitida
 from ...dominio.modelos import Cliente, Contacto, Cuenta, ResultadoConsulta
 from ..puertos.banco import ConsultorMovimientos, RepositorioContactos, RepositorioCuenta
 from ..puertos.seguridad import Auditoria
+from ..texto import enmascarar_numeros_largos
 
 
 class ConsultarSaldo:
@@ -35,9 +36,9 @@ class ConsultarMovimientos:
             limpia = reglas.validar_consulta_solo_lectura(sql)
             resultado = self._consultor.ejecutar_select(cliente.id, limpia, reglas.LIMITE_FILAS_CONSULTA)
         except ConsultaNoPermitida as e:
-            self._auditoria.registrar(cliente.id, "consulta_rechazada", sql[:300], e.mensaje)
+            self._auditoria.registrar(cliente.id, "consulta_rechazada", enmascarar_numeros_largos(sql)[:300], e.mensaje)
             raise
-        self._auditoria.registrar(cliente.id, "consulta_sql", limpia[:300], f"{len(resultado.filas)} filas")  # también las correctas
+        self._auditoria.registrar(cliente.id, "consulta_sql", enmascarar_numeros_largos(limpia)[:300], f"{len(resultado.filas)} filas")  # también las correctas
         return resultado
 
     def ultimos(self, cliente: Cliente, limite: int = 50) -> ResultadoConsulta:
