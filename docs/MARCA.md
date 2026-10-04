@@ -50,8 +50,10 @@ están entre 6,7 y 15,3.
 Los colores y la tipografía son los **publicados en su web**, no los de un manual de marca. Para una entrega final
 conviene confirmarlos con la Cátedra. Faltan:
 
-1. **El logotipo oficial** (SVG). No se ha dibujado ninguno parecido: el sello «u» es propio. Si se dispone del fichero,
-   basta con copiarlo a `frontend/assets/logo-unicaja.svg` y aparece solo junto al nombre.
+1. **El logotipo** (SVG): ya está en `frontend/assets/logo-unicaja.svg` (4-oct-2026), descargado de Wikimedia Commons
+   (`commons/1/15/Logo_Unicaja.svg`, 166×48, petróleo `#005265` y verde `#2BD124`) y la interfaz lo muestra solo junto al
+   nombre, en blanco sobre la cabecera. **No es el fichero oficial de la entidad**: confirmar con la Cátedra que se puede
+   usar en el vídeo y la memoria, y sustituirlo por el que den si lo hay.
 2. **El manual de identidad corporativa** (o confirmación de que se pueden usar estos tonos): sobre todo el verde
    exacto de la marca tras el rediseño de 2024 (`#278600` es el que domina en su web, pero la nueva identidad habla de
    «un verde más intenso»).

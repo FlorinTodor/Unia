@@ -12,7 +12,7 @@ FastAPI, SQLite, Groq ni Piper; son detalles intercambiables que se enchufan por
                     ┌─────────────────────────────────────────────────────┐
   HTTP / SSE        │  APLICACIÓN                                         │      SQLite
   (FastAPI)  ─────► │   ServicioChat → Agente → RegistroHerramientas      │ ◄──── (repositorios)
-  adaptadores/      │   casos de uso: saldo · bizum · movimientos · voz   │      LLM OpenAI-compat.
+  adaptadores/      │   casos de uso: saldo · bizum · tarjetas · voz      │      LLM OpenAI-compat.
   entrada           │   ajustes · estado                                  │ ◄──── (cadena fallback)
                     │        ▲ puertos (Protocol)  ▲                      │      Whisper · Piper
                     │  ┌─────┴──────────────────────┴─────┐              │ ◄──── ajustes.json
@@ -38,7 +38,7 @@ si una entrada conoce una salida, o si dominio/aplicación usan `fastapi`, `open
 
 | Puerto | Fichero | Adaptador que lo implementa |
 |---|---|---|
-| `RepositorioCuenta`, `RepositorioContactos`, `ConsultorMovimientos` | `puertos/banco.py` | `salida/sqlite/repositorios.py` |
+| `RepositorioCuenta`, `RepositorioContactos`, `RepositorioTarjetas`, `ConsultorMovimientos` | `puertos/banco.py` | `salida/sqlite/repositorios.py` |
 | `ProveedorLLM` (+ errores del puerto) | `puertos/llm.py` | `salida/llm/openai_compat.py` |
 | `Transcriptor`, `Sintetizador` | `puertos/voz.py` | `salida/voz/whisper.py`, `salida/voz/piper.py` |
 | `RepositorioSesiones`, `RepositorioAjustes`, `Reloj`, `SondaProveedores` | `puertos/infraestructura.py` | `salida/persistencia/*`, `salida/reloj.py`, `salida/llm/sonda.py` |
@@ -51,22 +51,22 @@ backend/
   main.py                      # solo: app = crear_aplicacion()
   composicion.py               # raíz de composición (inyección de dependencias manual)
   dominio/
-    modelos.py                 # Cliente, Cuenta, Contacto, Movimiento, Mensaje, LlamadaHerramienta…
-    operaciones.py             # OperacionPendiente + verificación del código OTP
+    modelos.py                 # Cliente, Cuenta, Contacto, Tarjeta, Movimiento, Mensaje, LlamadaHerramienta…
+    operaciones.py             # OperacionPendiente (Bizum o desbloqueo de tarjeta) + verificación del código OTP
     acceso.py                  # bloqueo temporal tras intentos fallidos
-    reglas.py                  # tope Bizum, saldo suficiente, validar_consulta_solo_lectura
+    reglas.py                  # tope Bizum, saldo suficiente, elegir/bloquear/desbloquear tarjeta, validar_consulta_solo_lectura
     errores.py                 # ErrorDeValidacion / ErrorNoEncontrado / ErrorNoDisponible…
     ajustes.py                 # Ajustes + cadena_llm() + transcripcion()
     proveedores.py             # catálogo (Groq, Gemini, OpenAI…) y modelos Whisper
   aplicacion/
     agente.py                  # bucle de tool calling + fallback + reintentos (sin SDK)
     chat.py                    # ServicioChat: sesión, compactación, saneado, errores
-    prompt.py                  # system prompt (13 normas)
+    prompt.py                  # system prompt (14 normas)
     texto.py                   # limpiar invisibles, normalizar números para voz
-    eventos.py                 # Delta, HerramientaEnUso, Aviso, Grafico, Fin, ErrorChat
+    eventos.py                 # Delta, HerramientaEnUso, Aviso, Grafico, OperacionPorConfirmar, TarjetaMostrada, Fin, ErrorChat
     puertos/                   # interfaces
-    casos_uso/                 # banco, bizum (OTP), acceso, movil, voz, ajustes, estado, graficos
-    herramientas/              # registro.py + saldo, contactos, bizum, movimientos, grafico
+    casos_uso/                 # banco, bizum (OTP), tarjetas, acceso, movil, voz, ajustes, estado, graficos
+    herramientas/              # registro.py + saldo, contactos, bizum, movimientos, grafico, tarjetas
   adaptadores/
     entrada/http/              # app.py, rutas_chat/banco/ajustes.py, sse.py, presentadores.py
     salida/                    # sqlite/, llm/, voz/, persistencia/, reloj.py
@@ -86,7 +86,8 @@ frontend/
 
 - **Nueva herramienta del agente**: crear `aplicacion/herramientas/<nombre>.py` (esquema +
   función + etiqueta + riesgo) y añadirla a la lista de `composicion.py`. El agente y el
-  frontend no cambian (la etiqueta «⚙️ Consultando…» viaja en el evento SSE).
+  frontend no cambian (la etiqueta «⚙️ Consultando…» viaja en el evento SSE). Receta completa y caso real
+  (bloqueo de tarjeta, con ficheros y líneas tocados): [`AÑADIR_FUNCIONALIDAD.md`](AÑADIR_FUNCIONALIDAD.md).
 - **Cambiar de base de datos**: nuevo adaptador que cumpla los puertos de `puertos/banco.py`.
 - **Otro proveedor de voz o de LLM**: nuevo adaptador del puerto correspondiente.
 - **Otra interfaz** (CLI, MCP, WhatsApp…): nuevo adaptador de entrada que llame a los mismos casos de uso.
@@ -112,6 +113,13 @@ El agente no se fía del modelo (sobre todo del pequeño al que cae tras un lím
 - **Cifras o gráficos sin respaldo:** si no ha consultado nada y da importes que no aparecen en la conversación, o dice «aquí tienes el gráfico» sin haberlo generado, se le obliga a consultar antes de responder.
 - **Gráfico escrito como ```json:** se convierte en gráfico.
 - **Modelos sin cuota:** un modelo que agota su cuota del día se salta hasta que el proveedor la devuelve (o 15 min por defecto); si no queda ninguno, se dice a qué hora volver sin llamar a nadie.
+- **Orden explícita sin llamada (`Herramienta.orden_directa`):** una herramienta puede declarar qué frases del usuario son una orden suya (hoy,
+  `bloquear_tarjeta`: primera persona en presente o perfecto, «he perdido la tarjeta», «me han robado…», «bloquea mi tarjeta»; no las preguntas con o sin signos, las
+  explicaciones, las hipótesis, los desbloqueos, las negaciones ni lo que le pasa a otra persona). Si el modelo responde sin llamarla (qwen3:8b decía «Tarjeta
+  bloqueada» sin hacer nada) recibe un empujón y, si sigue sin llamarla, la ejecuta el servidor, con cualquier modelo. Solo vale para acciones seguras (`PROTECCION`) o que
+  dejan una operación pendiente de OTP: `RegistroHerramientas` lo exige al arrancar (con `aviso_orden` no vacío). Al servidor solo le pasa los datos de la tarjeta
+  (últimos 4 dígitos, marca, tipo), nunca la frase. Además el agente limita las acciones de protección a una por turno y a que la última pregunta sea una orden clara de bloqueo o la respuesta a un «¿cuál?»
+  (`Herramienta.pregunta_valida(pregunta, último mensaje del asistente)`, validada en el servidor para cualquier llamada; si falla, `rechazo_final` fijo).
 - **Respuesta fija de una herramienta:** `transferencia_bizum` devuelve el texto final («He preparado el Bizum…») y el turno acaba sin otra vuelta al modelo: instantáneo, sin gastar tokens y sin riesgo de que el modelo afirme que se envió.
 
 ## Errores y códigos HTTP
@@ -124,9 +132,9 @@ Los casos de uso lanzan errores de dominio con categoría (`dominio/errores.py`)
 | 400 | JSON roto o sin cuerpo | `POST` con `{roto` |
 | 401 | `ErrorDeAutenticacion` | sin sesión, contraseña incorrecta |
 | 403 | `ErrorDeAccesoDenegado` | escritura desde otro origen (defensa CSRF sobre `SameSite=Strict`) |
-| 404 | `ErrorNoEncontrado` | contacto inexistente, operación ajena o inventada, ruta inexistente |
+| 404 | `ErrorNoEncontrado` | contacto o tarjeta inexistente, operación ajena o inventada, ruta inexistente |
 | 405 | método incorrecto | `DELETE /api/banco/saldo` |
-| 409 | `ErrorDeConflicto` | saldo insuficiente, tope diario superado, operación ya procesada |
+| 409 | `ErrorDeConflicto` | saldo insuficiente, tope diario superado, operación ya procesada, `ContactoAmbiguo` (el nombre encaja con varios contactos; lleva `contactos_disponibles`), `TarjetaAmbigua` (varias tarjetas posibles; `tarjetas_disponibles`), `TarjetaYaBloqueada` / `TarjetaYaActiva` (por el chat se cuentan como aviso, no como fallo) |
 | 410 | `ErrorCaducado` | código OTP caducado |
 | 413 | `ErrorCargaExcesiva` | mensaje de más de 1.500 caracteres, audio de más de 4 MB |
 | 415 | `ErrorTipoNoSoportado` | `/stt` con un fichero que no es audio |
@@ -199,7 +207,7 @@ navegador          adaptador HTTP         aplicación                    adaptad
    │                │      Agente.responder ──────────► ProveedorLLM.completar ┤──► API del proveedor
    │                │         ◄── DeltaTexto / PeticionHerramientas ◄──────────┘
    │                │         RegistroHerramientas.ejecutar → casos de uso → repositorios
-   │ SSE ◄──────────│◄── Delta · HerramientaEnUso · Grafico · Aviso · Fin · ErrorChat
+   │ SSE ◄──────────│◄── Delta · HerramientaEnUso · Grafico · OperacionPorConfirmar · TarjetaMostrada · Aviso · Fin · ErrorChat
 ```
 
 ### Protocolo SSE (`/chat`)
@@ -212,7 +220,8 @@ Cada evento es `data: {"tipo": ..., "dato": ...}\n\n`:
 | `herramienta` | nombre (+ `etiqueta` legible) | estado «⚙️ Consultando saldo…» (efímero) |
 | `aviso` | texto | nota «ℹ️» persistente (cambio de proveedor) |
 | `grafico` | `{titulo, config}` (config Chart.js completa) | tarjeta con canvas + `new Chart()` |
-| `operacion` | `{id, destinatario, importe, concepto, alertas, caduca}` (NUNCA el código) | tarjeta «Confirma tu Bizum» con campo de código |
+| `operacion` | `{id, destinatario, importe, concepto, alertas, caduca, tipo}` (NUNCA el código); `tipo` = `bizum` o `desbloqueo_tarjeta` (en este, `destinatario` es la tarjeta e `importe` 0) | tarjeta de confirmación con campo de código y huella: «Confirma tu Bizum» (`bizum`) o «Desbloquear tarjeta» (`desbloqueo_tarjeta`, solo muestra la tarjeta) |
+| `tarjeta` | `{marca, tipo, ultimos4, estado, bloqueada_el}` (nunca el número completo); uno por tarjeta tras consultar, bloquear o tratar de bloquear/desbloquear | tarjeta bancaria visual en el chat (`ui/tarjeta_bancaria.js`: marca, últimos 4 dígitos y estado activa/bloqueada) |
 | `fin` | texto completo final | reemplaza burbuja, dispara TTS |
 | `error` | mensaje legible (los errores inesperados se registran en el log y no se detallan al cliente) | burbuja «⚠️» |
 
@@ -238,7 +247,8 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 | Un turno a la vez | `aplicacion/chat.py` | `ServicioChat.enviar` reserva al cliente: una segunda pregunta mientras hay otra en curso → 429 (`TurnoEnCurso`); impide saltarse el tope diario con peticiones paralelas |
 | Ajustes de la IA | `casos_uso/ajustes.py`, `dominio/reglas.validar_url_ollama` | solo el admin; Ollama solo en loopback (o `OLLAMA_HOSTS_PERMITIDOS`); `GET /ajustes/ollama/estado` sin parámetros; cada cambio se audita (sin claves) |
 | Entrada HTTP | `entrada/http/esquemas.py`, `app.py` | `max_length` y patrones en todos los campos; cuerpos > 64 KB → 413 (salvo `/stt`: el middleware `LimiteSubidaAudio` parsea la cookie `sesion` y valida el token con `IdentificarCliente` (401, con cabeceras de seguridad), `Content-Length` ≤ 4 MB + 64 KB (413; sin él, también) y cuenta los bytes reales, todo antes de leer el cuerpo); `/stt` y `/tts` con limitador propio |
-| OTP | `dominio/operaciones.py`, `casos_uso/bizum.py`, `rutas_operaciones.py` | operación pendiente, código de 6 dígitos de un solo uso (5 min, 3 intentos, solo su huella), validado en un endpoint aparte |
+| OTP | `dominio/operaciones.py`, `casos_uso/bizum.py`, `rutas_operaciones.py` | operación pendiente (Bizum o desbloqueo de tarjeta), código de 6 dígitos de un solo uso (5 min, 3 intentos, solo su huella), validado en un endpoint aparte |
+| Tarjetas | `casos_uso/tarjetas.py`, `dominio/reglas.py` | **bloquear no pide OTP** (es lo seguro y lo urgente; auditado como `tarjeta_bloqueada`); **desbloquear sí** (operación pendiente + SMS + confirmación fuera del LLM). Bloquear cancela los desbloqueos pendientes de esa tarjeta, con el mismo cerrojo por cliente que confirmar/cancelar (`casos_uso/cerrojos.py`) y un `UPDATE` condicional. La tarjeta la elige el servidor (`elegir_tarjeta`), todo método recibe el cliente de la sesión y el SQL del LLM no ve la tabla (DECISIONES nº 20) |
 | Móvil simulado | `salida/persistencia/memoria_seguridad.MovilSimulado` | el único camino del código: `GET /movil/mensajes` (📱 en la interfaz), nunca el chat |
 | Riesgo | `dominio/reglas.py` | tope por operación 1.000 €, diario 1.500 €; avisos de destinatario nuevo e importe ≥ 300 € |
 | Auditoría | `salida/sqlite/auditoria.py` | login, OTP, Bizum solicitado/ejecutado/cancelado, consultas SQL (correctas y rechazadas) y cambios de ajustes |
@@ -251,15 +261,15 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 |---|---|---|
 | `POST /auth/login`, `GET /auth/yo`, `POST /auth/logout` | login: no | sesión |
 | `POST /chat` (SSE), `POST /stt`, `POST /tts`, `GET /estado` | sí | conversación y voz |
-| `GET /api/banco/saldo`, `/contactos`, `/movimientos` | sí | datos del cliente |
+| `GET /api/banco/saldo`, `/contactos`, `/movimientos`, `/tarjetas` | sí | datos del cliente |
 | `POST /api/banco/bizum` | sí | inicia el Bizum (pendiente de OTP) |
-| `POST /operaciones/{id}/confirmar`, `/aprobar`, `/cancelar` | sí | confirmación con el código del móvil, con huella (alternativa accesible) o cancelación |
+| `POST /operaciones/{id}/confirmar`, `/aprobar`, `/cancelar` | sí | confirmación con el código del móvil, con huella (alternativa accesible) o cancelación; sirve al Bizum y al desbloqueo de tarjeta (la respuesta lleva `tipo`) |
 | `GET /movil/mensajes` | sí | SMS simulados del cliente |
 | `GET /api/uso` | sí | gasto de tokens de la IA frente a los límites |
 | `/ajustes/*` | sí | panel de claves y modelos |
 | `/docs`, `/redoc`, `/openapi.json` | no | Swagger y OpenAPI: **solo con `DOCS_API=1`** (apagados por defecto) |
 
-## Las 5 herramientas (function calling)
+## Las 8 herramientas (function calling)
 
 | Herramienta | Qué hace | Implementación |
 |---|---|---|
@@ -267,6 +277,9 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 | `listar_contactos_bizum` | agenda Bizum | caso de uso `ListarContactos` |
 | `transferencia_bizum` | **inicia** un Bizum (no lo envía): valida, crea una operación pendiente y manda el OTP al móvil simulado. Riesgo `ESCRITURA` | caso de uso `SolicitarBizum` + `dominio/reglas.py` (importe, saldo, tope por operación y diario) |
 | `consultar_movimientos` | **NL→SQL**: el LLM escribe un SELECT de SQLite | `ConsultarMovimientos` → `reglas.validar_consulta_solo_lectura()` (solo SELECT/WITH, una sentencia, lista negra) y adaptador SQLite con conexión read-only, tope 60 filas |
+| `consultar_tarjetas` | lista las tarjetas del cliente y su estado; texto final fijo + un evento `tarjeta` por tarjeta. Riesgo `LECTURA` | caso de uso `ConsultarTarjetas` |
+| `bloquear_tarjeta` | bloquea **al instante** (sin OTP, auditado); `tarjeta` opcional (últimos 4 dígitos, marca o débito/crédito): el servidor elige si solo hay una activa y pregunta si hay varias; una ya bloqueada se dice sin error. Riesgo `PROTECCION`. Red de seguridad `orden_directa` para el modelo local | caso de uso `BloquearTarjeta` + `reglas.elegir_tarjeta` |
+| `desbloquear_tarjeta` | **inicia** el desbloqueo: operación pendiente + código al móvil simulado, la tarjeta sigue bloqueada hasta confirmarla (como el Bizum). Riesgo `ESCRITURA` | caso de uso `SolicitarDesbloqueoTarjeta`; la ejecución, `DesbloquearTarjeta` desde `ConfirmarOperacion` |
 | `generar_grafico` | dos modos. Con `fuente` (`gastos_por_categoria`, `gastos_por_mes`, `ingresos_vs_gastos`, `gastos_por_comercio`; más `tipo`, `periodo` o `desde`/`hasta`) el **servidor** ejecuta la consulta del cliente y construye etiquetas y series: el modelo solo elige tipo, título y fuente y no puede inventar cifras (si llega `fuente`, `config` se ignora). Sin `periodo` el servidor aplica uno por defecto: 12 meses naturales en `gastos_por_mes`/`ingresos_vs_gastos` y últimos 30 días en categoría/comercio; el título lleva el periodo aplicado y los gráficos mensuales se acotan a `MAX_MESES=24`. Con `config` el LLM emite la config Chart.js completa para lo que ninguna fuente cubre | evento SSE `grafico`; caso de uso `GenerarGraficoDeFuente` (modo fuente) o `preparar_grafico` (valida `type`/`data`, series y números) — **sin plantillas de diseño** |
 
 ## Cadena de fallback LLM
@@ -302,16 +315,19 @@ cuenta(iban, cliente_id, titular, saldo)
 movimientos(id AUTOINCREMENT, cliente_id, fecha 'YYYY-MM-DD', categoria, concepto, comercio,
             importe)  -- negativo = gasto; fecha SIN hora → desempatar con id
 contactos_bizum(cliente_id, nombre, telefono)
+tarjetas(id AUTOINCREMENT, cliente_id, marca, tipo, ultimos4, bloqueada, bloqueada_el)  -- UNIQUE(cliente_id, ultimos4); sin número completo
+operaciones_pendientes(..., estado, tipo 'bizum'|'desbloqueo_tarjeta', referencia)  -- referencia = id de la tarjeta
 auditoria(id, momento, cliente_id, accion, detalle, resultado)
 uso_ia(id, momento, cliente_id, proveedor, modelo, tokens_entrada, tokens_salida, estimado)
 ```
 
-Cuatro clientes ficticios (`sqlite/perfiles.py`): Alex (trabajador joven), Ana (estudiante), Marta
+Cuatro clientes ficticios (`sqlite/perfiles.py`; cada uno con 1-2 tarjetas en `TARJETAS_DEMO`, el admin ninguna): Alex (trabajador joven), Ana (estudiante), Marta
 (familia con hijos) y José Luis (jubilado). Cada uno tiene sus ingresos fijos, recibos, hábitos de gasto,
 contactos Bizum y saldo (`generador.py`, semilla fija por perfil).
 
 Arranque (`esquema.inicializar`): si `data/banco.db` no existe o tiene un esquema antiguo se regenera;
-si existe, solo se **desplazan las fechas** para que el último movimiento sea de hoy (así el «último mes»
+si existe, se aplica una **migración aditiva** (`CREATE TABLE IF NOT EXISTS`, columnas nuevas con `ALTER TABLE ADD COLUMN` solo si faltan y
+sembrado de tarjetas solo para los clientes que no tienen; no cambia `VERSION_ESQUEMA`, así que no dispara la regeneración) y se **desplazan las fechas** para que el último movimiento sea de hoy (así el «último mes»
 de la demo es siempre el actual). `forzar=True` regenera todo y borra los Bizum hechos desde el chat.
 Categorías: Nómina, Vivienda, Suscripciones, Deporte, Supermercado, Restaurantes, Transporte, Ropa,
 Ocio, Salud, Compras online, Educación, Bizum.

@@ -359,3 +359,44 @@ necesitarían un candado compartido (base de datos o Redis).
   sigue siendo imprescindible; los fallos (contacto inexistente o ambiguo) vuelven al modelo como resultado de herramienta para que los explique.
   Riesgo vigilado: doble operación (imposible: solo si no hubo herramientas en el turno y hay un único empujón). Descartado: extraer el destinatario
   de órdenes con teléfono o «a mi madre» (ahí se deja al modelo).
+
+## 20. Bloqueo de tarjeta: bloquear sin OTP, desbloquear con OTP (4-oct)
+
+- **Decisión**: `bloquear_tarjeta` lo ejecuta el asistente directamente (sin código) y queda auditado (`tarjeta_bloqueada`);
+  `desbloquear_tarjeta` solo crea una operación pendiente y la tarjeta sigue bloqueada hasta que el cliente confirma con el código
+  del móvil (o con la huella) fuera del LLM, por el mismo mecanismo que el Bizum (`ConfirmarOperacion`).
+- **Por qué es asimétrico**: el OTP (decisión 11) protege de que **el LLM o un atacante hagan una acción que perjudica al cliente**. Bloquear
+  no mueve dinero y es la dirección segura; pedir un código al que ha perdido la cartera y tiene prisa solo retrasa lo urgente, y el peor caso
+  de un bloqueo indebido (un modelo que se equivoca, una inyección de prompt) es una molestia reversible. Desbloquear es lo contrario:
+  reabre el uso de la tarjeta, justo lo que querría quien la ha robado si consigue suplantar al cliente en el chat.
+  En la PSD2 real la asimetría es la misma: bloquear no suele exigir autenticación fuerte, reactivar sí.
+- **Riesgo asumido y vigilado**: un bloqueo no deseado (alguien con la sesión abierta, o una orden mal interpretada). Se mitiga con: auditoría,
+  un servidor que solo bloquea una tarjeta ante una frase de pérdida/robo/bloqueo explícita en primera persona (`pide_bloquear_tarjeta`: no preguntas con o sin signos, ni
+  explicaciones, hipótesis, desbloqueos, negaciones ni lo que le pasa a otra persona; se endureció tres veces, incidencias 96, 103 y 105), un tope de una acción de protección por
+  turno y solo si la pregunta habla de tarjetas, el bloqueo que cancela los desbloqueos pendientes (con cerrojo compartido y `UPDATE` condicional), la
+  elección de tarjeta en el servidor (nunca adivina entre varias: pregunta) y el hecho de que el desbloqueo exige OTP. Se añadió un nivel de riesgo
+  propio (`Riesgo.PROTECCION`) para que «escritura sin OTP» sea una categoría explícita y no un `LECTURA` disfrazado.
+- **La orden se valida en el servidor, dentro de la herramienta** (incidencia 102): el modelo local llama a `bloquear_tarjeta` por su cuenta
+  («a mi madre le han robado la tarjeta» bloqueó la de ana), así que no basta con filtrar el gancho `orden_directa`. `Herramienta.pregunta_valida`
+  recibe la última pregunta real y el último mensaje del asistente, y vale solo si es una orden clara de bloqueo (`pide_bloquear_tarjeta`) o la
+  respuesta a un «¿cuál?»; si no, el servidor contesta un texto fijo (`rechazo_final`) sin volver al modelo, llame quien llame. Además el servidor no
+  llama por su cuenta si el modelo acaba de hacer una pregunta de aclaración (incidencia 104).
+- **Aislamiento**: igual que el resto: todo puerto y caso de uso recibe el cliente de la sesión; `UPDATE tarjetas … WHERE id = ? AND cliente_id = ?`;
+  la tabla no está entre las que se copian para el SQL del LLM; el número completo no existe (solo los 4 últimos dígitos).
+- **El texto lo pone el servidor** (`respuesta_final`): «he bloqueado tu tarjeta…» no depende de que el modelo local lo narre bien ni puede afirmar un
+  bloqueo que no ha ocurrido. Aun así, qwen3:8b respondía «Tarjeta bloqueada» **sin llamar a la herramienta** en 4 de 5 formulaciones coloquiales
+  (incidencia 95): se resolvió con un gancho genérico (`Herramienta.orden_directa`) en vez de otra guarda escrita a mano en el agente.
+- **Reutilizar el flujo OTP en vez de duplicarlo**: `OperacionPendiente` ganó `tipo` y `referencia`; `ConfirmarOperacion` ejecuta según el tipo. Coste
+  reconocido: la operación conserva forma de Bizum (destinatario/importe) y el `if tipo` pasará a un registro de ejecutores si hay un tercer tipo
+  (ver `AÑADIR_FUNCIONALIDAD.md` § 4).
+- **Migración aditiva**: tabla `tarjetas` con `CREATE TABLE IF NOT EXISTS`, columnas nuevas con `ALTER TABLE ADD COLUMN` solo si faltan y sembrado
+  solo para quien no tiene tarjetas. No se sube `VERSION_ESQUEMA` (regenerar borraría los Bizum hechos desde el chat). Probado sobre una copia de la base real.
+- **Descartado**: pedir OTP también para bloquear (mata el caso de uso estrella); bloquear con una «frase de seguridad» (no existe en la demo);
+  endpoint REST para bloquear/desbloquear (el único camino son las herramientas del agente; solo se añadió `GET /api/banco/tarjetas` de lectura).
+- **Riesgo aceptado: aprobar con la huella no pide el OTP.** `POST /operaciones/{id}/aprobar` confirma con solo la cookie de sesión (la «huella» es una
+  decisión de accesibilidad, decisión 13) y vale igual para el Bizum que para el desbloqueo de una tarjeta: quien tenga la sesión abierta puede
+  desbloquear sin ver el código. Se acepta porque quien tiene la sesión ya puede hacer un Bizum del mismo modo, y en un banco real la huella es el segundo
+  factor del móvil (aquí simulado). No se cambia el comportamiento; si se endureciera, habría que hacerlo para las dos operaciones a la vez.
+- **Limitación conocida: texto falso en el streaming.** A veces el modelo escribe «Tarjeta bloqueada correctamente…» como `delta` antes de llamar a la herramienta;
+  el `fin` lo corrige con el texto del servidor. No se evita porque exigiría retener los `delta` de cada ronda hasta saber si termina en una herramienta con
+  `respuesta_final`, y eso rompería el streaming de todas las respuestas.

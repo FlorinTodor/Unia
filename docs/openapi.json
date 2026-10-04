@@ -202,6 +202,46 @@
         ]
       }
     },
+    "/api/banco/tarjetas": {
+      "get": {
+        "tags": [
+          "banco"
+        ],
+        "summary": "Tarjetas del cliente y su estado",
+        "operationId": "obtener_tarjetas_api_banco_tarjetas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TarjetaOut"
+                  },
+                  "type": "array",
+                  "title": "Response Obtener Tarjetas Api Banco Tarjetas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No hay sesión válida: inicia sesión en `POST /auth/login`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/api/banco/bizum": {
       "post": {
         "tags": [
@@ -348,7 +388,7 @@
           "operaciones"
         ],
         "summary": "Confirmar una operación con su código OTP",
-        "description": "Si el código es correcto se ejecuta el Bizum. El código vale 5 minutos, 3 intentos y un solo uso. Una operación de otro cliente responde 404, como si no existiera.",
+        "description": "Si el código es correcto se ejecuta la operación (el Bizum o el desbloqueo de la tarjeta). El código vale 5 minutos, 3 intentos y un solo uso. Una operación de otro cliente responde 404, como si no existiera.",
         "operationId": "confirmar_operacion_operaciones__id_operacion__confirmar_post",
         "security": [
           {
@@ -382,7 +422,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ComprobanteOut"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ComprobanteOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ComprobanteTarjetaOut"
+                    }
+                  ],
+                  "title": "Response Confirmar Operacion Operaciones  Id Operacion  Confirmar Post"
                 }
               }
             }
@@ -490,7 +538,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ComprobanteOut"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ComprobanteOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ComprobanteTarjetaOut"
+                    }
+                  ],
+                  "title": "Response Aprobar Operacion Operaciones  Id Operacion  Aprobar Post"
                 }
               }
             }
@@ -1995,6 +2051,11 @@
             "title": "Ok",
             "default": true
           },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "default": "bizum"
+          },
           "destinatario": {
             "type": "string",
             "title": "Destinatario"
@@ -2025,6 +2086,29 @@
           "nuevo_saldo"
         ],
         "title": "ComprobanteOut"
+      },
+      "ComprobanteTarjetaOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "default": "desbloqueo_tarjeta"
+          },
+          "tarjeta": {
+            "$ref": "#/components/schemas/TarjetaOut",
+            "description": "La tarjeta ya desbloqueada."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tarjeta"
+        ],
+        "title": "ComprobanteTarjetaOut"
       },
       "ConsultaOut": {
         "properties": {
@@ -2321,6 +2405,12 @@
             "type": "string",
             "title": "Caduca",
             "description": "Instante (ISO 8601) hasta el que vale el código."
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "`bizum` o `desbloqueo_tarjeta` (en este, `destinatario` es la tarjeta e `importe` 0).",
+            "default": "bizum"
           }
         },
         "type": "object",
@@ -2701,6 +2791,50 @@
           "hora"
         ],
         "title": "SmsOut"
+      },
+      "TarjetaOut": {
+        "properties": {
+          "marca": {
+            "type": "string",
+            "title": "Marca"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "`débito` o `crédito`."
+          },
+          "ultimos4": {
+            "type": "string",
+            "title": "Ultimos4",
+            "description": "Solo los 4 últimos dígitos: el número completo no existe en el sistema."
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado",
+            "description": "`activa` o `bloqueada`."
+          },
+          "bloqueada_el": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bloqueada El",
+            "description": "Instante (ISO 8601) del bloqueo, o null si está activa."
+          }
+        },
+        "type": "object",
+        "required": [
+          "marca",
+          "tipo",
+          "ultimos4",
+          "estado",
+          "bloqueada_el"
+        ],
+        "title": "TarjetaOut"
       },
       "TranscripcionOut": {
         "properties": {
