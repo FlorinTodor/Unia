@@ -12,7 +12,7 @@
           "auth"
         ],
         "summary": "Iniciar sesión",
-        "description": "Comprueba usuario y contraseña (scrypt) y deja una cookie `sesion` `HttpOnly` y `SameSite=Strict`. Tras 5 intentos fallidos el usuario queda bloqueado 5 minutos. El mensaje de error es el mismo para un usuario inexistente y para una contraseña errónea.",
+        "description": "Comprueba usuario y contraseña (scrypt) y deja una cookie `sesion` `HttpOnly` y `SameSite=Strict`. Tras 5 intentos fallidos el usuario (o 100 en 15 minutos desde un mismo origen) queda bloqueado 5 minutos. El mensaje de error es el mismo para un usuario inexistente y para una contraseña errónea.",
         "operationId": "login_auth_login_post",
         "requestBody": {
           "content": {
@@ -1332,31 +1332,8 @@
           "ajustes"
         ],
         "summary": "Comprobar si Ollama responde",
-        "description": "Comprueba si Ollama responde y qué modelos tiene descargados.",
+        "description": "Comprueba si Ollama responde (en la URL guardada) y qué modelos tiene descargados.",
         "operationId": "estado_ollama_ajustes_ollama_estado_get",
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Url"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1387,18 +1364,13 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/chat": {
@@ -1640,6 +1612,16 @@
           },
           "422": {
             "description": "Datos no válidos o regla de negocio incumplida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de uso superado. La cabecera `Retry-After` indica los segundos de espera.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2356,6 +2338,7 @@
         "properties": {
           "proveedor": {
             "type": "string",
+            "maxLength": 32,
             "title": "Proveedor",
             "description": "Id de un proveedor con clave, o `ollama`."
           }
@@ -2370,6 +2353,7 @@
         "properties": {
           "destinatario": {
             "type": "string",
+            "maxLength": 100,
             "title": "Destinatario",
             "description": "Nombre (o parte) o teléfono de un contacto del cliente."
           },
@@ -2380,6 +2364,7 @@
           },
           "concepto": {
             "type": "string",
+            "maxLength": 140,
             "title": "Concepto",
             "default": ""
           }
@@ -2402,12 +2387,15 @@
         "properties": {
           "session_id": {
             "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
             "title": "Session Id",
-            "description": "Identificador de la conversación (lo elige el cliente). Es privado de cada usuario."
+            "description": "Identificador de la conversación (lo elige el cliente; letras, cifras, `_` y `-`, máx. 64). Es privado de cada usuario."
           },
           "mensaje": {
             "type": "string",
-            "title": "Mensaje"
+            "maxLength": 20000,
+            "title": "Mensaje",
+            "description": "El tope real (`MAX_CARACTERES_MENSAJE`) responde 413; esto solo acota el cuerpo."
           }
         },
         "type": "object",
@@ -2427,16 +2415,19 @@
         "properties": {
           "proveedor": {
             "type": "string",
+            "maxLength": 32,
             "title": "Proveedor"
           },
           "api_key": {
             "type": "string",
+            "maxLength": 512,
             "title": "Api Key"
           },
           "modelo": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128
               },
               {
                 "type": "null"
@@ -2447,7 +2438,8 @@
           "modelo_respaldo": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128
               },
               {
                 "type": "null"
@@ -2467,6 +2459,7 @@
         "properties": {
           "codigo": {
             "type": "string",
+            "pattern": "^\\d{6}$",
             "title": "Codigo",
             "description": "Código de 6 dígitos recibido en el móvil simulado."
           }
@@ -2486,11 +2479,13 @@
         "properties": {
           "usuario": {
             "type": "string",
+            "maxLength": 64,
             "title": "Usuario",
             "description": "Usuario (no distingue mayúsculas)."
           },
           "contrasena": {
             "type": "string",
+            "maxLength": 256,
             "title": "Contrasena"
           }
         },
@@ -2512,7 +2507,8 @@
           "modelo": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128
               },
               {
                 "type": "null"
@@ -2523,7 +2519,8 @@
           "modelo_respaldo": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128
               },
               {
                 "type": "null"
@@ -2541,7 +2538,8 @@
           "url": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -2552,7 +2550,8 @@
           "modelo": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128
               },
               {
                 "type": "null"
@@ -2579,10 +2578,12 @@
         "properties": {
           "proveedor": {
             "type": "string",
+            "maxLength": 32,
             "title": "Proveedor"
           },
           "api_key": {
             "type": "string",
+            "maxLength": 512,
             "title": "Api Key"
           }
         },
@@ -2597,6 +2598,7 @@
         "properties": {
           "texto": {
             "type": "string",
+            "maxLength": 5000,
             "title": "Texto",
             "description": "Hasta 1.200 caracteres; los números se leen como palabras."
           }

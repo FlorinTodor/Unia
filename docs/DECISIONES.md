@@ -274,3 +274,88 @@ sesiones tampoco vivirían en la memoria de un solo proceso. Es un cambio de ada
 **Límites.** Con un solo proceso y SQLite basta; con varios habría que pasar a una base de datos de servidor o a Redis.
 Los intentos de login y el limitador siguen en memoria a propósito.
 
+## 16. Endurecimiento tras la auditoría del 4-oct
+
+**Contexto.** Una auditoría encontró dos fallos altos (contraseña por defecto del administrador, SSRF vía la URL de Ollama,
+y el tope diario saltable con peticiones paralelas) y varios medios/bajos (ver INCIDENCIAS 52-61).
+
+**Decisiones.**
+- El administrador **no tiene contraseña por defecto**: solo existe si `CONTRASENA_ADMIN` está definida; los clientes siguen con
+  `CONTRASENA_<USUARIO>` o usuario+2026. La pantalla de login ya no da pistas de contraseña ni lista al administrador.
+- Ollama solo en loopback salvo lista blanca explícita (`OLLAMA_HOSTS_PERMITIDOS`); el estado nunca sondea una URL del cliente.
+- **Un turno de chat a la vez por cliente** (429 si hay otro en curso) en vez de reservar tokens por adelantado: es más simple,
+  y para un asistente conversacional no hay un caso legítimo de preguntar dos veces a la vez.
+- Los límites se ponen donde se evita el daño: en SQLite (`SQLITE_LIMIT_LENGTH`) y no solo filtrando texto SQL; en el esquema
+  de entrada (`max_length`, patrones) y en un tope de cuerpo de 64 KB.
+- Librerías de terceros servidas desde `/static/vendor` (versiones fijadas): se elimina la dependencia de un CDN y la CSP queda
+  en `script-src 'self'`.
+
+**Límites.** Los bloqueos de login y los limitadores siguen en memoria (un proceso). El límite por origen usa la IP del socket:
+tras un proxy habrá que configurarlo para que pase la IP real. Con varios procesos, el cerrojo por cliente y el turno único
+necesitarían un candado compartido (base de datos o Redis).
+
+## 17. Segunda ronda de endurecimiento (4-oct)
+
+- **El SQL del LLM se acota por tres lados**: tamaño de cada valor (4 kB), número de columnas (32) y bytes totales leídos
+  (200 kB, leyendo fila a fila). El *authorizer* ya no lista tablas: en la conexión solo existen las tres de la copia y ATTACH
+  está denegado, así que basta vetar `sqlite_*`; una lista blanca rompía las CTE con agregados.
+- **`/stt` se decide en un middleware ASGI** (sesión validada de verdad con `IdentificarCliente` —no basta la subcadena `sesion=`—, `Content-Length`, bytes reales) porque una dependencia de FastAPI llega
+  cuando el multipart ya se ha leído.
+- **Límite de login por origen: 100 fallos en 15 min (antes 20), sin reiniciarse al acertar.** Sin un proxy que ponga
+  `X-Forwarded-For` todos los clientes llegan como 127.0.0.1 y 20 fallos
+  de cualquiera bloqueaban a todos (ojo: uvicorn SÍ respeta esa cabecera desde 127.0.0.1 por defecto; ver nº 19). Se descartó limitar por pareja IP+usuario (anula el límite contra el rociado de usuarios);
+  subir el tope y dejar que los fallos caduquen es lo más simple, y el límite de 5 por usuario sigue protegiendo cada cuenta.
+- `CONTRASENA_<USUARIO>` rige también en bases ya creadas (se rehace el hash al arrancar); `CONTRASENA_ADMIN` exige 12 caracteres.
+- «[auto]» se rechaza en cualquier posición del mensaje (no solo al principio) tras normalizar Unicode.
+- Ante una respuesta vacía tras usar herramientas se reintenta una vez y, si no, hay un mensaje fijo: nunca un turno mudo.
+- **Aceptado para la demo**: la auditoría de consultas SQL (`consulta_sql`) crece sin purga.
+
+## 18. Tercera ronda: carrera del login, gráficos calculados por el servidor (4-oct)
+
+- **El intento de login se reserva antes de verificar.** Leer el contador, pasar por scrypt (~0,1 s) y guardarlo después dejaba
+  que ~40 peticiones en paralelo probaran ~160 contraseñas antes del bloqueo. `IntentosEnMemoria.reservar` comprueba el bloqueo
+  y cuenta un fallo provisional en un paso bajo cerrojo; si la contraseña es buena, `devolver` borra el contador del usuario y
+  restituye el del origen (solo si nadie más lo ha tocado). Los bloqueos y contadores siguen en memoria de un proceso.
+- **El bloqueo por origen conserva la ventana**: antes se reiniciaba el contador al bloquear y el tope real eran ~100 fallos por
+  bloqueo (5 min) y no por ventana (15). Ahora, tras el bloqueo, un fallo más dentro de la ventana lo vuelve a activar.
+  **Aceptado para la demo**: con 5 fallos cualquiera puede bloquear 5 min a un usuario concreto (denegación dirigida); la
+  alternativa (bloquear por pareja IP+usuario) anula el límite contra el rociado y sin proxy todos son 127.0.0.1.
+- Cupo de memoria **por espacio** de claves (`u:` cuentas reales, `x:` usuarios inventados, `ip:` orígenes): inundar con
+  usuarios inventados ya no expulsa el contador de una cuenta real.
+- **Los datos de un gráfico los calcula el servidor** cuando existe una fuente declarativa. Con qwen3:8b, «gráfico de mis gastos
+  por categoría» se quedaba en una `consultar_movimientos` y no llamaba a `generar_grafico` (4 de 4). Se descartó endurecer solo el
+  prompt: el modelo pequeño no encadena dos herramientas con fiabilidad. Ahora `generar_grafico(fuente=…)` hace la consulta y la
+  config en el servidor (mismo aislamiento por cliente y auditoría que `consultar_movimientos`) y el modelo solo elige fuente, tipo,
+  título y periodo. `config` libre sigue disponible para lo no cubierto. Red de seguridad: si se pidió un gráfico y no hay
+  `generar_grafico`, el empujón nombra la herramienta y la fuente sugerida por la pregunta.
+- El concepto de un Bizum pasa por `reglas.validar_concepto` también por el camino del agente (≤140 caracteres, sin `[auto]`), y
+  `[auto]` se detecta con espacios dentro de los corchetes, mayúsculas, acentos y homoglifos cirílicos/griegos.
+
+## 19. Cuarta ronda: el origen no se falsifica, periodo por defecto en los gráficos (4-oct)
+
+- **Corrección de la nº 17**: se decía que uvicorn solo respeta `X-Forwarded-For` con `--forwarded-allow-ips`. Es falso: `proxy_headers`
+  está activo por defecto y confía en `127.0.0.1`, que es justo desde donde llega el tráfico sin proxy. Cualquiera podía poner
+  `X-Forwarded-For: <IP inventada>` y obtener un contador de login nuevo (o cargar el de otra IP). Dos defensas: (1) arrancar con
+  `uvicorn backend.main:app --no-proxy-headers` si no hay proxy; (2) en el código, `rutas_auth.origen_de` no se fía de las cabeceras
+  `X-Forwarded-For`/`X-Real-IP`/`Forwarded`: si aparecen y no está `PROXY_DE_CONFIANZA=1`, el origen es el valor fijo
+  `origen-no-fiable` (falsificar la cabecera no da un contador nuevo). Detrás de un proxy propio que sobrescriba esa cabecera:
+  `PROXY_DE_CONFIANZA=1` y `--proxy-headers --forwarded-allow-ips=<ip del proxy>`. Se descartó recomponer la IP real en la app:
+  uvicorn ya ha sustituido `scope["client"]` antes de que la app lo vea.
+- **Periodo por defecto decidido por el servidor.** Si el modelo no pasa `periodo`: `gastos_por_mes` e `ingresos_vs_gastos` → 12 meses
+  naturales; `gastos_por_categoria` y `gastos_por_comercio` → últimos 30 días (el mes en curso daba un gráfico casi vacío los primeros
+  días del mes). El título lleva siempre el periodo aplicado («Gastos por categoría · 4 sep – 3 oct 2026»). Un `periodo` explícito
+  (incluido `todo`) se respeta. `MAX_MESES = 24` acota los gráficos mensuales a los 24 meses más recientes.
+- La marca `[auto]` es ahora «corchete (`[`, `【`, `⁅`) seguido de `aut`» en cualquier posición: más amplia a propósito (`[autobús]` se rechaza).
+- «Pide un gráfico» exige verbo de petición + objeto gráfico y descarta negaciones y referencias a un gráfico anterior; si `generar_grafico`
+  ya se llamó en el turno (aunque fallara) no se vuelve a empujar al modelo.
+- La salida del modelo nunca lleva la marca `[auto]` (se recorta del principio, también en streaming) y no se guarda en el historial; la
+  marca sigue siendo exclusiva de la entrada que pone el servidor. Una orden de Bizum completa y viable sin llamada a la herramienta
+  recibe el empujón (solo uno por turno); órdenes en otra divisa, sobre el tope o en forma de pregunta no (ahí el modelo debe explicar).
+- **El destinatario del Bizum lo resuelve el servidor, no el modelo (incidencia 94).** `reglas.buscar_contactos` empareja el nombre escrito (sin acentos,
+  mayúsculas ni plural, por palabras) con la agenda del cliente; solo es «ambiguo» (`ContactoAmbiguo`, 409, con los candidatos) si encajan varios. El concepto
+  lo pone solo el usuario: sin él, «Bizum»; el agente descarta el que el modelo no pueda haber sacado de lo escrito por el usuario.
+- **El servidor llama a `transferencia_bizum` si el modelo no lo hace tras el único empujón** y la orden es inequívoca (`datos_de_orden_bizum`, nombre de
+  ≤ 3 palabras, importe único ≤ tope, ninguna herramienta ejecutada antes en el turno). No afloja la decisión 11: solo crea la operación PENDIENTE y el OTP
+  sigue siendo imprescindible; los fallos (contacto inexistente o ambiguo) vuelven al modelo como resultado de herramienta para que los explique.
+  Riesgo vigilado: doble operación (imposible: solo si no hubo herramientas en el turno y hay un único empujón). Descartado: extraer el destinatario
+  de órdenes con teléfono o «a mi madre» (ahí se deja al modelo).

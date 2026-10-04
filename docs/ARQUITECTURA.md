@@ -61,7 +61,7 @@ backend/
   aplicacion/
     agente.py                  # bucle de tool calling + fallback + reintentos (sin SDK)
     chat.py                    # ServicioChat: sesión, compactación, saneado, errores
-    prompt.py                  # system prompt (10 normas)
+    prompt.py                  # system prompt (13 normas)
     texto.py                   # limpiar invisibles, normalizar números para voz
     eventos.py                 # Delta, HerramientaEnUso, Aviso, Grafico, Fin, ErrorChat
     puertos/                   # interfaces
@@ -132,7 +132,7 @@ Los casos de uso lanzan errores de dominio con categoría (`dominio/errores.py`)
 | 415 | `ErrorTipoNoSoportado` | `/stt` con un fichero que no es audio |
 | 422 | `ErrorDeValidacion` | campo con tipo erróneo (con `errores: [{campo, motivo}]`), importe fuera de rango, mensaje vacío, código mal escrito |
 | 423 | `ErrorBloqueado` | tres códigos OTP erróneos: operación cancelada |
-| 429 | `ErrorLimiteExcedido` | login bloqueado, demasiadas peticiones por minuto, cuota diaria de tokens (con `Retry-After`) |
+| 429 | `ErrorLimiteExcedido` | login bloqueado, demasiadas peticiones por minuto (chat y voz), cuota diaria de tokens, otra pregunta aún en curso (con `Retry-After`) |
 | 500 | cualquier otro fallo | cuerpo genérico con una referencia; el detalle va solo al log |
 | 502 / 504 | `ErrorProveedorExterno` / `ErrorTiempoAgotado` | Whisper falla o no responde |
 | 503 | `ErrorNoDisponible` | sin motor de IA, sin clave de voz |
@@ -178,6 +178,7 @@ cuota gratuita de Groq (8.000 tokens/min y 100.000/día por modelo) se controla 
 | Mensaje | máximo de caracteres → 413 | `MAX_CARACTERES_MENSAJE` (1500) |
 | Ritmo | máximo de peticiones por cliente y minuto → 429 | `PETICIONES_POR_MINUTO` (20) |
 | Cuota diaria | tokens por cliente y día → 429 con `Retry-After` hasta medianoche | `TOKENS_DIA_CLIENTE` (80000) |
+| Cuota diaria local | tokens de Ollama por cliente y día (aparte de la nube) | `TOKENS_DIA_LOCAL` (400000) |
 | Pregunta | tope de una consulta con todas sus rondas; si lo supera se corta con un mensaje | `TOKENS_MAX_TURNO` (30000) |
 | Salida | `max_tokens` por llamada al modelo | `MAX_TOKENS_RESPUESTA` (4096) |
 | **Reducir** | el historial reenviado se recorta por tokens | `MAX_TOKENS_HISTORIAL` (3000) |
@@ -230,15 +231,19 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 
 | Capa | Dónde | Qué hace |
 |---|---|---|
-| Login y sesión | `casos_uso/acceso.py`, `salida/seguridad/`, `entrada/http/rutas_auth.py` | scrypt con sal; cookie `HttpOnly` + `SameSite=Strict`; bloqueo 5 min tras 5 fallos; mismo error para usuario inexistente y contraseña errónea |
+| Login y sesión | `casos_uso/acceso.py`, `salida/seguridad/`, `entrada/http/rutas_auth.py` | scrypt con sal; cookie `HttpOnly` + `SameSite=Strict`; bloqueo 5 min tras 5 fallos por usuario o 100 en 15 min por origen (IP; el bloqueo conserva la ventana y el acierto no reinicia el del origen; claves `u:`/`x:`/`ip:`, cada espacio con su cupo). El intento se **reserva de forma atómica antes de verificar** (`RegistroIntentos.reservar`/`devolver`, bajo `threading.Lock`): los intentos en paralelo no pasan todos por scrypt; sin contraseña por defecto para `admin` (solo existe con `CONTRASENA_ADMIN`); mismo error para usuario inexistente y contraseña errónea |
 | Todo protegido | `entrada/http/seguridad.py` | dependencia `cliente_actual`: sin sesión válida → 401 en banco, chat, voz, estado y ajustes |
 | Cliente en todo | puertos `RepositorioCuenta`, `RepositorioContactos`, `ConsultorMovimientos` | cada método recibe el `cliente_id` de la sesión; las herramientas reciben al `Cliente` y el LLM no puede elegirlo |
-| Aislamiento NL→SQL | `salida/sqlite/consultor.py` | la consulta corre en una base en memoria con SOLO las filas del cliente + authorizer (sin ATTACH, PRAGMA ni sqlite_master) |
+| Aislamiento NL→SQL | `salida/sqlite/consultor.py` | la consulta corre en una base en memoria con SOLO las filas del cliente + authorizer (sin ATTACH, PRAGMA, sqlite_master, `randomblob`, `zeroblob`, `printf`, `format`, `fts3_tokenizer`, `load_extension`, `sqlite_compileoption_*`) + límites de SQLite (4 kB por valor, 32 columnas, 10 kB de SQL) y 200 kB máximos de resultado |
+| Un turno a la vez | `aplicacion/chat.py` | `ServicioChat.enviar` reserva al cliente: una segunda pregunta mientras hay otra en curso → 429 (`TurnoEnCurso`); impide saltarse el tope diario con peticiones paralelas |
+| Ajustes de la IA | `casos_uso/ajustes.py`, `dominio/reglas.validar_url_ollama` | solo el admin; Ollama solo en loopback (o `OLLAMA_HOSTS_PERMITIDOS`); `GET /ajustes/ollama/estado` sin parámetros; cada cambio se audita (sin claves) |
+| Entrada HTTP | `entrada/http/esquemas.py`, `app.py` | `max_length` y patrones en todos los campos; cuerpos > 64 KB → 413 (salvo `/stt`: el middleware `LimiteSubidaAudio` parsea la cookie `sesion` y valida el token con `IdentificarCliente` (401, con cabeceras de seguridad), `Content-Length` ≤ 4 MB + 64 KB (413; sin él, también) y cuenta los bytes reales, todo antes de leer el cuerpo); `/stt` y `/tts` con limitador propio |
 | OTP | `dominio/operaciones.py`, `casos_uso/bizum.py`, `rutas_operaciones.py` | operación pendiente, código de 6 dígitos de un solo uso (5 min, 3 intentos, solo su huella), validado en un endpoint aparte |
 | Móvil simulado | `salida/persistencia/memoria_seguridad.MovilSimulado` | el único camino del código: `GET /movil/mensajes` (📱 en la interfaz), nunca el chat |
 | Riesgo | `dominio/reglas.py` | tope por operación 1.000 €, diario 1.500 €; avisos de destinatario nuevo e importe ≥ 300 € |
-| Auditoría | `salida/sqlite/auditoria.py` | login, OTP, Bizum solicitado/ejecutado/cancelado y consultas rechazadas |
-| Navegador | `entrada/http/app.py` | CSP estricta, `X-Frame-Options: DENY`, `nosniff`, `no-store`; sin `/docs` |
+| Auditoría | `salida/sqlite/auditoria.py` | login, OTP, Bizum solicitado/ejecutado/cancelado, consultas SQL (correctas y rechazadas) y cambios de ajustes |
+| Datos en disco | `salida/sqlite/esquema.py` | `data/banco.db` con permisos 600; conversaciones purgadas (7 días, 50 por cliente) |
+| Navegador | `entrada/http/app.py` | CSP `script-src 'self'` (Chart.js, marked y DOMPurify en `frontend/vendor/`), HSTS, `X-Frame-Options: DENY`, `nosniff`, `no-store`; cookie `Secure` por HTTPS; sin `/docs` |
 
 ### Endpoints
 
@@ -262,7 +267,7 @@ Regla central: **el LLM propone, el servidor decide**. Detalle y motivos en `DEC
 | `listar_contactos_bizum` | agenda Bizum | caso de uso `ListarContactos` |
 | `transferencia_bizum` | **inicia** un Bizum (no lo envía): valida, crea una operación pendiente y manda el OTP al móvil simulado. Riesgo `ESCRITURA` | caso de uso `SolicitarBizum` + `dominio/reglas.py` (importe, saldo, tope por operación y diario) |
 | `consultar_movimientos` | **NL→SQL**: el LLM escribe un SELECT de SQLite | `ConsultarMovimientos` → `reglas.validar_consulta_solo_lectura()` (solo SELECT/WITH, una sentencia, lista negra) y adaptador SQLite con conexión read-only, tope 60 filas |
-| `generar_grafico` | el LLM emite la config Chart.js completa (tipo, datos, opciones) | evento SSE `grafico`; el backend solo valida que haya `type` y `data` — **sin plantillas** |
+| `generar_grafico` | dos modos. Con `fuente` (`gastos_por_categoria`, `gastos_por_mes`, `ingresos_vs_gastos`, `gastos_por_comercio`; más `tipo`, `periodo` o `desde`/`hasta`) el **servidor** ejecuta la consulta del cliente y construye etiquetas y series: el modelo solo elige tipo, título y fuente y no puede inventar cifras (si llega `fuente`, `config` se ignora). Sin `periodo` el servidor aplica uno por defecto: 12 meses naturales en `gastos_por_mes`/`ingresos_vs_gastos` y últimos 30 días en categoría/comercio; el título lleva el periodo aplicado y los gráficos mensuales se acotan a `MAX_MESES=24`. Con `config` el LLM emite la config Chart.js completa para lo que ninguna fuente cubre | evento SSE `grafico`; caso de uso `GenerarGraficoDeFuente` (modo fuente) o `preparar_grafico` (valida `type`/`data`, series y números) — **sin plantillas de diseño** |
 
 ## Cadena de fallback LLM
 
@@ -323,10 +328,22 @@ Ocio, Salud, Compras online, Educación, Bizum.
 | `CEREBRAS_API_KEY` | — | opcional (requiere facturación activa) |
 | `MODELO_STT` | `whisper-large-v3-turbo` | transcripción |
 | `TTS_LENGTH_SCALE` | `0.78` | velocidad de la voz Piper |
+| `CONTRASENA_ADMIN` | — (sin ella no hay administrador) | contraseña del perfil `admin`; mínimo 12 caracteres, sin valor por defecto |
+| `OLLAMA_HOSTS_PERMITIDOS` | vacío | hosts extra (separados por comas) donde se admite Ollama; por defecto solo loopback |
+| `COOKIE_SEGURA` | automático | `1`/`0` fuerza el atributo `Secure`; sin definir, se pone si la petición llega por HTTPS |
 
 ## Arranque
 
 ```bash
 source .venv/bin/activate
-uvicorn backend.main:app --reload     # http://localhost:8000
+uvicorn backend.main:app --reload --no-proxy-headers     # http://localhost:8000
 ```
+
+### Detrás de un proxy (IP real)
+
+Uvicorn trae `--proxy-headers` activo y confía en `X-Forwarded-For` / `X-Forwarded-Proto` de las IP de
+`--forwarded-allow-ips`, que por defecto es **127.0.0.1**: justo desde donde llega el tráfico local. Sin proxy, cualquiera podría
+falsificar su IP y esquivar el límite de login por origen, así que se arranca con `--no-proxy-headers` (arriba). Además
+`rutas_auth.origen_de` ignora esas cabeceras (origen fijo `origen-no-fiable`) salvo que el entorno tenga `PROXY_DE_CONFIANZA=1`.
+Con un proxy propio que sobrescriba la cabecera:
+`PROXY_DE_CONFIANZA=1 uvicorn backend.main:app --proxy-headers --forwarded-allow-ips=<ip del proxy>`.

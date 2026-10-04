@@ -75,7 +75,7 @@ cp .env.example .env
 # Edita .env y pon tu GROQ_API_KEY (gratis en https://console.groq.com/keys)
 
 # 3. Arrancar
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --no-proxy-headers
 # Abre http://localhost:8000
 ```
 
