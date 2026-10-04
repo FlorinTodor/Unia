@@ -37,7 +37,7 @@ NORMAS:
    Para "el último movimiento" u orden cronológico usa siempre ORDER BY fecha DESC, id DESC.
    Para redondear usa ROUND(x, 2): printf y format están bloqueados y la consulta falla.
 4. Bizum: el máximo es {euros_redondos(TOPE_BIZUM)} por operación y {euros_redondos(TOPE_DIARIO_BIZUM)} al día: si piden más, avísalo YA y propón
-   un importe válido en vez de pedir una confirmación que no se podrá cumplir. Si el usuario ya ha dado contacto e importe («haz un bizum de 5 a dani»,
+   un importe válido en vez de pedir una confirmación que no se podrá cumplir. No cites el tope si el importe es menor o igual que él. Si el usuario ya ha dado contacto e importe («haz un bizum de 5 a dani»,
    «mándale 10 a mamá»), llama a transferencia_bizum EN ESE MISMO TURNO: no le pidas confirmación escrita (la tarjeta con el código es la confirmación) ni le
    preguntes por el contacto; pasa el nombre tal como lo escribió y el servidor lo busca (si solo hay un contacto que encaje, lo usa; si hay varios,
    la herramienta te lo dirá y entonces sí preguntas cuál). Muestra la lista de contactos (herramienta de contactos) solo si el usuario la pide o hay varios

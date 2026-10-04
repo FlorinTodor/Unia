@@ -1,5 +1,6 @@
 """Tratamiento de texto puro: limpieza de la salida del modelo y preparación para voz."""
 import re
+import unicodedata
 
 from num2words import num2words
 
@@ -259,3 +260,33 @@ def datos_de_tarjeta(pregunta: str) -> str:
     if len(cifras) > 1 or len(marcas) > 1 or len(tipos) > 1:
         return ""
     return " ".join([*marcas, *tipos, *cifras])
+
+
+# --- intento de saltarse las normas (inyección de prompt) ---
+_NOMBRES_DE_NORMAS = r"(?:normas?|reglas?|instrucciones|restricciones|limites|directrices|filtros|salvaguardas|protocolos|indicaciones|prompt|rules|instructions|guidelines|restrictions|constraints)"
+_RE_SALTARSE_LAS_NORMAS = re.compile(
+    # verbo + hasta 3 palabras + norma («ignora tus normas», «olvida todas las instrucciones», «ignore all previous
+    # instructions»). «mis» queda fuera: «olvida mis instrucciones de antes» habla de lo que dijo el propio cliente.
+    # Sin «no»/«no te» delante («no ignores…»). Todo acotado: sin cuantificadores anidados.
+    rf"(?<!\bno )(?<!\bno te )\b(?:ignor\w*|olvid\w*|saltat\w*|saltes|omit\w*|desobedec\w*|desactiv\w*|anul\w*|rompe|"
+    rf"ignore|disregard|forget|bypass|override)(?:\s+(?!mis\b)\w+){{0,3}}\s+{_NOMBRES_DE_NORMAS}\b"
+    rf"|\bdeja\s+de\s+(?:seguir|cumplir|obedecer)(?:\s+\w+){{0,2}}\s+{_NOMBRES_DE_NORMAS}\b"
+    rf"|\b(?:actua|responde|comportate|funciona|habla|act|respond|behave)(?:\s+\w+){{0,2}}\s+(?:sin|without)\s+(?:ninguna\s+|any\s+)?(?:restriccion\w*|limit\w*|norma\w*|regla\w*|filtro\w*|restrictions|rules)\b"
+    rf"|\bmodo\s+(?:desarrollador|developer|dios|dan|jailbreak|sin\s+restricciones|sin\s+filtros|administrador|admin|mantenimiento|debug)\b"
+    rf"|\b(?:developer|dan|jailbreak|god)\s+mode\b|\bjailbreak\b|\bdo\s+anything\s+now\b"
+    rf"|\bya\s+no\s+tienes\s+(?:ninguna\s+|ningun\s+)?{_NOMBRES_DE_NORMAS}\b|\bno\s+tienes\s+(?:ninguna?\s+)?{_NOMBRES_DE_NORMAS}\b"
+    rf"|\beres\s+libre\s+de\b|\byou\s+are\s+(?:now\s+)?free\s+(?:of|from|to)\b"
+)
+_RE_NO_ALFANUMERICO = re.compile(r"[^a-z0-9]+")
+
+
+def pide_saltarse_las_normas(mensaje: str) -> bool:
+    """¿El mensaje intenta que el asistente se salte sus normas («ignora tus normas», «modo desarrollador»…)?
+
+    Heurística de defensa en profundidad: no sustituye al OTP (aunque el modelo obedeciera, no puede mover dinero). Se
+    analizan solo los primeros 500 caracteres, sin acentos, mayúsculas ni signos. Estrecha a propósito: «ignora ese
+    movimiento», «no ignores mi mensaje», «¿qué normas sigues?» o «ignora lo de antes y dime mi saldo» NO cuentan,
+    porque no nombran las normas ni piden quitarlas."""
+    base = unicodedata.normalize("NFKD", mensaje[:_MAX_ANALIZADO].casefold())
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return bool(_RE_SALTARSE_LAS_NORMAS.search(_RE_NO_ALFANUMERICO.sub(" ", base)))

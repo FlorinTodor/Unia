@@ -149,7 +149,7 @@ def crear_aplicacion() -> FastAPI:
         ),
     ])
     agente = Agente(llm, herramientas, ajustes, uso_ia, presupuesto, reloj)
-    chat = ServicioChat(agente, sesiones_chat, reloj, uso_ia, limitador, presupuesto, operaciones)
+    chat = ServicioChat(agente, sesiones_chat, reloj, uso_ia, limitador, presupuesto, operaciones, auditoria)
     consultar_uso = ConsultarUso(uso_ia, presupuesto, reloj)
     administrar_uso = AdministrarUso(clientes, uso_ia, presupuesto, reloj, auditoria)
 
