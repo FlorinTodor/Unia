@@ -25,6 +25,10 @@ export class Movil {
     this.#leer.addEventListener("change", () => guardarPreferencia("leerSms", this.#leer.checked ? "1" : "0"));
   }
 
+  get leeSmsEnVozAlta() {
+    return this.#leer.checked;
+  }
+
   /** Al iniciar sesión: los SMS que ya hubiera no se anuncian como si acabaran de llegar. */
   async sembrar() {
     try {

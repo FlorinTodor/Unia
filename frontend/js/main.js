@@ -35,13 +35,21 @@ const vista = new VistaChat($("chat"));
 const panelCuenta = new PanelCuenta();
 const movil = new Movil();
 const medidor = new MedidorUso();
+let esperaSms = Promise.resolve(); // el SMS del turno ya está encolado cuando esto se resuelve
 const conversacion = new Conversacion(
   vista,
   (texto) => {
-    if (ttsCheck.checked) leerEnVozAlta(texto);
+    // Suenan los dos, uno detrás de otro: primero el SMS con el código y después el aviso del asistente («He
+    // preparado el Bizum…»). Se espera a que el SMS esté en la cola de voz para que el asistente no lo pise.
+    const sms = esperaSms;
+    esperaSms = Promise.resolve();
+    if (ttsCheck.checked) sms.catch(() => {}).then(() => leerEnVozAlta(texto));
   },
   {
-    alOperacion: () => movil.avisarMensajeNuevo(),
+    alOperacion: () => {
+      esperaSms = Promise.resolve(movil.avisarMensajeNuevo());
+      return esperaSms;
+    },
     alResolverOperacion: () => {
       movil.refrescar();
       panelCuenta.cargar(); // un Bizum confirmado cambia el saldo y los movimientos
@@ -64,6 +72,7 @@ const sugerencias = new Sugerencias((texto) => enviar(texto));
 
 async function enviar(texto) {
   pararVoz();
+  esperaSms = Promise.resolve();
   entrada.value = "";
   sugerencias.deshabilitar(true);
   await conversacion.enviar(texto);
@@ -82,6 +91,7 @@ formulario.addEventListener("submit", (e) => {
 const microfono = new Microfono();
 
 async function alternarGrabacion() {
+  pararVoz(); // si el usuario va a hablar, nada debe seguir sonando
   if (microfono.grabando) return microfono.parar();
   try {
     await microfono.empezar(async (audio) => {
