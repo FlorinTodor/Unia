@@ -8,7 +8,7 @@
 import threading
 
 from ...dominio import reglas
-from ...dominio.errores import ERRORES_DE_REGLA, ContactoNoEncontrado, OperacionNoEncontrada
+from ...dominio.errores import ERRORES_DE_REGLA, ContactoAmbiguo, ContactoNoEncontrado, OperacionNoEncontrada
 from ...dominio.modelos import ComprobanteBizum, Cliente, Movimiento
 from ...dominio.operaciones import EstadoOperacion, OperacionPendiente
 from ..puertos.banco import RepositorioContactos, RepositorioCuenta
@@ -48,12 +48,19 @@ class SolicitarBizum:
 
     def _crear(self, cliente: Cliente, destinatario: str, importe: float, concepto: str) -> OperacionPendiente:
         importe = reglas.validar_importe_bizum(importe)
-        contacto = self._contactos.buscar(cliente.id, destinatario)
-        if contacto is None:
-            disponibles = [c.nombre for c in self._contactos.listar(cliente.id)]
+        concepto = reglas.validar_concepto(concepto) or reglas.CONCEPTO_POR_DEFECTO
+        agenda = self._contactos.listar(cliente.id)
+        candidatos = reglas.buscar_contactos(agenda, destinatario)
+        if not candidatos:
             raise ContactoNoEncontrado(
-                f"No encuentro el contacto '{destinatario}'.", contactos_disponibles=disponibles
+                f"No encuentro el contacto '{destinatario}'.", contactos_disponibles=[c.nombre for c in agenda]
             )
+        if len(candidatos) > 1:
+            raise ContactoAmbiguo(
+                f"'{destinatario}' coincide con varios contactos: pregunta a cuál se refiere.",
+                contactos_disponibles=[c.nombre for c in candidatos],
+            )
+        contacto = candidatos[0]
         reglas.validar_saldo_suficiente(self._cuentas.obtener(cliente.id).saldo, importe)
         reglas.validar_tope_diario(self._cuentas.bizum_enviado_el(cliente.id, self._reloj.hoy()), importe)
 
@@ -70,6 +77,23 @@ class SolicitarBizum:
             "Caduca en 5 minutos. No lo compartas con nadie.",
         )
         return operacion
+
+
+class CerrojosPorCliente:
+    """Un cerrojo por cliente para serializar las operaciones que cambian el estado de sus Bizum.
+
+    Confirmar y cancelar DEBEN compartir la MISMA instancia (si no, una cancelación pisaba una confirmación en curso y el
+    dinero salía con la operación marcada como cancelada): por eso es un parámetro obligatorio y lo crea
+    `composicion.py` una sola vez, sin instancia global escondida.
+    """
+
+    def __init__(self):
+        self._cerrojos: dict[int, threading.Lock] = {}
+        self._guarda = threading.Lock()
+
+    def de(self, cliente_id: int) -> threading.Lock:
+        with self._guarda:
+            return self._cerrojos.setdefault(cliente_id, threading.Lock())
 
 
 class _OperacionesDelCliente:
@@ -94,6 +118,7 @@ class ConfirmarOperacion(_OperacionesDelCliente):
         operaciones: RepositorioOperaciones,
         reloj: Reloj,
         auditoria: Auditoria,
+        cerrojos: CerrojosPorCliente,
     ):
         super().__init__(operaciones)
         self._cuentas = cuentas
@@ -102,12 +127,10 @@ class ConfirmarOperacion(_OperacionesDelCliente):
         # Leer, comprobar y guardar la operación no es atómico: con peticiones paralelas (hilos) un mismo Bizum se
         # ejecutaba varias veces y el OTP admitía más de 3 intentos. Se serializa por cliente, que además protege
         # el tope diario entre operaciones distintas. Con varios procesos haría falta la transición atómica en SQL.
-        self._cerrojos: dict[int, threading.Lock] = {}
-        self._cerrojos_guarda = threading.Lock()
+        self._cerrojos = cerrojos
 
     def _cerrojo(self, cliente_id: int) -> threading.Lock:
-        with self._cerrojos_guarda:
-            return self._cerrojos.setdefault(cliente_id, threading.Lock())
+        return self._cerrojos.de(cliente_id)
 
     def __call__(self, cliente: Cliente, id_operacion: str, codigo: str) -> ComprobanteBizum:
         """Confirma con el código de 6 dígitos que llegó por SMS."""
@@ -155,12 +178,14 @@ class ConfirmarOperacion(_OperacionesDelCliente):
 
 
 class CancelarOperacion(_OperacionesDelCliente):
-    def __init__(self, operaciones: RepositorioOperaciones, auditoria: Auditoria):
+    def __init__(self, operaciones: RepositorioOperaciones, auditoria: Auditoria, cerrojos: CerrojosPorCliente):
         super().__init__(operaciones)
         self._auditoria = auditoria
+        self._cerrojos = cerrojos
 
     def __call__(self, cliente: Cliente, id_operacion: str) -> None:
-        operacion = self.obtener(cliente, id_operacion)
-        operacion.cancelar()
-        self._operaciones.guardar(operacion)
+        with self._cerrojos.de(cliente.id):
+            operacion = self.obtener(cliente, id_operacion)
+            operacion.cancelar()
+            self._operaciones.guardar(operacion)
         self._auditoria.registrar(cliente.id, "bizum_cancelado", f"op {operacion.id}", "cancelado por el cliente")

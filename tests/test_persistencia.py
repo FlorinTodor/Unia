@@ -126,3 +126,23 @@ def test_la_aplicacion_completa_conserva_la_sesion_tras_reiniciar(tmp_path, monk
         assert segundo.get("/auth/yo").json()["usuario"] == "alex"  # sigue dentro
         assert len(segundo.get("/movil/mensajes").json()) == 1  # el SMS con el código no se perdió
         assert segundo.post(f"/operaciones/{op}/aprobar").status_code == 200  # ni la operación a medias
+
+
+def test_las_conversaciones_viejas_y_las_sobrantes_se_purgan(bd):
+    """M-3: `session_id` lo elige el cliente; sin purga la tabla crecía sin fin."""
+    from backend.adaptadores.salida.persistencia.sqlite_estado import MAX_CONVERSACIONES_POR_CLIENTE
+    sesiones = SesionesChatSqlite(bd)
+    sesiones.guardar("1:vieja", [Mensaje.sistema("p")])
+    con = bd.abrir()
+    with con:
+        con.execute("UPDATE sesiones_chat SET actualizada = datetime('now', '-30 days')")
+    con.close()
+    for i in range(MAX_CONVERSACIONES_POR_CLIENTE + 20):
+        sesiones.guardar(f"1:s{i}", [Mensaje.sistema("p")])
+    sesiones.guardar("2:otra", [Mensaje.sistema("p")])
+    con = bd.abrir(solo_lectura=True)
+    n1 = con.execute("SELECT COUNT(*) FROM sesiones_chat WHERE clave LIKE '1:%'").fetchone()[0]
+    con.close()
+    assert n1 == MAX_CONVERSACIONES_POR_CLIENTE
+    assert sesiones.obtener("1:vieja") is None and sesiones.obtener("2:otra") is not None
+    assert sesiones.obtener(f"1:s{MAX_CONVERSACIONES_POR_CLIENTE + 19}") is not None  # la más reciente se conserva

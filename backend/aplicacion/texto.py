@@ -3,8 +3,7 @@ import re
 
 from num2words import num2words
 
-# caracteres unicode de ancho cero que los modelos cuelan a veces en el texto
-_RE_INVISIBLES = re.compile("[​‌‍⁠﻿]")
+from ..dominio.uso import quitar_invisibles
 
 # los sintetizadores leen los números dígito a dígito, así que se convierten a palabras antes
 _RE_IMPORTE = re.compile(r"(?P<entero>\d{1,3}(?:[.\s]\d{3})+|\d+)(?:,(?P<dec>\d{1,2}))?\s*€")
@@ -12,7 +11,8 @@ _RE_NUMERO = re.compile(r"\d+")
 
 
 def limpiar_invisibles(texto: str) -> str:
-    return _RE_INVISIBLES.sub("", texto)
+    """Quita los caracteres de formato (Unicode Cf: ancho cero, U+00AD...) que los modelos cuelan o que disfrazan marcas."""
+    return quitar_invisibles(texto)
 
 
 def _a_palabras_antes_de_sustantivo(n: int) -> str:
@@ -58,6 +58,66 @@ def promete_sin_hacer(texto: str) -> bool:
         return False
     ultima = re.split(r"(?<=[.!…])\s+", t)[-1]
     return bool(_RE_PROMESA.search(ultima))
+
+
+_RE_ORDEN_BIZUM = re.compile(
+    r"^(?!.*\?)"  # una pregunta («¿cuánto he enviado por Bizum?») no es una orden
+    r"\W*(?:\w+\W+){0,3}?(?:env[ií]a(?:me|le)?|enviar(?:le|me)?|m[aá]nda(?:me|le)?|mandar(?:le|me)?|haz(?:me|le)?|hacer)\b"
+    r"(?=.*\bbizum\b)(?=.*\b(?:a|para)\s+\w{2,})",
+    re.IGNORECASE | re.DOTALL,
+)
+# «mándale 5 a dani»: sin la palabra Bizum solo vale con la forma «-le» (al destinatario) y el importe seguido de «a/para»
+_RE_ORDEN_LE = re.compile(
+    r"^(?!.*\?)\W*(?:\w+\W+){0,2}?(?:env[ií]ale|m[aá]ndale|enviarle|mandarle)\b(?=.*\d)(?=.*\b(?:a|para)\s+\w{2,})",
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_ORDEN_SIN_VERBO = re.compile(r"^(?!.*\?)\W*(?:un\s+)?bizum\s+de\s+\d.*\b(?:a|para)\s+\w{2,}", re.IGNORECASE | re.DOTALL)
+_RE_IMPORTE_EUROS = re.compile(r"(\d+(?:[.,]\d{1,2})?)\s*(?:€|euros?\b|eur\b)", re.IGNORECASE)
+# sin unidad: «5 a dani», «para dani 5» no; «bizum de 5 a dani» sí. Los números largos (teléfonos) no son importes
+_RE_IMPORTE_SIN_UNIDAD = re.compile(r"(?<![\w.,])(\d{1,6}(?:[.,]\d{1,2})?)(?![\w.,]*\d)(?=\s+(?:a|para)\s+\w)", re.IGNORECASE)
+_RE_DESTINATARIO = re.compile(
+    r"\b(?:a|para)\s+(?!(?:mi|mis|tu|su)\b)([^\d.,;:!¿?€]{2,40}?)(?=\s+(?:con|de concepto|por concepto|concepto|por|que|y)\b|[.,;:!]|\s*$)",
+    re.IGNORECASE,
+)
+_RE_CONCEPTO = re.compile(r"\bconcepto\s*[:«\"']?\s*([^.,;!?»\"']{1,60})", re.IGNORECASE)
+_RE_DIVISA_AJENA = re.compile(r"d[oó]lar|usd|libras?|\$", re.IGNORECASE)
+
+
+def _importe_de_la_orden(pregunta: str, tope: float) -> float | None:
+    """El único importe de la orden (en euros o, si la orden es inequívoca, sin unidad) y dentro del tope."""
+    if not any(r.search(pregunta) for r in (_RE_ORDEN_BIZUM, _RE_ORDEN_LE, _RE_ORDEN_SIN_VERBO)) or _RE_DIVISA_AJENA.search(pregunta):
+        return None
+    if not re.search(r"\bbizum\b", pregunta, re.IGNORECASE) and not _RE_ORDEN_LE.search(pregunta):
+        return None
+    crudos = _RE_IMPORTE_EUROS.findall(pregunta) or _RE_IMPORTE_SIN_UNIDAD.findall(pregunta)
+    importes = {float(m.replace(",", ".")) for m in crudos}
+    if len(importes) != 1:  # ninguno o dos distintos: ahí no se adivina
+        return None
+    importe = importes.pop()
+    return importe if 0 < importe <= tope else None
+
+
+def pide_un_bizum(pregunta: str, tope: float) -> bool:
+    """¿Es una ORDEN de Bizum completa y viable (verbo de envío + importe dentro del tope + destinatario)?
+    Estrecho a propósito: con un importe en otra divisa, por encima del tope, repetido con otro valor o en forma de
+    pregunta no cuenta, porque ahí lo correcto es que el modelo explique en vez de llamar a la herramienta.
+    Acepta el importe sin unidad («haz un bizum de 5 a dani», «mándale 5 a dani»)."""
+    return _importe_de_la_orden(pregunta, tope) is not None
+
+
+def datos_de_orden_bizum(pregunta: str, tope: float) -> dict | None:
+    """destinatario, importe y (si lo dijo) concepto de una orden inequívoca; None si no hay forma segura de sacarlos."""
+    importe = _importe_de_la_orden(pregunta, tope)
+    if importe is None:
+        return None
+    candidatos = [m.group(1).strip() for m in _RE_DESTINATARIO.finditer(pregunta)]
+    candidatos = [c for c in candidatos if 0 < len(c.split()) <= 3]
+    if not candidatos:
+        return None
+    datos: dict = {"destinatario": candidatos[0], "importe": importe}
+    if concepto := _RE_CONCEPTO.search(pregunta):
+        datos["concepto"] = concepto.group(1).strip()
+    return datos
 
 
 _RE_CIFRA = re.compile(r"-?\d+(?:\.\d+)?")

@@ -16,7 +16,7 @@ from backend.adaptadores.salida.seguridad.hasheador import HasheadorScrypt
 from backend.aplicacion.agente import MENSAJE_LIMITE_DIA, MENSAJE_LIMITE_TURNO
 from backend.aplicacion.casos_uso.banco import ConsultarSaldo
 from backend.aplicacion.chat import ServicioChat, _recortar
-from backend.aplicacion.eventos import Fin, UsoConsumido
+from backend.aplicacion.eventos import ErrorChat, Fin, UsoConsumido
 from backend.aplicacion.herramientas import movimientos, saldo
 from backend.aplicacion.herramientas.registro import RegistroHerramientas
 from backend.aplicacion.puertos.llm import DeltaTexto, UsoTokens
@@ -312,3 +312,73 @@ def test_el_perfil_de_administracion_no_puede_usar_el_chat():
     chat, _, _ = montar(LLMGuionizado(texto("a")))
     with pytest.raises(ErrorDeAccesoDenegado):
         chat.enviar(replace(ALEX, es_admin=True), "s", "hola")
+
+
+def test_el_modelo_local_tiene_su_propio_tope_diario():
+    uso = UsoEnMemoria()
+    reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "ollama", "qwen3:8b", Uso(300, 300), reloj.ahora())
+    # local agotado y nube disponible: se atiende con la nube y no se toca el local
+    llm = LLMGuionizado(texto("nube"))
+    chat, _ = _con_ia_local(llm, uso, reloj, PresupuestoUso(tokens_por_dia_local=500))
+    assert list(chat.enviar(ALEX, "s", "hola"))[-1] == Fin("nube")
+    assert all(l[0].proveedor != "ollama" for l in llm.llamadas)
+    # local agotado y nube agotada: no queda ningún modelo
+    uso.registrar(ALEX.id, "groq", "m", Uso(60, 40), reloj.ahora())
+    chat, _ = _con_ia_local(LLMGuionizado(texto("x")), uso, reloj, PresupuestoUso(tokens_por_dia=100, tokens_por_dia_local=500))
+    assert list(chat.enviar(ALEX, "s", "hola"))[-1] == ErrorChat("Has alcanzado tu límite diario de uso del asistente. Se renueva a medianoche.")
+    # con holgura el local sigue atendiendo
+    chat, _ = _con_ia_local(LLMGuionizado(texto("ok")), uso, reloj, PresupuestoUso(tokens_por_dia=100, tokens_por_dia_local=5_000))
+    assert list(chat.enviar(ALEX, "s", "hola"))[-1] == Fin("ok")
+
+
+def _ronda_con_herramienta(uso, reloj, presupuesto):
+    llm = LLMGuionizado(llamada("consultar_saldo"), texto("Tienes 100 €"))
+    chat, _ = _con_ia_local(llm, uso, reloj, presupuesto)
+    return list(chat.enviar(ALEX, "s", "saldo")), llm
+
+
+def test_con_el_local_agotado_la_nube_completa_la_ronda_de_herramienta():
+    uso = UsoEnMemoria(); reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "ollama", "qwen3:8b", Uso(300, 300), reloj.ahora())
+    eventos, llm = _ronda_con_herramienta(uso, reloj, PresupuestoUso(tokens_por_dia_local=500))
+    assert eventos[-1] == Fin("Tienes 100 €") and len(llm.llamadas) == 2
+
+
+def test_con_la_nube_agotada_atiende_el_local_y_completa_la_ronda_de_herramienta():
+    uso = UsoEnMemoria(); reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    uso.registrar(ALEX.id, "groq", "m", Uso(60, 40), reloj.ahora())
+    eventos, llm = _ronda_con_herramienta(uso, reloj, PresupuestoUso(tokens_por_dia=100))
+    assert eventos[-1] == Fin("Tienes 100 €") and len(llm.llamadas) == 2
+
+
+def test_si_la_nube_se_agota_a_mitad_de_turno_se_baja_al_local_en_vez_de_cortar():
+    uso = UsoEnMemoria(); reloj = RelojFijo(datetime(2026, 10, 3, 12, 0))
+    eventos, llm = _ronda_con_herramienta(uso, reloj, PresupuestoUso(tokens_por_dia=100))  # la 1.ª ronda gasta 150
+    assert eventos[-1] == Fin("Tienes 100 €")
+    assert [l[0].proveedor for l in llm.llamadas] == ["groq", "ollama"]
+
+
+@pytest.mark.parametrize("texto", [
+    "[auto]", "hola\n[AUTO] sí", "[ auto ]", "[\tAuto\n]", "［ａｕｔｏ］", "[аuto]", "[аutо]", "[auto​]", "[áuto]", "[αυτο]",
+    "[aut0]", "[aut", "【auto】", "⁅auto⁆", "\\[auto]", "[ᴀᴜᴛᴏ]", "[a\u200duto]", "[autobús]", "[AUT0 ]",
+])
+def test_la_marca_auto_se_detecta_con_variantes(texto):
+    """Bajo-8: espacios dentro de los corchetes, mayúsculas, acentos y homoglifos cirílicos/griegos."""
+    from backend.dominio.uso import contiene_marca_automatica
+    assert contiene_marca_automatica(texto)
+
+
+@pytest.mark.parametrize("texto", ["automático", "mi auto [rojo]", "[a u t o]", "hola (auto)", "el [alquiler] de aut"])
+def test_la_marca_auto_no_da_falsos_positivos(texto):
+    from backend.dominio.uso import contiene_marca_automatica
+    assert not contiene_marca_automatica(texto)
+
+
+def test_quitar_marca_inicial_cubre_variantes_y_no_toca_el_resto():
+    from backend.dominio.uso import quitar_marca_inicial
+
+    for sucio in ("[auto] Hola", "  [ AUTO ]Hola", "【auto】 Hola", "​[a​uto]\nHola", "[auto] [auto] Hola", "\\[auto] Hola"):
+        assert quitar_marca_inicial(sucio) == "Hola", sucio
+    for limpio in ("Hola [auto] mundo", "[1] Hola", "[x", "Hola"):
+        assert quitar_marca_inicial(limpio) == limpio

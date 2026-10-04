@@ -44,3 +44,35 @@ def test_importes_sin_respaldo_detecta_cifras_inventadas():
     assert afirma_haber_hecho_un_grafico("Texto.\n\n**Gráfico comparativo:** barras agrupadas")
     assert afirma_haber_hecho_un_grafico("Aquí tienes el gráfico de tus gastos")
     assert not afirma_haber_hecho_un_grafico("¿Quieres que te haga un gráfico?")
+
+
+def test_pide_un_bizum_solo_con_orden_completa_y_viable():
+    from backend.aplicacion.texto import pide_un_bizum
+
+    assert pide_un_bizum("Envía 5 euros por Bizum a Ana con concepto prueba", 1000)
+    assert pide_un_bizum("mándale un bizum de 12,50 € a Luis", 1000)
+    for no in ("¿qué es un Bizum?", "cuánto he enviado por Bizum", "envía un bizum de 500 USD a María",
+               "envía 5000 euros por bizum a Ana", "envía bizum a Ana", "he enviado 5 euros por bizum a Ana"):
+        assert not pide_un_bizum(no, 1000), no
+
+
+def test_pide_un_bizum_acepta_importe_sin_unidad_si_la_orden_es_inequivoca():
+    from backend.aplicacion.texto import datos_de_orden_bizum, pide_un_bizum
+
+    for si in ("Haz un bizum de 5 a dani", "hazme un bizum de 5,50 a mamá", "mándale 10 a mamá", "enviale 5 a dani", "envíale 2.5 a Dani",
+               "bizum de 5 a dani", "envía un bizum de 5 a carmen con concepto cena", "mandale un bizum de 5 a dani"):
+        assert pide_un_bizum(si, 1000), si
+    for no in ("¿qué es un Bizum?", "cuánto he enviado por Bizum", "he enviado 5 euros por bizum a Ana", "envía 5 dólares por bizum a ana",
+               "envía 5000 a dani por bizum", "haz un bizum de 5000 a dani", "envía 5 euros y 7 euros por bizum a ana",
+               "haz un bizum de 5 a dani?", "mándale a dani el recibo del día 3 de octubre", "envía un bizum a dani el 3 de octubre"):
+        assert not pide_un_bizum(no, 1000), no
+
+
+def test_datos_de_orden_bizum_saca_destinatario_importe_y_concepto_solo_si_los_dijo():
+    from backend.aplicacion.texto import datos_de_orden_bizum
+
+    assert datos_de_orden_bizum("Haz un bizum de 5 a dani", 1000) == {"destinatario": "dani", "importe": 5.0}
+    assert datos_de_orden_bizum("envía un bizum de 5 a carmen con concepto cena", 1000) == {
+        "destinatario": "carmen", "importe": 5.0, "concepto": "cena"}
+    assert datos_de_orden_bizum("envía 5 euros por bizum a Pepe", 1000)["destinatario"] == "Pepe"
+    assert datos_de_orden_bizum("¿qué es un Bizum?", 1000) is None

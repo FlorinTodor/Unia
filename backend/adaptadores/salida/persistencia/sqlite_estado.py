@@ -16,6 +16,8 @@ from ....aplicacion.puertos.infraestructura import Reloj
 from ..sqlite.conexion import BaseDeDatos
 
 HORAS_SESION = 8
+DIAS_CONSERVAR_CONVERSACION = 7
+MAX_CONVERSACIONES_POR_CLIENTE = 50  # session_id lo elige el cliente: sin tope, inventar ids llenaría la base de datos
 
 
 def _huella(token: str) -> str:
@@ -163,6 +165,13 @@ class SesionesChatSqlite:
         con = self._bd.abrir()
         try:
             with con:
+                con.execute("DELETE FROM sesiones_chat WHERE actualizada < datetime('now', ?)", (f"-{DIAS_CONSERVAR_CONVERSACION} days",))
+                prefijo = id_sesion.split(":", 1)[0] + ":%"  # la clave es «cliente:sesión»
+                con.execute(
+                    "DELETE FROM sesiones_chat WHERE clave LIKE ? AND clave != ? AND clave NOT IN "
+                    "(SELECT clave FROM sesiones_chat WHERE clave LIKE ? AND clave != ? ORDER BY actualizada DESC LIMIT ?)",
+                    (prefijo, id_sesion, prefijo, id_sesion, MAX_CONVERSACIONES_POR_CLIENTE - 1),
+                )
                 con.execute(
                     "INSERT OR REPLACE INTO sesiones_chat (clave, mensajes, actualizada) VALUES (?,?,datetime('now'))",
                     (id_sesion, json.dumps([_mensaje_a_dict(m) for m in mensajes], ensure_ascii=False)),

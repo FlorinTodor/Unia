@@ -138,3 +138,92 @@ def test_el_modelo_recibe_el_resultado_de_la_operacion_en_el_turno_siguiente():
     list(chat.enviar(ALEX, "s", "pero no ha funcionado"))
     avisos = [m.contenido for m in llm.llamadas[2][1] if m.rol == "user" and "[auto]" in (m.contenido or "")]
     assert avisos == ["[auto] Resultado del Bizum de 10,00 € a María López: BLOQUEADA por demasiados códigos erróneos: no se ha enviado nada."]
+
+
+# ------------------------------------------------------------------ un solo turno a la vez por cliente (A-2)
+
+class _LLMBloqueado(LLMGuionizado):
+    """Se queda esperando dentro del turno hasta que el test lo suelte (simula un turno lento)."""
+
+    def __init__(self, *pasos):
+        super().__init__(*pasos)
+        import threading
+        self.dentro = threading.Event()
+        self.soltar = threading.Event()
+
+    def completar(self, modelo, mensajes, herramientas, max_tokens=None):
+        self.dentro.set()
+        assert self.soltar.wait(5)
+        yield from super().completar(modelo, mensajes, herramientas, max_tokens)
+
+
+def test_veinte_peticiones_en_paralelo_solo_dejan_pasar_una():
+    """Antes pasaban todas la comprobación del tope diario porque el gasto se anota al terminar el turno."""
+    import threading
+    from backend.dominio.errores import TurnoEnCurso
+    llm = _LLMBloqueado(texto("ok"))
+    chat, _ = servicio(llm)
+    resultados = []
+
+    def lanzar():
+        try:
+            resultados.append(("ok", list(chat.enviar(ALEX, "s", "hola"))))
+        except TurnoEnCurso as e:
+            resultados.append(("429", e))
+
+    primero = threading.Thread(target=lanzar)
+    primero.start()
+    assert llm.dentro.wait(5)
+    otros = [threading.Thread(target=lanzar) for _ in range(19)]
+    for h in otros:
+        h.start()
+    for h in otros:
+        h.join(5)
+    assert [r[0] for r in resultados] == ["429"] * 19 and resultados[0][1].reintentar_en
+    llm.soltar.set()
+    primero.join(5)
+    assert sum(r[0] == "ok" for r in resultados) == 1
+    assert ANA.id != ALEX.id  # otro cliente no se ve afectado
+    llm2 = LLMGuionizado(texto("hola"))
+    assert list(servicio(llm2)[0].enviar(ALEX, "s", "otra"))  # y el cliente puede volver a preguntar tras terminar
+
+
+def test_el_turno_se_libera_si_falla_o_si_nunca_se_consume():
+    import pytest
+    from backend.dominio.errores import ErrorDeValidacion
+    chat, _ = servicio(LLMGuionizado(texto("uno"), texto("dos"), texto("tres")))
+    with pytest.raises(ErrorDeValidacion):
+        chat.enviar(ALEX, "s", "   ")  # rechazado antes de reservar
+    abandonado = chat.enviar(ALEX, "s", "a")  # nunca se itera (el cliente se desconectó)
+    abandonado.close()
+    assert list(chat.enviar(ALEX, "s", "b"))
+    del_sin_cerrar = chat.enviar(ALEX, "s", "c")
+    del del_sin_cerrar  # el recolector lo libera
+    assert list(chat.enviar(ALEX, "s", "d")) is not None
+
+
+def test_liberar_el_turno_no_toma_el_cerrojo_y_no_se_interbloquea():
+    """Medio-8: `__del__` liberaba con un `threading.Lock` no reentrante; el GC podía dispararlo con el cerrojo tomado."""
+    import threading
+    chat, _ = servicio(LLMGuionizado(texto("a")))
+    turno = chat.enviar(ALEX, "s", "hola")
+    hecho = threading.Event()
+
+    def liberar_con_el_cerrojo_tomado():
+        with chat._en_curso_guarda:
+            turno.close()
+        hecho.set()
+
+    hilo = threading.Thread(target=liberar_con_el_cerrojo_tomado, daemon=True)
+    hilo.start()
+    assert hecho.wait(2), "interbloqueo al liberar con el cerrojo tomado"
+
+
+def test_el_prompt_y_la_herramienta_avisan_de_que_printf_esta_bloqueado():
+    """Medio-11: el consultor veta printf/format; el modelo debe usar ROUND(x, 2) desde el principio."""
+    from backend.aplicacion.herramientas import movimientos
+    chat, sesiones = servicio(LLMGuionizado(texto("Hola")))
+    list(chat.enviar(ALEX, "s1", "hola"))
+    assert "ROUND(x, 2)" in sesiones.obtener("1:s1")[0].contenido
+    herramienta = movimientos.crear(lambda *a, **k: None)
+    assert "ROUND(x, 2)" in herramienta.esquema.descripcion

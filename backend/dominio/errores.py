@@ -108,6 +108,10 @@ class ContactoNoEncontrado(ErrorNoEncontrado):
     pass
 
 
+class ContactoAmbiguo(ErrorDeConflicto):
+    """El nombre escrito coincide con varios contactos: hay que elegir (no se adivina)."""
+
+
 # ------------------------------------------------------------------ acceso
 
 class NoAutenticado(ErrorDeAutenticacion):
@@ -164,6 +168,10 @@ class DemasiadasPeticiones(ErrorLimiteExcedido):
 
 class LimiteDeTokensExcedido(ErrorLimiteExcedido):
     pass
+
+
+class TurnoEnCurso(ErrorLimiteExcedido):
+    """El cliente ya tiene una pregunta respondiéndose: solo se atiende una a la vez (429)."""
 
 
 # Los que un caso de uso trata como «la regla de negocio no lo permite» (se audita y se propaga tal cual).

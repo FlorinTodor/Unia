@@ -69,3 +69,10 @@ def test_transcripcion_prefiere_groq():
     a = Ajustes(claves={"openai": ConfigClave("k"), "groq": ConfigClave("k")})
     assert a.transcripcion() == ModeloRef("groq", "whisper-large-v3-turbo")
     assert Ajustes(claves={"gemini": ConfigClave("k")}).transcripcion() is None
+
+
+@pytest.mark.parametrize("importe", [float("nan"), float("inf"), float("-inf")])
+def test_bizum_rechaza_importes_no_finitos(importe):
+    # NaN no es > TOPE ni <= 0: sin isfinite se colaba como importe válido (incidencia 47)
+    with pytest.raises(ImporteInvalido):
+        reglas.validar_importe_bizum(importe)

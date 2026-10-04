@@ -1,14 +1,15 @@
 """Servicio de chat: sesiones, compactación del historial y un turno de conversación."""
 import logging
-from collections.abc import Iterator
+import threading
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 
-from ..dominio.errores import DemasiadasPeticiones, ErrorDeAccesoDenegado, ErrorDeDominio
+from ..dominio.errores import DemasiadasPeticiones, ErrorDeAccesoDenegado, ErrorDeDominio, TurnoEnCurso
 from ..dominio.modelos import Cliente, Mensaje
-from .agente import MARCA_AUTOMATICA, Agente
+from .agente import Agente
 from .eventos import Aviso, Delta, ErrorChat, EventoChat, Fin, OperacionPorConfirmar
 from .prompt import construir_system_prompt
-from ..dominio.uso import PresupuestoUso, comprobar_cuota_diaria, estimar_tokens, validar_mensaje
+from ..dominio.uso import MARCA_AUTOMATICA, PresupuestoUso, comprobar_cuota_diaria, estimar_tokens, validar_mensaje
 from .puertos.infraestructura import Reloj, RepositorioSesiones
 from .puertos.seguridad import RepositorioOperaciones
 from .puertos.uso import LimitadorPeticiones, RegistroUso
@@ -61,6 +62,43 @@ def _recortar(mensajes: list[Mensaje], max_tokens: int) -> list[Mensaje]:
     return mensajes
 
 
+class _TurnoReservado:
+    """Flujo de eventos de un turno que libera la reserva del cliente al terminar, fallar o descartarse.
+
+    Un generador que nunca llega a arrancar (el cliente se desconecta antes del primer evento) no ejecuta su
+    `finally`; por eso la liberación vive aquí y es idempotente (también en `close` y `__del__`).
+    """
+
+    def __init__(self, flujo: Iterator[EventoChat], liberar: Callable[[], None]):
+        self._flujo = flujo
+        self._liberar = liberar
+        self._liberado = False
+
+    def _soltar(self) -> None:
+        if not self._liberado:
+            self._liberado = True
+            self._liberar()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> EventoChat:
+        try:
+            return next(self._flujo)
+        except BaseException:  # fin normal (StopIteration), error o cancelación: en todos se libera
+            self._soltar()
+            raise
+
+    def close(self) -> None:
+        try:
+            self._flujo.close()
+        finally:
+            self._soltar()
+
+    def __del__(self):
+        self._soltar()
+
+
 class ServicioChat:
     def __init__(
         self,
@@ -79,6 +117,8 @@ class ServicioChat:
         self._limitador = limitador
         self._presupuesto = presupuesto
         self._operaciones = operaciones
+        self._en_curso: set[int] = set()  # clientes con un turno respondiéndose: solo uno a la vez
+        self._en_curso_guarda = threading.Lock()
         self._seguimiento: dict[str, list[str]] = {}  # sesión → operaciones por confirmar cuyo resultado aún no se ha contado
 
     def enviar(self, cliente: Cliente, id_sesion: str, texto: str) -> Iterator[EventoChat]:
@@ -89,15 +129,30 @@ class ServicioChat:
         """
         if cliente.es_admin:
             raise ErrorDeAccesoDenegado("El perfil de administración no tiene cuenta: entra con un cliente para usar el chat.")
-        texto = validar_mensaje(texto, self._presupuesto)
-        espera = self._limitador.permitir(cliente.id, self._reloj.ahora())
-        if espera:
-            raise DemasiadasPeticiones(f"Vas demasiado rápido. Espera {espera} s y vuelve a escribir.", reintentar_en=espera)
-        if not self._agente.tiene_respaldo_local():  # con IA local el límite de la nube no bloquea: el agente la usa
-            comprobar_cuota_diaria(
-                self._registro_uso.tokens_del_dia(cliente.id, self._reloj.hoy()), self._presupuesto, self._reloj.ahora()
-            )
-        return self._turno(cliente, id_sesion, texto)
+        texto = validar_mensaje(limpiar_invisibles(texto), self._presupuesto)  # sin invisibles que disfracen «[auto]»
+        # Un solo turno a la vez por cliente: el gasto de tokens se anota al terminar, así que N peticiones en
+        # paralelo pasaban todas la comprobación del tope diario antes de que ninguna lo gastara.
+        with self._en_curso_guarda:
+            if cliente.id in self._en_curso:
+                raise TurnoEnCurso("Aún estoy respondiendo a tu pregunta anterior. Espera a que termine.", reintentar_en=2)
+            self._en_curso.add(cliente.id)
+        try:
+            espera = self._limitador.permitir(cliente.id, self._reloj.ahora())
+            if espera:
+                raise DemasiadasPeticiones(f"Vas demasiado rápido. Espera {espera} s y vuelve a escribir.", reintentar_en=espera)
+            if not self._agente.tiene_respaldo_local():  # con IA local el límite de la nube no bloquea: el agente la usa
+                comprobar_cuota_diaria(
+                    self._registro_uso.tokens_del_dia(cliente.id, self._reloj.hoy()), self._presupuesto, self._reloj.ahora()
+                )
+        except BaseException:
+            self._liberar(cliente.id)
+            raise
+        return _TurnoReservado(self._turno(cliente, id_sesion, texto), lambda: self._liberar(cliente.id))
+
+    def _liberar(self, cliente_id: int) -> None:
+        # SIN cerrojo: se llama desde `__del__`, que el recolector puede disparar en un hilo que ya tiene el cerrojo
+        # (un `threading.Lock` no es reentrante: interbloqueo). `set.discard` es atómico y no pisa a `add`/`in`.
+        self._en_curso.discard(cliente_id)
 
     def _turno(self, cliente: Cliente, id_sesion: str, texto: str) -> Iterator[EventoChat]:
         # la sesión de chat pertenece al cliente autenticado: otro cliente no puede leerla aunque conozca el id

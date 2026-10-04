@@ -171,6 +171,9 @@ class UsoEnMemoria:
     def tokens_del_dia(self, cliente_id: int, dia: date) -> int:
         return sum(r[3].total for r in self.registros if r[0] == cliente_id and r[1] != "ollama" and r[4].date() == dia)
 
+    def tokens_locales_del_dia(self, cliente_id: int, dia: date) -> int:
+        return sum(r[3].total for r in self.registros if r[0] == cliente_id and r[1] == "ollama" and r[4].date() == dia)
+
     def reiniciar_dia(self, cliente_id: int, dia: date) -> int:
         liberados = self.tokens_del_dia(cliente_id, dia)
         self.registros = [r for r in self.registros if not (r[0] == cliente_id and r[4].date() == dia)]

@@ -63,6 +63,11 @@ class RepositorioCuentaSqlite:
             con.close()
 
 
+def _escapar_like(texto: str) -> str:
+    """`%` y `_` del usuario (o del LLM) son literales: «%» no debe coincidir con todos los contactos."""
+    return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class RepositorioContactosSqlite:
     def __init__(self, bd: BaseDeDatos):
         self._bd = bd
@@ -82,8 +87,8 @@ class RepositorioContactosSqlite:
         try:
             fila = con.execute(
                 "SELECT nombre, telefono FROM contactos_bizum "
-                "WHERE cliente_id = ? AND (nombre LIKE ? OR telefono = ?)",
-                (cliente_id, f"%{nombre_o_telefono}%", nombre_o_telefono),
+                "WHERE cliente_id = ? AND (nombre LIKE ? ESCAPE '\\' OR telefono = ?)",
+                (cliente_id, f"%{_escapar_like(nombre_o_telefono)}%", nombre_o_telefono),
             ).fetchone()
         finally:
             con.close()
