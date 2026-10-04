@@ -12,6 +12,10 @@ class RegistroUso(Protocol):
         """Tokens de modelos en la nube; los del modelo local (Ollama) son gratis y no cuentan."""
         ...
 
+    def tokens_locales_del_dia(self, cliente_id: int, dia: date) -> int:
+        """Tokens del modelo local (Ollama): no cuentan para el límite de la nube, pero tienen su propio tope."""
+        ...
+
     def ultimos(self, cliente_id: int, limite: int = 10) -> list[dict]: ...
 
     def reiniciar_dia(self, cliente_id: int, dia: date) -> int:

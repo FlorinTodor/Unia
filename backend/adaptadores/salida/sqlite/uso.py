@@ -1,6 +1,7 @@
 """Registro de uso de tokens en SQLite: sobrevive a los reinicios y permite ver el gasto por cliente y día."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
+from ....dominio.proveedores import OLLAMA
 from ....dominio.uso import Uso
 from .conexion import BaseDeDatos
 
@@ -22,11 +23,19 @@ class UsoSqlite:
             con.close()
 
     def tokens_del_dia(self, cliente_id: int, dia: date) -> int:
+        """Tokens gastados en la nube (el modelo local es gratis y no cuenta aquí)."""
+        return self._suma_del_dia(cliente_id, dia, "proveedor != ?")
+
+    def tokens_locales_del_dia(self, cliente_id: int, dia: date) -> int:
+        return self._suma_del_dia(cliente_id, dia, "proveedor = ?")
+
+    def _suma_del_dia(self, cliente_id: int, dia: date, filtro_proveedor: str) -> int:
         con = self._bd.abrir(solo_lectura=True)
         try:
             return con.execute(
-                "SELECT COALESCE(SUM(tokens_entrada + tokens_salida), 0) FROM uso_ia WHERE proveedor != 'ollama' AND cliente_id = ? AND momento >= ? AND momento < ?",
-                (cliente_id, dia.isoformat(), (dia.fromordinal(dia.toordinal() + 1)).isoformat()),
+                "SELECT COALESCE(SUM(tokens_entrada + tokens_salida), 0) FROM uso_ia "
+                f"WHERE {filtro_proveedor} AND cliente_id = ? AND momento >= ? AND momento < ?",
+                (OLLAMA, cliente_id, dia.isoformat(), (dia + timedelta(days=1)).isoformat()),
             ).fetchone()[0]
         finally:
             con.close()
@@ -38,7 +47,7 @@ class UsoSqlite:
             with con:
                 con.execute(
                     "DELETE FROM uso_ia WHERE cliente_id = ? AND momento >= ? AND momento < ?",
-                    (cliente_id, dia.isoformat(), (dia.fromordinal(dia.toordinal() + 1)).isoformat()),
+                    (cliente_id, dia.isoformat(), (dia + timedelta(days=1)).isoformat()),
                 )
         finally:
             con.close()

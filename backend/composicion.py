@@ -48,10 +48,11 @@ from .adaptadores.salida.sqlite.repositorios import (
 from .adaptadores.salida.voz.piper import SintetizadorPiper
 from .adaptadores.salida.voz.whisper import TranscriptorWhisper
 from .aplicacion.agente import Agente
+from .aplicacion.casos_uso.graficos import GenerarGraficoDeFuente
 from .aplicacion.casos_uso.acceso import CerrarSesion, IdentificarCliente, IniciarSesion
 from .aplicacion.casos_uso.ajustes import GestionAjustes
 from .aplicacion.casos_uso.banco import ConsultarMovimientos, ConsultarSaldo, ListarContactos
-from .aplicacion.casos_uso.bizum import CancelarOperacion, ConfirmarOperacion, SolicitarBizum
+from .aplicacion.casos_uso.bizum import CancelarOperacion, CerrojosPorCliente, ConfirmarOperacion, SolicitarBizum
 from .aplicacion.casos_uso.estado import ConsultarEstado
 from .aplicacion.casos_uso.movil import LeerMensajesMovil
 from .aplicacion.casos_uso.uso import AdministrarUso, ConsultarUso
@@ -75,6 +76,7 @@ def _presupuesto_desde_entorno() -> PresupuestoUso:
     d = PresupuestoUso()
     return PresupuestoUso(
         tokens_por_dia=entero("TOKENS_DIA_CLIENTE", d.tokens_por_dia),
+        tokens_por_dia_local=entero("TOKENS_DIA_LOCAL", d.tokens_por_dia_local),
         tokens_por_turno=entero("TOKENS_MAX_TURNO", d.tokens_por_turno),
         max_caracteres_mensaje=entero("MAX_CARACTERES_MENSAJE", d.max_caracteres_mensaje),
         max_tokens_respuesta=entero("MAX_TOKENS_RESPUESTA", d.max_tokens_respuesta),
@@ -82,6 +84,11 @@ def _presupuesto_desde_entorno() -> PresupuestoUso:
         max_tokens_historial=entero("MAX_TOKENS_HISTORIAL", d.max_tokens_historial),
         max_caracteres_resultado=entero("MAX_CARACTERES_RESULTADO", d.max_caracteres_resultado),
     )
+
+
+def _hosts_ollama_permitidos() -> frozenset[str]:
+    """Hosts extra (aparte de loopback) donde se admite Ollama: `OLLAMA_HOSTS_PERMITIDOS=host1,host2` en `.env`."""
+    return frozenset(h.strip().lower() for h in os.getenv("OLLAMA_HOSTS_PERMITIDOS", "").split(",") if h.strip())
 
 
 def crear_aplicacion() -> FastAPI:
@@ -98,8 +105,9 @@ def crear_aplicacion() -> FastAPI:
     auditoria = AuditoriaSqlite(bd, reloj)
     uso_ia = UsoSqlite(bd)
     limitador = LimitadorEnMemoria(presupuesto.peticiones_por_minuto)
+    limitador_voz = LimitadorEnMemoria(presupuesto.peticiones_por_minuto * 3)  # /stt y /tts: más holgado, el TTS es por frases
     ajustes = AjustesJson()
-    fabrica = FabricaClientes(ajustes)
+    fabrica = FabricaClientes(ajustes, _hosts_ollama_permitidos())
     llm = ProveedorLLMOpenAI(fabrica)
     sonda = SondaOpenAI(fabrica)
     piper = SintetizadorPiper()
@@ -117,8 +125,9 @@ def crear_aplicacion() -> FastAPI:
     listar_contactos = ListarContactos(agenda)
     consultar_movimientos = ConsultarMovimientos(consultor, auditoria)
     solicitar_bizum = SolicitarBizum(cuentas, agenda, operaciones, codigos, movil, reloj, auditoria)
-    confirmar_operacion = ConfirmarOperacion(cuentas, operaciones, reloj, auditoria)
-    cancelar_operacion = CancelarOperacion(operaciones, auditoria)
+    cerrojos = CerrojosPorCliente()  # confirmar y cancelar comparten cerrojo por cliente
+    confirmar_operacion = ConfirmarOperacion(cuentas, operaciones, reloj, auditoria, cerrojos)
+    cancelar_operacion = CancelarOperacion(operaciones, auditoria, cerrojos)
     iniciar_sesion = IniciarSesion(clientes, hasheador, sesiones_auth, intentos, reloj, auditoria)
     identificar = IdentificarCliente(sesiones_auth, clientes)
     cerrar_sesion = CerrarSesion(sesiones_auth, auditoria)
@@ -129,7 +138,7 @@ def crear_aplicacion() -> FastAPI:
         contactos.crear(listar_contactos),
         bizum.crear(solicitar_bizum),
         movimientos.crear(consultar_movimientos, presupuesto.max_caracteres_resultado),
-        grafico.crear(),
+        grafico.crear(GenerarGraficoDeFuente(consultar_movimientos, reloj)),
     ])
     agente = Agente(llm, herramientas, ajustes, uso_ia, presupuesto, reloj)
     chat = ServicioChat(agente, sesiones_chat, reloj, uso_ia, limitador, presupuesto, operaciones)
@@ -138,16 +147,19 @@ def crear_aplicacion() -> FastAPI:
 
     # ── adaptadores de entrada (HTTP) ────────────────────────────────────
     cliente_actual = crear_dependencia(identificar)
-    cookie_segura = os.getenv("COOKIE_SEGURA") == "1"  # activar al servir por HTTPS
+    # COOKIE_SEGURA=1/0 lo fuerza; sin definir, la cookie es `Secure` cuando la petición llega por HTTPS
+    cookie_segura = {"1": True, "0": False}.get(os.getenv("COOKIE_SEGURA", ""))
+    # solo con un proxy inverso propio que sobrescriba X-Forwarded-For se puede fiar uno de esa cabecera (DECISIONES 19)
+    proxy_de_confianza = os.getenv("PROXY_DE_CONFIANZA") == "1"
     routers = [
-        rutas_auth.crear_router(iniciar_sesion, cerrar_sesion, cliente_actual, cookie_segura),
+        rutas_auth.crear_router(iniciar_sesion, cerrar_sesion, cliente_actual, cookie_segura, proxy_de_confianza),
         rutas_banco.crear_router(consultar_saldo, listar_contactos, solicitar_bizum, consultar_movimientos, cliente_actual),
         rutas_operaciones.crear_router(confirmar_operacion, cancelar_operacion, LeerMensajesMovil(movil), cliente_actual),
         rutas_uso.crear_router(consultar_uso, cliente_actual),
         rutas_admin.crear_router(administrar_uso, cliente_actual),
-        rutas_ajustes.crear_router(GestionAjustes(ajustes, sonda), cliente_actual),
+        rutas_ajustes.crear_router(GestionAjustes(ajustes, sonda, _hosts_ollama_permitidos(), auditoria), cliente_actual),
         rutas_chat.crear_router(
-            chat, TranscribirAudio(whisper, ajustes), SintetizarVoz(piper), ConsultarEstado(ajustes, piper), cliente_actual
+            chat, TranscribirAudio(whisper, ajustes, limitador_voz, reloj), SintetizarVoz(piper, limitador_voz, reloj), ConsultarEstado(ajustes, piper), cliente_actual
         ),
     ]
 
@@ -156,4 +168,4 @@ def crear_aplicacion() -> FastAPI:
         piper.precargar()
 
     documentar = os.getenv("DOCS_API") == "1"  # Swagger/OpenAPI solo bajo petición: por defecto no se publica el mapa de la API
-    return crear_app(routers, RUTA_FRONTEND, al_arrancar, documentar)
+    return crear_app(routers, RUTA_FRONTEND, identificar, al_arrancar, documentar)
