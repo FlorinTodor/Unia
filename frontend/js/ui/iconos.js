@@ -19,6 +19,10 @@ const TRAZOS = {
   envio: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
   cartera: '<path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l12-4v4"/><circle cx="17" cy="13.5" r="1"/>',
   huella: '<path d="M12 11v3a3 3 0 0 1-3 3"/><path d="M8 11a4 4 0 0 1 8 0v2a7 7 0 0 1-2 5"/><path d="M5 11a7 7 0 0 1 14 0v1"/><path d="M12 14v2a9 9 0 0 1-1 4"/>',
+  tarjeta: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  candado_abierto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/>',
   punto: '<circle cx="12" cy="12" r="4"/>',
 };
 

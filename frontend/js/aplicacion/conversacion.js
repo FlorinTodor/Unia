@@ -53,6 +53,8 @@ export class Conversacion {
           vista.aviso(dato);
         } else if (tipo === "grafico") {
           vista.grafico(dato);
+        } else if (tipo === "tarjeta") {
+          vista.tarjeta(dato);
         } else if (tipo === "uso") {
           this.alUso(dato);
         } else if (tipo === "operacion") {

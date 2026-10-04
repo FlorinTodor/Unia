@@ -1,4 +1,4 @@
-/* Tarjeta «Confirma tu Bizum»: el cliente confirma con el código que le llegó al móvil o con su huella.
+/* Tarjeta «Confirma tu Bizum» (o «Desbloquear tarjeta»): el cliente confirma con el código que le llegó al móvil o con su huella.
  * Nada de esto pasa por el chat ni por el modelo: va directo a los endpoints de confirmación.
  *
  * Accesibilidad: el foco salta al campo del código (quien usa lector de pantalla cae justo ahí y oye el
@@ -11,7 +11,16 @@ function fila(etiqueta, valor) {
   const dt = document.createElement("dt");
   dt.textContent = etiqueta;
   const dd = document.createElement("dd");
-  dd.textContent = valor;
+  // «••7310»: en la tipografía de texto los puntos se ven separados; se pintan en monoespaciada
+  const partes = String(valor).split(/([•·]{2,}\s?\d{4})/);
+  for (const parte of partes) {
+    if (/^[•·]{2,}\s?\d{4}$/.test(parte)) {
+      const span = document.createElement("span");
+      span.className = "ult4";
+      span.textContent = parte;
+      dd.appendChild(span);
+    } else if (parte) dd.appendChild(document.createTextNode(parte));
+  }
   return [dt, dd];
 }
 
@@ -30,6 +39,7 @@ function boton(tipo, clase, texto, etiquetaAccesible) {
  * @returns HTMLElement
  */
 export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
+  const desbloqueo = operacion.tipo === "desbloqueo_tarjeta";
   const importe = formatearEuros(operacion.importe);
   const tarjeta = document.createElement("div");
   tarjeta.className = "tarjeta-operacion";
@@ -38,11 +48,15 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
 
   const titulo = document.createElement("h3");
   titulo.id = `op-titulo-${operacion.id}`;
-  titulo.textContent = "Confirma tu Bizum";
+  titulo.textContent = desbloqueo ? "Desbloquear tarjeta" : "Confirma tu Bizum";
 
   const datos = document.createElement("dl");
-  datos.append(...fila("Para", operacion.destinatario), ...fila("Importe", importe));
-  if (operacion.concepto) datos.append(...fila("Concepto", operacion.concepto));
+  if (desbloqueo) {
+    datos.append(...fila("Tarjeta", operacion.destinatario));
+  } else {
+    datos.append(...fila("Para", operacion.destinatario), ...fila("Importe", importe));
+    if (operacion.concepto) datos.append(...fila("Concepto", operacion.concepto));
+  }
 
   const alertas = document.createElement("ul");
   alertas.className = "alertas";
@@ -56,8 +70,9 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
   const resumen = document.createElement("p");
   resumen.id = `op-resumen-${operacion.id}`;
   resumen.className = "solo-lector";
+  const queSeConfirma = desbloqueo ? `el desbloqueo de la tarjeta ${operacion.destinatario}` : `el Bizum de ${importe} a ${operacion.destinatario}`;
   resumen.textContent =
-    `Confirma el Bizum de ${importe} a ${operacion.destinatario}. ` +
+    `Confirma ${queSeConfirma}. ` +
     "Te hemos enviado un código de 6 dígitos por SMS al móvil. Escríbelo aquí, o pulsa Aprobar con huella para no teclearlo.";
 
   const ayuda = document.createElement("p");
@@ -77,14 +92,14 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
   codigo.placeholder = "000000";
   codigo.setAttribute("aria-label", "Código de confirmación de 6 dígitos");
   codigo.setAttribute("aria-describedby", resumen.id);
-  const confirmar = boton("submit", "btn-primario", "Confirmar", "Confirmar el Bizum con el código");
-  const cancelar = boton("button", "btn-secundario", "Cancelar", "Cancelar el Bizum");
+  const confirmar = boton("submit", "btn-primario", "Confirmar", desbloqueo ? "Confirmar el desbloqueo con el código" : "Confirmar el Bizum con el código");
+  const cancelar = boton("button", "btn-secundario", "Cancelar", desbloqueo ? "Cancelar el desbloqueo" : "Cancelar el Bizum");
   formulario.append(codigo, confirmar, cancelar);
 
   // alternativa a teclear: aprobar con un gesto desde el móvil, como en las apps bancarias reales
   const huella = boton(
     "button", "btn-huella", "",
-    `Aprobar el Bizum de ${importe} con la huella o Face ID. Alternativa a escribir el código.`
+    `Aprobar ${desbloqueo ? "el desbloqueo" : `el Bizum de ${importe}`} con la huella o Face ID. Alternativa a escribir el código.`
   );
   huella.append(icono("huella", 18), document.createTextNode(" Aprobar con huella"));
   const nota = document.createElement("p");
@@ -102,16 +117,16 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
   const reloj = setInterval(() => {
     const restante = Math.max(0, Math.round((caduca - Date.now()) / 1000));
     cuentaAtras.textContent = `${Math.floor(restante / 60)}:${String(restante % 60).padStart(2, "0")}`;
-    if (restante === 0) cerrar("caducada", "El código ha caducado. Pide el Bizum de nuevo.");
+    if (restante === 0) cerrar("caducada", `El código ha caducado. Pide ${desbloqueo ? "el desbloqueo" : "el Bizum"} de nuevo.`);
   }, 1000);
 
-  function cerrar(resultado, mensaje) {
+  function cerrar(resultado, mensaje, extra = {}) {
     clearInterval(reloj);
     for (const el of controles) el.disabled = true;
     estado.className = `mensaje-estado ${resultado === "confirmada" ? "ok" : "error"}`;
     estado.setAttribute("role", resultado === "confirmada" ? "status" : "alert"); // los fallos se anuncian al instante
     estado.textContent = mensaje;
-    alTerminar({ estado: resultado, mensaje });
+    alTerminar({ estado: resultado, mensaje, ...extra });
   }
 
   /** Lanza la confirmación (por código o por huella) y refleja el resultado. */
@@ -122,6 +137,10 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
     estado.textContent = "Comprobando…";
     try {
       const r = await peticion();
+      if (r.tipo === "desbloqueo_tarjeta" && r.tarjeta) {
+        const t = r.tarjeta;
+        return cerrar("confirmada", `Tarjeta desbloqueada: ${t.marca} ${t.tipo} terminada en ${t.ultimos4}.`, { tarjeta: t });
+      }
       cerrar("confirmada", `Bizum enviado: ${formatearEuros(r.importe)} a ${r.destinatario}. Nuevo saldo: ${formatearEuros(r.nuevo_saldo)}.`);
     } catch (err) {
       // 404 no existe · 409 ya procesada o sin saldo · 410 caducada · 423 intentos agotados: no se puede reintentar
@@ -143,7 +162,7 @@ export function crearTarjetaOperacion(operacion, alTerminar = () => {}) {
   cancelar.addEventListener("click", async () => {
     try {
       await cancelarOperacion(operacion.id);
-      cerrar("cancelada", "Operación cancelada. No se ha enviado nada.");
+      cerrar("cancelada", desbloqueo ? "Operación cancelada. La tarjeta sigue bloqueada." : "Operación cancelada. No se ha enviado nada.");
     } catch (err) {
       estado.className = "mensaje-estado error";
       estado.setAttribute("role", "alert");

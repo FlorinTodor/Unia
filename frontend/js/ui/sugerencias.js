@@ -7,6 +7,7 @@ const SUGERENCIAS = [
   { icono: "grafico", texto: "Gráfico de mis gastos por categoría" },
   { icono: "carrito", texto: "¿Cuánto gasté en supermercados este mes?" },
   { icono: "envio", texto: "Quiero enviar un Bizum" },
+  { icono: "tarjeta", texto: "Mis tarjetas" },
 ];
 
 export class Sugerencias {

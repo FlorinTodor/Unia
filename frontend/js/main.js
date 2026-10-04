@@ -69,14 +69,23 @@ async function actualizarEstado() {
 }
 
 const sugerencias = new Sugerencias((texto) => enviar(texto));
+// los botones de las tarjetas bancarias solo piden al chat una frase: el flujo y su seguridad son los de siempre
+vista.alPedirTexto = (texto) => enviar(texto);
 
 async function enviar(texto) {
+  // con un turno en curso no se hace nada (ni cortar la voz ni borrar lo escrito): evita pisar la cola SMS -> asistente
+  if (conversacion.ocupada || !texto.trim()) return;
+  vista.ocupado(true);
   pararVoz();
   esperaSms = Promise.resolve();
   entrada.value = "";
   sugerencias.deshabilitar(true);
-  await conversacion.enviar(texto);
-  sugerencias.deshabilitar(false);
+  try {
+    await conversacion.enviar(texto);
+  } finally {
+    vista.ocupado(false);
+    sugerencias.deshabilitar(false);
+  }
   panelCuenta.cargar(); // el asistente puede haber cambiado datos (p. ej. tras una operación)
   entrada.focus();
 }

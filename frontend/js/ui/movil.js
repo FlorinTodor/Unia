@@ -40,6 +40,7 @@ export class Movil {
 
   async abrir() {
     this.#panel.hidden = false;
+    document.body.classList.add("movil-abierto"); // en pantallas estrechas el chat deja sitio al aviso
     this.#boton.classList.remove("nuevo");
     await this.refrescar();
     clearInterval(this.#temporizador);
@@ -48,6 +49,7 @@ export class Movil {
 
   cerrar() {
     this.#panel.hidden = true;
+    document.body.classList.remove("movil-abierto");
     clearInterval(this.#temporizador);
   }
 

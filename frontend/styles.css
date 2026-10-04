@@ -340,6 +340,46 @@ label { font-size: 0.85rem; font-weight: 700; }
 .btn-huella:disabled { opacity: 0.5; cursor: default; }
 .tarjeta-operacion .mensaje-estado.ok { background: var(--exito-fondo); padding: 10px 12px; border-radius: 10px; }
 
+/* ------------------------------------------------------------------ tarjetas bancarias (evento «tarjeta») */
+
+.fila-tarjetas {
+  align-self: stretch; flex-shrink: 0; margin-left: 44px; display: flex; gap: 14px; overflow-x: auto; padding: 4px 4px 10px;
+  scroll-snap-type: x proximity; scrollbar-width: thin;
+}
+/* Colores fijos (no cambian en modo oscuro): texto blanco sobre petróleo 8,8:1; sobre pizarra 11:1 */
+.tarjeta-banco {
+  flex: 0 0 auto; width: min(300px, 82vw); aspect-ratio: 1.586; min-height: 170px; scroll-snap-align: start;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 16px 18px; border-radius: 18px;
+  color: #fff; box-shadow: var(--sombra); position: relative; overflow: hidden;
+  background: linear-gradient(150deg, #005265 0%, #00323a 100%);
+}
+.tarjeta-banco::after {
+  content: ""; position: absolute; width: 190px; height: 190px; border-radius: 50%; right: -70px; top: -80px;
+  background: #95e891; opacity: 0.14; pointer-events: none;
+}
+.tarjeta-banco.bloqueada { background: linear-gradient(150deg, #3c4a50 0%, #1f2a30 100%); }
+.tarjeta-banco.bloqueada::after { background: #ff8a8f; }
+.tb-cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; position: relative; z-index: 1; }
+.tb-marca { font-weight: 800; font-size: 1.15rem; letter-spacing: 0.02em; }
+.tb-tipo { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.tb-numero { font: 800 1.45rem ui-monospace, monospace; letter-spacing: 0.1em; position: relative; z-index: 1; }
+.tb-desde { font-size: 0.78rem; font-weight: 600; }
+.tb-situacion { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.tb-pie { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1; }
+.ult4 { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+.tb-estado {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #fff;
+  font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; color: #046a38; /* 5,9:1 sobre blanco */
+}
+.tarjeta-banco.bloqueada .tb-estado { color: #b3202a; } /* 6,4:1 sobre blanco */
+.tb-accion {
+  min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1.5px solid #fff; background: transparent; color: #fff;
+  font-weight: 800; font-size: 0.88rem;
+}
+.chat.ocupado .tb-accion, .tb-accion[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; border-style: dashed; }
+.tb-accion:hover { background: rgba(255, 255, 255, 0.18); }
+.tb-accion:focus-visible { outline-color: #95e891; }
+
 /* ------------------------------------------------------------------ móvil simulado */
 
 .movil {
@@ -442,7 +482,7 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
   .btn-salir { padding: 0 12px; }
   .burbuja { max-width: 92%; }
   .avatar-ia { display: none; }
-  .estado-herramienta, .tarjeta-grafico, .tarjeta-operacion { margin-left: 0; }
+  .estado-herramienta, .tarjeta-grafico, .tarjeta-operacion, .fila-tarjetas { margin-left: 0; }
   .tarjeta-operacion { width: 100%; }
   .lienzo { height: 260px; }
   #panel-login[open] { grid-template-columns: 1fr; }
@@ -450,7 +490,12 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
   .login-marca h1 { font-size: 2.2rem; }
   .login-ventajas { display: none; }
   .login-formulario { padding: 24px; }
-  .movil { right: 12px; bottom: 96px; }
+  /* en estrecho el SMS llega como aviso compacto arriba: la tarjeta de confirmación (abajo) sigue visible y accionable */
+  .movil { top: 64px; bottom: auto; right: 12px; left: 12px; width: auto; max-height: 170px; padding: 8px 14px 10px; border-radius: 18px; }
+  .movil .texto-mini { display: none; }
+  .movil-cabecera { margin-bottom: 0; }
+  body.movil-abierto .chat { padding-top: 170px; } /* en un chat corto, el contenido arranca bajo el aviso del móvil */
+  .movil .sms { margin-top: 4px; padding: 8px 12px; }
   .fila-clave { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
