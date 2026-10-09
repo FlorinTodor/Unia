@@ -40,6 +40,7 @@ from .puertos.uso import RegistroUso
 MAX_RONDAS = 6
 MAX_REINTENTOS_GENERACION = 2
 MAX_ESPERA_SEGUNDOS = 20  # un límite por minuto que se libera antes se espera, en vez de bajar a un modelo peor
+MAX_ESPERA_TURNO = 40  # tope de espera acumulada por turno: un gráfico necesita varias rondas y chocaba con el límite cada vez
 MINUTOS_SIN_CUOTA_POR_DEFECTO = 15  # si el proveedor no dice cuándo vuelve la cuota
 MAX_HORAS_SIN_CUOTA = 6  # tope de lo que se recuerda que un modelo está sin cuota (el proveedor puede pedir días)
 MAX_EMPUJONES = 1  # veces por turno que se obliga al modelo a cumplir lo que acaba de prometer
@@ -270,7 +271,7 @@ class Agente:
         con_herramientas = False  # ¿se ha ejecutado alguna herramienta en este turno?
         con_grafico = False
         grafico_llamado = False  # generar_grafico se llamó (aunque fallara, p. ej. periodo vacío): no se vuelve a empujar
-        con_espera: set[int] = set()  # posiciones de la cadena a las que ya se esperó una vez
+        esperado = 0.0  # segundos esperados en este turno por límites por minuto (tope MAX_ESPERA_TURNO)
         proteccion_ejecutada = False  # solo UNA acción de protección (bloquear una tarjeta) por turno
 
         while rondas < MAX_RONDAS:
@@ -291,12 +292,13 @@ class Agente:
                         self._contar(consumo, cliente, cadena[posicion], evento.uso)
             except ProveedorNoUtilizable as e:
                 espera = e.espera if isinstance(e, LimitePorMinuto) else None
-                if espera is not None and espera <= MAX_ESPERA_SEGUNDOS and posicion not in con_espera:
-                    con_espera.add(posicion)
-                    yield Aviso(
-                        f"{cadena[posicion].modelo} ha alcanzado su límite por minuto. "
-                        f"Espero {math.ceil(espera)} s y lo reintento."
-                    )
+                if espera is not None and espera <= MAX_ESPERA_SEGUNDOS and esperado + espera + 0.5 <= MAX_ESPERA_TURNO:
+                    if not esperado:  # se avisa la primera vez; las siguientes esperas del turno van en silencio
+                        yield Aviso(
+                            f"{cadena[posicion].modelo} ha alcanzado su límite por minuto. "
+                            f"Espero {math.ceil(espera)} s y lo reintento."
+                        )
+                    esperado += espera + 0.5
                     self._esperar(espera + 0.5)
                     continue
                 motivo = explicar_fallo(cadena[posicion], e)

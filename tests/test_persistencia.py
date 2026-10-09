@@ -114,7 +114,7 @@ def test_la_aplicacion_completa_conserva_la_sesion_tras_reiniciar(tmp_path, monk
     ruta = tmp_path / "banco.db"
     monkeypatch.setattr(conexion, "RUTA_DB", ruta)
     monkeypatch.setattr(composicion, "BaseDeDatos", lambda: BaseDeDatos(ruta))
-    monkeypatch.setattr(composicion, "SintetizadorPiper", lambda: type("P", (), {"disponible": lambda s: False, "precargar": lambda s: None})())
+    monkeypatch.setattr(composicion, "crear_sintetizador", lambda: type("P", (), {"disponible": lambda s: False, "precargar": lambda s: None})())
     monkeypatch.setenv("COOKIE_SEGURA", "0")
 
     with TestClient(composicion.crear_aplicacion()) as primero:

@@ -416,3 +416,20 @@ necesitarían un candado compartido (base de datos o Redis).
 - **Descartado**: pedir al LLM que clasifique (cuesta tokens y es justo lo que se quiere no fiar); bloquear al cliente tras N intentos (el cliente puede
   ser un curioso; la auditoría basta). El mensaje del intento se queda en el historial de la sesión.
 
+
+## 22. Voz realista con OmniVoice en local, Piper de reserva (5-oct)
+
+- **Decisión**: la voz del servidor (`POST /tts`) y la del vídeo pasan a **OmniVoice** (k2-fsa, vía el proyecto VoiceStudio), en la GPU local.
+  La voz de Unia se eligió entre 12 candidatas de su «diseño de voz» (`pruebas/disenar_voz.py`) y se guarda como referencia en
+  `data/voces/unia_ref.wav`; cada frase **clona esa referencia**, así que siempre suena la misma voz. En el vídeo, otras dos referencias hacen de
+  cliente y de móvil. `SintetizadorConReserva` usa OmniVoice y, si no está instalado, no hay GPU, falta la referencia o falla, **Piper** (sin cambios).
+  `TTS_MOTOR=piper` fuerza la voz anterior. En la interfaz, «Automática» pasa a usar primero la voz del servidor y la del navegador queda de reserva.
+- **Por qué**: Piper `sharvard` sonaba robótica y acelerada (`TTS_LENGTH_SCALE=0.78`), y edge-tts envía el texto a Microsoft. OmniVoice es local
+  (no sale nada del equipo), suena natural y tranquila (`TTS_VELOCIDAD=0.95`) y es rápida: ~1,5–1,8 s por frase en una RTX 3060, igual para 3 que para 10 s de audio.
+- **GPU compartida**: el modelo ocupa 1,9 GB, pero PyTorch reserva 5 GB al cargarlo; se libera la caché tras la carga y tras cada frase (queda en ~2,1 GB)
+  para que quepa Ollama (qwen3:8b, último eslabón de la cadena LLM) en una GPU de 6 GB. Un cerrojo sintetiza las frases de una en una.
+- **Licencia (riesgo aceptado)**: el código es Apache-2.0, pero los **pesos son CC-BY-NC** (uso no comercial). Vale para el reto académico; para producción
+  habría que cambiar de modelo, que con la arquitectura hexagonal es escribir otro adaptador `Sintetizador` y cambiar `crear_sintetizador()` en `composicion.py`.
+- **Coste**: PyTorch con CUDA y el modelo ocupan ~8 GB, por eso es opcional (`requirements-voz.txt`); sin GPU la app sigue funcionando con Piper.
+- **Descartado**: instalar VoiceStudio entero (aplicación Electron con AGPL, pensada para escritorio); diseñar la voz en cada frase (cambia de una a otra);
+  ElevenLabs u otras voces en la nube (cuota, coste y el texto de las respuestas bancarias saldría del equipo).

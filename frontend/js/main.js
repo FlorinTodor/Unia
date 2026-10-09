@@ -7,6 +7,7 @@ import { transcribir } from "./api/voz.js";
 import { Conversacion } from "./aplicacion/conversacion.js";
 import { leerEnVozAlta, pararVoz } from "./dispositivos/altavoz.js";
 import { Microfono } from "./dispositivos/microfono.js";
+import { guardarPreferencia, leerPreferencia } from "./dispositivos/preferencias.js";
 import { pintarEstado } from "./ui/cabecera.js";
 import { aplicarMarca } from "./marca.js";
 import { MedidorUso } from "./ui/medidor_uso.js";
@@ -23,6 +24,12 @@ const formulario = $("formulario");
 const entrada = $("entrada");
 const btnMic = $("btn-mic");
 const ttsCheck = $("tts-check");
+// la voz viene activada: es un asistente de voz y se olvidaba encenderla. Si el cliente la apaga, se recuerda
+ttsCheck.checked = leerPreferencia("leerEnVoz", "1") === "1";
+ttsCheck.addEventListener("change", () => {
+  guardarPreferencia("leerEnVoz", ttsCheck.checked ? "1" : "0");
+  if (!ttsCheck.checked) pararVoz();
+});
 
 aplicarMarca();
 
@@ -39,11 +46,12 @@ let esperaSms = Promise.resolve(); // el SMS del turno ya está encolado cuando 
 const conversacion = new Conversacion(
   vista,
   (texto) => {
-    // Suenan los dos, uno detrás de otro: primero el SMS con el código y después el aviso del asistente («He
-    // preparado el Bizum…»). Se espera a que el SMS esté en la cola de voz para que el asistente no lo pise.
-    const sms = esperaSms;
-    esperaSms = Promise.resolve();
-    if (ttsCheck.checked) sms.catch(() => {}).then(() => leerEnVozAlta(texto));
+    // Suenan los dos, uno detrás de otro: primero el asistente («He preparado el Bizum… te hemos enviado un código»)
+    // y después el SMS con el código. Se espera a que el móvil haya recibido el SMS para leerlo en ese orden.
+    esperaSms.catch(() => {}).then(() => {
+      if (ttsCheck.checked) leerEnVozAlta(texto);
+      movil.leerSmsPendientes();
+    });
   },
   {
     alOperacion: () => {
@@ -55,6 +63,12 @@ const conversacion = new Conversacion(
       panelCuenta.cargar(); // un Bizum confirmado cambia el saldo y los movimientos
     },
     alUso: (uso) => medidor.pintar(uso),
+    alFinTurno: () => {
+      // si el turno acabó en error (sin respuesta que leer), el SMS se lee igual; encadenado tras hablar(): no se adelanta
+      const sms = esperaSms;
+      esperaSms = Promise.resolve();
+      sms.catch(() => {}).then(() => movil.leerSmsPendientes());
+    },
   }
 );
 

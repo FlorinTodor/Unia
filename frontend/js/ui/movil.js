@@ -17,6 +17,8 @@ export class Movil {
   #leer = document.getElementById("movil-leer");
   #temporizador = null;
   #vistos = new Set(); // SMS que el cliente ya conoce: no se vuelven a anunciar
+  #retener = false; // SMS de una operación del chat: se leen DESPUÉS de la respuesta del asistente
+  #porLeer = [];
 
   constructor() {
     this.#boton.addEventListener("click", () => (this.#panel.hidden ? this.abrir() : this.cerrar()));
@@ -56,6 +58,7 @@ export class Movil {
   /** Al cerrar sesión se vacía todo: el siguiente cliente no debe ver los SMS del anterior. */
   reiniciar() {
     this.cerrar();
+    this.#porLeer = [];
     this.#lista.replaceChildren();
     this.#vistos = new Set();
     this.#anuncio.textContent = "";
@@ -102,12 +105,27 @@ export class Movil {
     this.#anuncio.textContent = ""; // para lectores de pantalla: un único anuncio por SMS
     setTimeout(() => (this.#anuncio.textContent = `Nuevo SMS de ${mensaje.remitente}. ${mensaje.texto}`), 50);
     navigator.vibrate?.([200, 100, 200]); // quien no oye lo nota en la mano (móviles)
-    if (this.#leer.checked) leerSms(`Nuevo mensaje de ${mensaje.remitente}. ${mensaje.texto}`);
+    if (!this.#leer.checked) return;
+    const texto = `Nuevo mensaje de ${mensaje.remitente}. ${mensaje.texto}`;
+    if (this.#retener) this.#porLeer.push(texto);
+    else leerSms(texto);
   }
 
-  /** Llega un SMS nuevo: se abre el móvil para que el cliente lea el código. */
-  avisarMensajeNuevo() {
+  /** Llega un SMS nuevo por una operación del chat: se abre el móvil, pero su lectura espera a leerSmsPendientes(). */
+  async avisarMensajeNuevo() {
     if (this.#panel.hidden) this.#boton.classList.add("nuevo");
-    return this.abrir();
+    this.#retener = true;
+    try {
+      await this.abrir();
+    } finally {
+      this.#retener = false;
+    }
+  }
+
+  /** Tras la respuesta del asistente («Te he enviado un código…»), el SMS: así se oye en el orden lógico. */
+  leerSmsPendientes() {
+    const pendientes = this.#porLeer;
+    this.#porLeer = [];
+    for (const texto of pendientes) leerSms(texto, { prioridad: 0 }); // a la cola, sin cortar al asistente
   }
 }

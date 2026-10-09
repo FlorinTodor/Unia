@@ -46,7 +46,9 @@ from .adaptadores.salida.sqlite.repositorios import (
     RepositorioCuentaSqlite,
     RepositorioTarjetasSqlite,
 )
+from .adaptadores.salida.voz.omnivoice import SintetizadorOmniVoice
 from .adaptadores.salida.voz.piper import SintetizadorPiper
+from .adaptadores.salida.voz.reserva import SintetizadorConReserva
 from .adaptadores.salida.voz.whisper import TranscriptorWhisper
 from .aplicacion.agente import Agente
 from .aplicacion.casos_uso.graficos import GenerarGraficoDeFuente
@@ -93,6 +95,14 @@ def _hosts_ollama_permitidos() -> frozenset[str]:
     return frozenset(h.strip().lower() for h in os.getenv("OLLAMA_HOSTS_PERMITIDOS", "").split(",") if h.strip())
 
 
+def crear_sintetizador():
+    """TTS_MOTOR=auto (OmniVoice con Piper de reserva) | piper. Sin GPU o sin la voz de referencia, «auto» habla con Piper."""
+    piper = SintetizadorPiper()
+    if os.getenv("TTS_MOTOR", "auto").lower() == "piper":
+        return piper
+    return SintetizadorConReserva(SintetizadorOmniVoice(), piper)
+
+
 def crear_aplicacion() -> FastAPI:
     load_dotenv()
     presupuesto = _presupuesto_desde_entorno()
@@ -113,7 +123,7 @@ def crear_aplicacion() -> FastAPI:
     fabrica = FabricaClientes(ajustes, _hosts_ollama_permitidos())
     llm = ProveedorLLMOpenAI(fabrica)
     sonda = SondaOpenAI(fabrica)
-    piper = SintetizadorPiper()
+    voz = crear_sintetizador()
     whisper = TranscriptorWhisper(ajustes, fabrica)
     sesiones_chat = SesionesChatSqlite(bd)  # el estado sobrevive a los reinicios (ver persistencia/sqlite_estado.py)
     hasheador = HasheadorScrypt()
@@ -167,13 +177,13 @@ def crear_aplicacion() -> FastAPI:
         rutas_admin.crear_router(administrar_uso, cliente_actual),
         rutas_ajustes.crear_router(GestionAjustes(ajustes, sonda, _hosts_ollama_permitidos(), auditoria), cliente_actual),
         rutas_chat.crear_router(
-            chat, TranscribirAudio(whisper, ajustes, limitador_voz, reloj), SintetizarVoz(piper, limitador_voz, reloj), ConsultarEstado(ajustes, piper), cliente_actual
+            chat, TranscribirAudio(whisper, ajustes, limitador_voz, reloj), SintetizarVoz(voz, limitador_voz, reloj), ConsultarEstado(ajustes, voz), cliente_actual
         ),
     ]
 
     def al_arrancar() -> None:
         esquema.inicializar(bd, reloj, hasheador)
-        piper.precargar()
+        voz.precargar()
 
     documentar = os.getenv("DOCS_API") == "1"  # Swagger/OpenAPI solo bajo petición: por defecto no se publica el mapa de la API
     return crear_app(routers, RUTA_FRONTEND, identificar, al_arrancar, documentar)

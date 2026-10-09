@@ -11,11 +11,13 @@ export class Conversacion {
    * @param alOperacion    (datos) => void — llega una operación por confirmar (se abre el móvil con el código)
    * @param alResolverOperacion () => void — la operación terminó (confirmada, cancelada...): refresca el saldo, etc.
    * @param alUso          ({tokens_turno, tokens_hoy, limite_dia}) => void — gasto de tokens al terminar la consulta
+   * @param alFinTurno     () => void — el turno terminó (con respuesta o con error): se leen los SMS retenidos
    */
-  constructor(vista, hablar, { alOperacion = () => {}, alResolverOperacion = () => {}, alUso = () => {} } = {}) {
+  constructor(vista, hablar, { alOperacion = () => {}, alResolverOperacion = () => {}, alUso = () => {}, alFinTurno = () => {} } = {}) {
     this.vista = vista;
     this.hablar = hablar;
     this.alOperacion = alOperacion;
+    this.alFinTurno = alFinTurno;
     this.alResolverOperacion = alResolverOperacion;
     this.alUso = alUso;
   }
@@ -87,6 +89,7 @@ export class Conversacion {
       burbuja?.classList.remove("cursor-escribiendo");
       this.#ocupada = false;
       vista.alFinal();
+      this.alFinTurno();
     }
   }
 }

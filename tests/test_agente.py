@@ -158,7 +158,7 @@ def test_un_limite_por_minuto_corto_se_espera_y_se_reintenta_con_el_mismo_modelo
     assert eventos[-1] == Fin("ok")
 
 
-def test_un_limite_por_minuto_largo_o_repetido_baja_al_siguiente_modelo_sin_esperar_de_mas():
+def test_un_limite_por_minuto_largo_o_que_agota_el_tope_del_turno_baja_al_siguiente_modelo():
     ajustes = AjustesEnMemoria(Ajustes(activo="groq", claves={"groq": ConfigClave("k", "grande", "pequeño")}, fallback_local=False))
     esperas = []
     llm = LLMGuionizado(LimitePorMinuto("TPM", espera=45), texto("ok"))  # 45 s: demasiado para esperar
@@ -167,10 +167,20 @@ def test_un_limite_por_minuto_largo_o_repetido_baja_al_siguiente_modelo_sin_espe
     assert esperas == [] and [ll[0].modelo for ll in llm.llamadas] == ["grande", "pequeño"]
 
     esperas.clear()
-    llm = LLMGuionizado(LimitePorMinuto("TPM", espera=2), LimitePorMinuto("TPM", espera=2), texto("ok"))
+    llm = LLMGuionizado(*[LimitePorMinuto("TPM", espera=15)] * 3, texto("ok"))  # 15,5 + 15,5 = 31; una tercera pasaría de 40
     agente = crear_agente(llm, RegistroHerramientas([]), ajustes, esperar=esperas.append)
     list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("hola")], ALEX))
-    assert len(esperas) == 1 and [ll[0].modelo for ll in llm.llamadas] == ["grande", "grande", "pequeño"]  # solo una espera por modelo
+    assert esperas == [15.5, 15.5] and [ll[0].modelo for ll in llm.llamadas] == ["grande", "grande", "grande", "pequeño"]
+
+
+def test_varios_limites_por_minuto_cortos_se_esperan_sin_cambiar_de_modelo_y_se_avisa_una_vez():
+    ajustes = AjustesEnMemoria(Ajustes(activo="groq", claves={"groq": ConfigClave("k", "grande", "pequeño")}, fallback_local=False))
+    esperas = []
+    llm = LLMGuionizado(LimitePorMinuto("TPM", espera=2), LimitePorMinuto("TPM", espera=2), texto("ok"))
+    agente = crear_agente(llm, RegistroHerramientas([]), ajustes, esperar=esperas.append)
+    eventos = list(agente.responder([Mensaje.sistema("s"), Mensaje.usuario("hola")], ALEX))
+    assert esperas == [2.5, 2.5] and [ll[0].modelo for ll in llm.llamadas] == ["grande", "grande", "grande"]
+    assert sum(isinstance(e, Aviso) for e in eventos) == 1 and eventos[-1] == Fin("ok")
 
 
 def test_se_lee_el_tiempo_de_espera_que_indica_groq():

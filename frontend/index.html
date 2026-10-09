@@ -35,7 +35,7 @@
 
       <div class="cabecera-acciones">
         <label class="tts-toggle" title="Leer las respuestas en voz alta">
-          <input type="checkbox" id="tts-check">
+          <input type="checkbox" id="tts-check" checked>
           <span class="interruptor" aria-hidden="true"></span>
           <span>Voz</span>
         </label>
@@ -205,9 +205,9 @@
       <p class="texto-suave">Entrada: <span id="estado-voz-entrada">—</span></p>
       <label>Lectura en voz alta
         <select id="motor-voz">
-          <option value="auto">Automática (navegador y, si no tiene voces, servidor)</option>
+          <option value="auto">Automática (voz de Unia y, si no responde, la del navegador)</option>
           <option value="navegador">Voces del navegador</option>
-          <option value="servidor">Voz neuronal del servidor (Piper)</option>
+          <option value="servidor">Solo la voz de Unia (servidor)</option>
         </select>
       </label>
     </section>

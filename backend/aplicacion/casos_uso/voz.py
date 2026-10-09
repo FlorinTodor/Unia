@@ -57,7 +57,7 @@ class SintetizarVoz:
     def __call__(self, cliente: Cliente, texto: str) -> bytes:
         _limitar(self._limitador, self._reloj, cliente)
         if not self._sintetizador.disponible():
-            raise ErrorNoDisponible("TTS del servidor no disponible (falta el modelo de voz Piper).")
+            raise ErrorNoDisponible("Voz del servidor no disponible (no hay ningún modelo de voz instalado).")
         texto = texto.strip()[:MAX_CARACTERES_TTS]
         if not texto:
             raise ErrorDeValidacion("Texto vacío.")

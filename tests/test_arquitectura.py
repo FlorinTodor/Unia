@@ -22,8 +22,8 @@ PROHIBIDO = {
 
 # librerías de infraestructura que dominio y aplicación no pueden usar
 LIBRERIAS_PROHIBIDAS = {
-    "dominio": {"fastapi", "starlette", "pydantic", "openai", "sqlite3", "httpx", "piper", "dotenv", "uvicorn"},
-    "aplicacion": {"fastapi", "starlette", "pydantic", "openai", "sqlite3", "httpx", "piper", "dotenv", "uvicorn"},
+    "dominio": {"fastapi", "starlette", "pydantic", "openai", "sqlite3", "httpx", "piper", "omnivoice", "torch", "dotenv", "uvicorn"},
+    "aplicacion": {"fastapi", "starlette", "pydantic", "openai", "sqlite3", "httpx", "piper", "omnivoice", "torch", "dotenv", "uvicorn"},
 }
 
 
