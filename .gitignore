@@ -10,3 +10,6 @@ data/ajustes.json
 # material de la organización (vídeo de 800 MB, transcripción con datos de terceros)
 directo/
 .claude/settings.local.json
+
+# copias que deja pruebas/reset_demo.py (contienen hashes y claves API)
+data/*.copia-*

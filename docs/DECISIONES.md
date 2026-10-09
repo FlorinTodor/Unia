@@ -5,12 +5,15 @@ base del apartado de diseño de la memoria del reto.
 
 ## 1. Estrategia de IA generativa: híbrido API gratuita + local (18-jul)
 
+> **Actualizada (oct.):** la estrategia sigue, pero Llama 3.3 70B se retiró de Groq; el principal es `openai/gpt-oss-120b`
+> (`dominio/proveedores.py`). No hay una decisión numerada que la sustituya: ver la nota de la nº 2 y `ARQUITECTURA.md` § Cadena de fallback.
+
 **Contexto.** El reto puntúa precisión de consultas NL (30 pts), latencia (15) y
 calidad conversacional (15). Hardware disponible: RTX 3060 Laptop 6 GB VRAM.
 Se analizaron: Ollama local, Groq, Cerebras, Google AI Studio, OpenRouter
 (fuente: repo *free-llm-api-resources*).
 
-**Decisión.** Groq como principal (Llama 3.3 70B) + Ollama local como fallback,
+**Decisión.** Groq como principal (Llama 3.3 70B; hoy `openai/gpt-oss-120b`) + Ollama local como fallback,
 con capa de abstracción de proveedor (todos exponen API OpenAI-compatible: cambiar
 proveedor = cambiar `base_url` + modelo).
 
@@ -21,6 +24,11 @@ Descartados: AI Studio (20 req/día en modelos top, usa datos para entrenar),
 OpenRouter (50 req/día).
 
 ## 2. Cadena de fallback de 3 eslabones (18-jul)
+
+> **Sustituida en parte (oct.)** — no por una decisión numerada, sino por la incidencia 30 y el código actual: la cadena es
+> `openai/gpt-oss-120b` → `openai/gpt-oss-20b` (Groq) → `qwen3:8b` (local), y ante un límite por minuto el agente **espera** y
+> reintenta con el mismo modelo (hasta 20 s por espera y 40 s por turno, `aplicacion/agente.py`) en vez de saltar al instante.
+> Solo la cuota diaria agotada provoca el salto inmediato. El texto de abajo es el original.
 
 **Contexto.** El tier gratuito de Groq resultó tener límites POR MODELO:
 70B = 12k tokens/min y 100k tokens/DÍA (se agotó el primer día de pruebas).
@@ -154,6 +162,10 @@ proveedor, eventos ↔ SSE). Se acepta a cambio de poder defender cada pieza en 
 ve un mensaje genérico. El evento SSE `herramienta` añade el campo `etiqueta`.
 
 ## 11. Seguridad simulada: el LLM propone, el servidor decide (3-oct)
+
+> **Sustituida en parte por las decisiones nº 15 a 19** en sus «límites honestos»: sesiones, operaciones y SMS ya están en
+> SQLite (nº 15); hay límite de login por origen, 100 fallos en 15 min (nº 16, 17 y 18); la pantalla de login ya no muestra
+> contraseñas y el administrador no tiene contraseña por defecto (nº 16). Las cuatro capas de la decisión siguen vigentes.
 
 **Contexto.** En la reunión del 29-jul insistieron en que «lo que ofrece un banco es seguridad».
 La app tenía un único cliente sin login, y el LLM podía mover dinero con solo llamar a una
@@ -425,7 +437,7 @@ necesitarían un candado compartido (base de datos o Redis).
   cliente y de móvil. `SintetizadorConReserva` usa OmniVoice y, si no está instalado, no hay GPU, falta la referencia o falla, **Piper** (sin cambios).
   `TTS_MOTOR=piper` fuerza la voz anterior. En la interfaz, «Automática» pasa a usar primero la voz del servidor y la del navegador queda de reserva.
 - **Por qué**: Piper `sharvard` sonaba robótica y acelerada (`TTS_LENGTH_SCALE=0.78`), y edge-tts envía el texto a Microsoft. OmniVoice es local
-  (no sale nada del equipo), suena natural y tranquila (`TTS_VELOCIDAD=0.95`) y es rápida: ~1,5–1,8 s por frase en una RTX 3060, igual para 3 que para 10 s de audio.
+  (no sale nada del equipo), suena natural y tranquila (`TTS_VELOCIDAD`, 1.0 por defecto: con 0.95 metía más cortes a mitad de frase, ver `.env.example`) y es rápida: ~1,5–1,8 s por frase en una RTX 3060, igual para 3 que para 10 s de audio.
 - **GPU compartida**: el modelo ocupa 1,9 GB, pero PyTorch reserva 5 GB al cargarlo; se libera la caché tras la carga y tras cada frase (queda en ~2,1 GB)
   para que quepa Ollama (qwen3:8b, último eslabón de la cadena LLM) en una GPU de 6 GB. Un cerrojo sintetiza las frases de una en una.
 - **Licencia (riesgo aceptado)**: el código es Apache-2.0, pero los **pesos son CC-BY-NC** (uso no comercial). Vale para el reto académico; para producción

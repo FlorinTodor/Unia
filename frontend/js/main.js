@@ -8,6 +8,7 @@ import { Conversacion } from "./aplicacion/conversacion.js";
 import { leerEnVozAlta, pararVoz } from "./dispositivos/altavoz.js";
 import { Microfono } from "./dispositivos/microfono.js";
 import { guardarPreferencia, leerPreferencia } from "./dispositivos/preferencias.js";
+import { iniciarAspecto } from "./ui/aspecto.js";
 import { pintarEstado } from "./ui/cabecera.js";
 import { aplicarMarca } from "./marca.js";
 import { MedidorUso } from "./ui/medidor_uso.js";
@@ -32,6 +33,7 @@ ttsCheck.addEventListener("change", () => {
 });
 
 aplicarMarca();
+iniciarAspecto(); // texto grande y alto contraste (cabecera y login)
 
 // si existe frontend/assets/logo-unicaja.svg se muestra junto al nombre; si no, no pasa nada
 const logo = $("logo-entidad");

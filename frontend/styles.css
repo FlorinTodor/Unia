@@ -167,6 +167,7 @@ svg { flex: none; }
 .tts-toggle input:checked + .interruptor { background: var(--lima); }
 .tts-toggle input:checked + .interruptor::after { transform: translateX(16px); background: var(--marca-osc); }
 .tts-toggle input:focus-visible + .interruptor { outline: 3px solid var(--lima); outline-offset: 2px; }
+.icono-interruptor { display: none; } /* solo en pantallas estrechas, donde el interruptor se queda sin texto */
 
 .usuario { display: flex; align-items: center; gap: 8px; margin-left: 6px; }
 .avatar {
@@ -189,6 +190,7 @@ body:not(.con-sesion) .cabecera-centro, body:not(.con-sesion) .panel-cuenta { vi
 .saldo {
   background: linear-gradient(150deg, var(--marca) 0%, var(--marca-osc) 100%); color: #fff;
   border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: var(--sombra);
+  flex-shrink: 0; /* si los movimientos no caben, que desplace el panel en vez de recortar el titular */
 }
 .saldo::after {
   content: ""; position: absolute; width: 170px; height: 170px; border-radius: 50%; right: -60px; top: -60px;
@@ -316,6 +318,7 @@ label { font-size: 0.85rem; font-weight: 700; }
 
 .tarjeta-operacion {
   align-self: flex-start; margin-left: 44px; width: min(500px, calc(100% - 44px)); display: grid; gap: 10px;
+  grid-template-columns: minmax(0, 1fr); /* sin esto, con «Texto grande» en el móvil el campo del código la desbordaba */
   background: var(--superficie); border: 1px solid var(--borde); border-top: 5px solid var(--verde);
   border-radius: var(--radio); padding: 16px 18px 18px; box-shadow: var(--sombra);
 }
@@ -430,6 +433,8 @@ dialog::backdrop { background: rgba(0, 50, 58, 0.72); backdrop-filter: blur(4px)
 .cuenta-demo b { font-size: 0.9rem; }
 .cuenta-demo span { font-size: 0.76rem; color: var(--texto-suave); }
 .cuenta-demo:hover, .cuenta-demo:focus-visible { border-color: var(--acento); background: var(--info-fondo); }
+.aspecto-login { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 18px; margin: -16px 0 6px; }
+.aspecto-login .casilla { margin: 4px 0; }
 
 /* ------------------------------------------------------------------ ajustes */
 
@@ -474,11 +479,28 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
   .movimientos { display: none; }
   .cabecera-centro { display: none; }
   .usuario-actual, .marca-texto small { display: none; }
+  /* Voz, Texto grande y Alto contraste no caben con su texto: pasan a botones de icono (pulsados en lima).
+     El texto queda oculto solo a la vista, para que el lector de pantalla siga diciendo el nombre. */
+  .tts-toggle {
+    width: 40px; height: 40px; justify-content: center; margin-right: 0; border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+  }
+  .tts-toggle .interruptor { display: none; }
+  .tts-toggle .icono-interruptor { display: block; }
+  .tts-toggle .texto-interruptor {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+  }
+  .tts-toggle:has(input:checked) { background: var(--lima); border-color: var(--lima); color: var(--marca-osc); }
+  .tts-toggle:has(input:focus-visible) { outline: 3px solid var(--lima); outline-offset: 2px; }
 }
 @media (max-width: 700px) {
   .sugerencias { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .cabecera { gap: 8px; }
-  .tts-toggle span:last-child { display: none; }
+  /* con los tres interruptores no cabía en 390 px: fuera el logotipo (el sello «u» sigue) y las iniciales,
+     que son decorativas (el nombre ya estaba oculto); «Salir» y el móvil siguen a la vista */
+  .logo-entidad, .usuario { display: none !important; }
+  .tts-toggle { width: 38px; height: 38px; }
+  .cabecera-acciones { gap: 4px; }
   .btn-salir { padding: 0 12px; }
   .burbuja { max-width: 92%; }
   .avatar-ia { display: none; }
@@ -497,6 +519,9 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
   body.movil-abierto .chat { padding-top: 170px; } /* en un chat corto, el contenido arranca bajo el aviso del móvil */
   .movil .sms { margin-top: 4px; padding: 8px 12px; }
   .fila-clave { flex-wrap: wrap; }
+}
+@media (max-width: 380px) {
+  .marca-texto { display: none; } /* en los móviles más estrechos la marca se queda en el sello «u» (con su aria-label) */
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -537,7 +562,7 @@ label.mini select { min-height: 38px; font-size: 0.85rem; }
 /* perfiles: solo el administrador ve los ajustes; el administrador no tiene cuenta ni chat */
 body:not(.es-admin) #btn-ajustes { display: none; }
 body.es-admin .panel-cuenta, body.es-admin .zona-entrada, body.es-admin #btn-movil,
-body.es-admin .tts-toggle, body.es-admin .medidor-uso { display: none; }
+body.es-admin .tts-toggle:has(#tts-check), body.es-admin .medidor-uso { display: none; }
 body.es-admin .cuerpo { display: none; }
 .panel-admin { max-width: 760px; width: 100%; margin: 32px auto; padding: 0 16px; }
 .panel-admin[hidden] { display: none; }
@@ -548,3 +573,69 @@ body.es-admin .cuerpo { display: none; }
 .tabla-admin th { font-size: 0.8rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
 .tabla-admin td:last-child { text-align: right; }
 .tabla-admin .btn-secundario { height: 36px; padding: 0 14px; }
+
+
+/* ------------------------------------------------------------------ texto grande y alto contraste
+
+   Clases en <html> que ponen js/aspecto_previo.js (antes de pintar) y js/ui/aspecto.js (interruptores de la
+   cabecera y del login). Casi todo va en rem, así que basta con subir la raíz; aquí solo se ajusta lo que tiene
+   ancho fijo en px. */
+
+html.texto-grande { font-size: 120%; }
+html.texto-grande body { font-size: 1rem; } /* body fija 16 px: que siga a la raíz */
+html.texto-grande .tarjeta-banco { width: min(360px, 86vw); }
+html.texto-grande .fila-codigo input { flex-basis: 190px; } /* que quepan los 6 dígitos; los botones bajan de línea */
+@media (min-width: 1001px) {
+  html.texto-grande .cuerpo { grid-template-columns: 380px 1fr; }
+}
+@media (min-width: 701px) {
+  html.texto-grande .movil { width: min(400px, calc(100vw - 32px)); }
+}
+@media (max-width: 700px) {
+  html.texto-grande .movil { max-height: 210px; }
+  html.texto-grande body.movil-abierto .chat { padding-top: 210px; }
+}
+
+/* Alto contraste: la misma paleta de Unicaja (petróleo, lima, verde), con textos más oscuros, bordes que se ven
+   (≥ 4,5:1 sobre blanco) y sin transparencias en la cabecera. Ratios WCAG en el claro, sobre blanco: texto
+   suave #2e3d43 10,6; borde #56676d 5,9; verde #1e6b00 6,7; peligro #a81f26 6,2 sobre su fondo; aviso #6b4400 7,9.
+   En oscuro, sobre #12282f: texto suave #c9dadd 10,6; borde #8aa6ae 6,0. */
+html.alto-contraste {
+  --texto: #0a161b;
+  --texto-suave: #2e3d43;
+  --borde: #56676d;
+  --borde-suave: #7f8f95;    /* separadores y rejilla de los gráficos: 3,4:1 (no es texto) */
+  --verde: #1e6b00;
+  --peligro: #a81f26;
+  --aviso: #6b4400;
+  --foco: #00323a;
+  --sombra: none;
+}
+@media (prefers-color-scheme: dark) {
+  html.alto-contraste {
+    --fondo: #071216;
+    --texto: #ffffff;
+    --texto-suave: #c9dadd;
+    --borde: #8aa6ae;
+    --borde-suave: #5f7d86;
+    --verde: #95e891;
+    --foco: #95e891;
+    --peligro: #ff8a8f;        /* los del oscuro ya pasan de 6,8:1; los del claro de arriba no valen aquí */
+    --aviso: #f2c24c;
+  }
+}
+html.alto-contraste .marca-texto small, html.alto-contraste .logo-entidad, html.alto-contraste .uso-tokens,
+html.alto-contraste .saldo-etiqueta, html.alto-contraste .saldo-iban, html.alto-contraste .login-lema { opacity: 1; }
+html.alto-contraste .chip-ia { background: transparent; border: 1px solid #fff; }
+html.alto-contraste .interruptor { background: transparent; box-shadow: inset 0 0 0 2px #fff; }
+html.alto-contraste .tts-toggle input:checked + .interruptor { background: var(--lima); box-shadow: none; }
+html.alto-contraste .btn-salir, html.alto-contraste .tts-toggle { border-color: #fff; }
+html.alto-contraste .mensaje.asistente .burbuja, html.alto-contraste .formulario, html.alto-contraste .sugerencia,
+html.alto-contraste .tarjeta-grafico, html.alto-contraste .estado-herramienta, html.alto-contraste .tarjeta,
+html.alto-contraste .sms, html.alto-contraste .aviso { border: 1px solid var(--borde); }
+html.alto-contraste .tarjeta-operacion { border-width: 2px; border-top-width: 5px; }
+html.alto-contraste .btn-mic { border: 1.5px solid var(--info); }
+html.alto-contraste .btn-cerrar, html.alto-contraste .btn-icono { color: var(--texto); }
+html.alto-contraste .mov-meta, html.alto-contraste .sms-cabecera { font-weight: 600; }
+html.alto-contraste a:not(.marca):not(.saltar) { text-decoration: underline; }
+html.alto-contraste .formulario input::placeholder { color: var(--texto-suave); opacity: 1; }

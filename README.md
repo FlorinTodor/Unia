@@ -5,44 +5,46 @@
 Asistente bancario conversacional basado en IA generativa. Permite interactuar con
 tus finanzas **por voz o por escrito** (accesible para personas que no pueden o no
 quieren hablar): consultar saldo, enviar Bizum, analizar movimientos en lenguaje
-natural y generar **gráficos dinámicos sin plantillas**.
+natural, generar **gráficos dinámicos sin plantillas** y consultar, bloquear o desbloquear tarjetas.
+El LLM propone y el servidor decide: el dinero solo se mueve con un código OTP. Memoria técnica: `docs/MEMORIA.md`.
 
 ## Arquitectura
 
 ```
 ┌───────────────┐   SSE / REST   ┌──────────────────────────────┐
 │   Frontend    │ ◄────────────► │        Backend FastAPI       │
-│  chat + voz   │                │                              │
+│  chat + voz   │                │  login · OTP · límites       │
 │  Chart.js     │                │  Agente LLM (tool calling)   │
-│  Web Speech   │                │   ├─ consultar_saldo         │
-│  (TTS)        │                │   ├─ transferencia_bizum ────┼──► API bancaria ficticia
-└───────────────┘                │   ├─ consultar_movimientos ──┼──► SQLite (NL → SQL)
-        │ audio                  │   └─ generar_grafico ────────┼──► spec Chart.js al frontend
-        ▼                        │                              │
-   POST /stt ────────────────────┼──► Whisper (Groq, gratuito)  │
+│  móvil        │                │   ├─ consultar_saldo         │
+│  simulado     │                │   ├─ listar_contactos_bizum  │
+└───────────────┘                │   ├─ consultar_movimientos ──┼──► SQLite (NL → SQL, copia del cliente)
+        │ audio                  │   ├─ generar_grafico ────────┼──► gráfico Chart.js al frontend
+        ▼                        │   ├─ transferencia_bizum ────┼──► operación pendiente + SMS con código
+   POST /stt ───► Whisper (Groq) │   ├─ consultar_tarjetas      │
+   POST /tts ───► OmniVoice/Piper│   ├─ bloquear_tarjeta        │
+                                 │   └─ desbloquear_tarjeta ────┼──► operación pendiente + SMS con código
                                  └──────────────────────────────┘
 ```
 
-- **LLM agnóstico al proveedor**: Groq, Cerebras y Ollama exponen API compatible con
-  OpenAI; se cambia de proveedor con una variable de entorno (`LLM_PROVIDER`).
+- **LLM agnóstico al proveedor**: todos los proveedores exponen API compatible con OpenAI;
+  se cambian en el panel de ajustes del administrador (o con `LLM_PROVIDER`).
 - **NL → SQL**: el LLM traduce la pregunta del usuario a un `SELECT` de SQLite,
   validado en el servidor (solo lectura, una sentencia, lista negra de palabras clave).
 - **Gráficos sin plantillas**: el LLM razona qué tipo de gráfico conviene y emite la
   configuración Chart.js completa, que el frontend renderiza tal cual.
 - **Voz**: entrada por Whisper large-v3-turbo (API gratuita de Groq, con temperatura 0,
-  prompt de dominio y filtro de audio corto contra alucinaciones). Salida con doble vía:
-  voces del navegador (Web Speech API) si existen, y si no —Brave/Chromium en Linux no trae
-  voces— síntesis en el servidor con **Piper** (voz neuronal española local, ~0,3 s por
-  frase, endpoint `POST /tts`). Ambas son opcionales: el chat escrito funciona siempre.
-  Para descargar la voz: `python -m piper.download_voices es_ES-sharvard-medium --data-dir data/voces`
+  prompt de dominio y filtro de audio corto contra alucinaciones). Salida en el servidor
+  (`POST /tts`) con **OmniVoice** en la GPU local (opcional: `requirements-voz.txt`, pesos CC-BY-NC)
+  y **Piper** de reserva; las voces del navegador quedan como último recurso. El chat escrito
+  funciona siempre. Voz de Piper: `python -m piper.download_voices es_ES-sharvard-medium --data-dir data/voces`
 - **Latencia**: streaming SSE token a token + inferencia en Groq (~300-800 tok/s).
 
 ## Análisis de proveedores LLM (resumen)
 
 | Proveedor | Modelo | Coste | Velocidad | Límite gratuito | Rol |
 |---|---|---|---|---|---|
-| **Groq** | Llama 3.3 70B | Gratis | ★★★★★ | 1.000 req/día · 100k tokens/día | **Principal** (+ Whisper STT) |
-| **Groq** | GPT-OSS 120B | Gratis | ★★★★★ | cuota diaria independiente | **Fallback 1** (misma clave) |
+| **Groq** | GPT-OSS 120B | Gratis | ★★★★★ | 8.000 tokens/min y cuota diaria, por modelo | **Principal** (+ Whisper STT) |
+| **Groq** | GPT-OSS 20B | Gratis | ★★★★★ | cuota independiente | **Fallback 1** (misma clave) |
 | **Ollama local** | Qwen3 8B | Gratis | ★★★ | Sin límite | **Fallback 2** (offline) |
 | Cerebras | GPT-OSS 120B | — | ★★★★★ | requiere activar facturación | Descartado (ya no hay free tier de API) |
 | Google AI Studio | Gemini Flash | Gratis | ★★★★ | 20 req/día (modelos top) | Descartado (límites + privacidad) |
@@ -51,7 +53,8 @@ natural y generar **gráficos dinámicos sin plantillas**.
 Se eligió una **cadena de fallback automática** (los límites diarios de Groq son por
 modelo, así que un segundo modelo de la misma clave es un fallback real): si un
 proveedor devuelve 429 o falla la red, el agente salta al siguiente eslabón *en el
-mismo mensaje* y avisa al usuario. Medido: ~3 s por turno incluso con el principal agotado.
+mismo mensaje* y avisa al usuario. Ante un límite por minuto, en cambio, espera (hasta 40 s por turno)
+y reintenta con el mismo modelo: el pequeño es menos fiable. Llama 3.3 70B, el principal original, ya no está en Groq.
 
 ### Control de latencia y consumo de tokens
 
@@ -79,13 +82,14 @@ uvicorn backend.main:app --reload --no-proxy-headers
 # Abre http://localhost:8000
 ```
 
-La base de datos ficticia (`data/banco.db`, ~12 meses de movimientos realistas) se
-genera automáticamente al arrancar.
+La base de datos ficticia (`data/banco.db`: cuatro clientes, dos años de movimientos) se
+genera automáticamente al arrancar. Entrar con `alex`, `ana`, `marta` o `jose`; la contraseña es
+`CONTRASENA_<USUARIO>` de `.env` o, si no existe, el usuario seguido de 2026.
 
 ### Fallback local con Ollama
 
 ```bash
-ollama pull qwen3:4b   # (o qwen3:8b si tu GPU tiene VRAM suficiente)
+ollama pull qwen3:8b   # el modelo por defecto (con poca VRAM: qwen3:4b y OLLAMA_MODEL=qwen3:4b)
 # En .env: LLM_PROVIDER=ollama
 ```
 
@@ -93,7 +97,8 @@ ollama pull qwen3:4b   # (o qwen3:8b si tu GPU tiene VRAM suficiente)
 
 - «¿Cuánto dinero tengo?»
 - «¿Cuánto gasté en supermercados en junio?»
-- «Envíale 20 € a María por la cena» → el asistente pide confirmación → «sí»
+- «Envíale 20 € a María por la cena» → el asistente prepara el Bizum y llega un código al móvil
+  simulado (📱) → se confirma con el código o con la huella, nunca a través del chat
 - «Hazme un gráfico de mis gastos por categoría de los últimos 3 meses»
 - «¿Cómo ha evolucionado mi gasto mensual este año?» (gráfico de líneas autónomo)
 
@@ -108,12 +113,12 @@ backend/
   aplicacion/    # casos de uso, agente, registro de herramientas y puertos (interfaces)
   adaptadores/
     entrada/http/  # FastAPI: chat SSE, voz, API bancaria, ajustes
-    salida/        # SQLite, LLM OpenAI-compatible, Whisper, Piper, ajustes, sesiones
+    salida/        # SQLite, LLM OpenAI-compatible, Whisper, OmniVoice/Piper, seguridad, estado
   composicion.py # único sitio que conecta puertos con adaptadores
   main.py        # uvicorn backend.main:app
 frontend/
   index.html, styles.css
   js/{api,aplicacion,dispositivos,ui}/   # módulos ES: chat SSE, voz, panel de ajustes, Chart.js
-tests/           # ~200 pruebas sin red (incluye seguridad y aislamiento): python -m pytest -q
+tests/           # 746 pruebas sin red (incluye seguridad y aislamiento): python -m pytest -q
 pruebas/         # demo + batería contra la app en marcha (usa el LLM real)
 ```

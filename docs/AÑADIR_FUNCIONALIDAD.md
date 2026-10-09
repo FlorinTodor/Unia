@@ -89,7 +89,7 @@ Los tests existentes no fallaron por lógica: solo hubo que adaptar los sitios d
 propio caso de uso y la herramienta; el resto es dominio, esquema y el hecho de que el desbloqueo con OTP **reutiliza** el flujo de
 confirmación existente en vez de duplicarlo. Una parte importante (~160 líneas de `texto.py`, `registro.py` y `agente.py`, más
 sus tests) no es la funcionalidad sino **la defensa frente al modelo pequeño** (2.4 y 4): esa es la cifra que más creció tras
-la primera versión (antes de las revisiones eran ≈ 675 de producción). El número de tests pasó de 514 a 693.
+la primera versión (antes de las revisiones eran ≈ 675 de producción). El número de tests pasó de 514 a 693 con esta funcionalidad (746 en total a 9-oct-2026).
 
 ### 2.3 Lo que NO hubo que tocar (y por qué)
 
@@ -285,9 +285,9 @@ Cosas que se encontraron al hacerlo. Es lo más útil de la guía para decidir q
 
 ```bash
 source .venv/bin/activate
-python -m pytest -q tests/test_tarjetas.py          # 110 pruebas de la funcionalidad
+python -m pytest -q tests/test_tarjetas.py          # 167 pruebas de la funcionalidad
 python -m pytest -q tests/test_arquitectura.py      # la regla de dependencia sigue intacta
-python -m pytest -q                                 # 636 en total
+python -m pytest -q                                 # 746 en total (9-oct-2026; crece con otras funciones)
 ```
 
 En vivo (modelo local, servidor aparte): «¿qué tarjetas tengo?», «he perdido la tarjeta», «bloquea la tarjeta

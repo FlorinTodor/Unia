@@ -207,6 +207,8 @@ function aplicarEstiloCorporativo(config) {
   const rejilla = estilo.getPropertyValue("--borde-suave").trim() || "#e5eef0";
   Chart.defaults.font.family = '"Manrope", system-ui, sans-serif';
   Chart.defaults.color = texto;
+  // con «Texto grande» la raíz pasa de 16 px a ~19 px: el lienzo no lo hereda, se escala a mano (12 px por defecto)
+  Chart.defaults.font.size = Math.round((12 * parseFloat(estilo.fontSize)) / 16) || 12;
 
   const oscuro = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   const paleta = oscuro ? MARCA.paletaOscura : MARCA.paleta;

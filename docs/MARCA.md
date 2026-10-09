@@ -45,6 +45,29 @@ verde `#278600` sobre blanco 4,7; peligro 5,4; aviso 6,6. Un único par de su pa
 `#048848` sobre su tinta clara da 3,98, así que el texto de ingresos usa `#046a38` (5,9). En oscuro todos los pares
 están entre 6,7 y 15,3.
 
+### Texto grande y alto contraste (9-oct)
+
+Dos interruptores en la cabecera y en el login. Cada uno es una clase en `<html>` (`texto-grande`, `alto-contraste`;
+reglas al final de `frontend/styles.css`) y se recuerda en `localStorage` con `js/dispositivos/preferencias.js`
+(`js/ui/aspecto.js`). Para que no parpadee, `frontend/js/aspecto_previo.js` aplica las clases antes de pintar: es un
+script clásico cargado en `<head>` porque la CSP no admite código en línea. Sin elección guardada, `prefers-contrast: more`
+del sistema activa el alto contraste.
+
+- **Texto grande**: la raíz pasa al 120 % (casi todo va en `rem`); se ajusta a mano lo que tiene ancho fijo (panel de
+  cuenta, móvil simulado, tarjeta bancaria, campo del código) y la letra de los gráficos.
+- **Alto contraste**: la misma paleta de Unicaja, con textos más oscuros, bordes visibles, sin sombras ni transparencias
+  en la cabecera y enlaces subrayados. Ratios WCAG:
+
+| Elemento | Claro (sobre blanco) | Oscuro (sobre `#12282f`) |
+|---|---|---|
+| Texto suave | `#2e3d43` · 10,6:1 | `#c9dadd` · 10,6:1 |
+| Bordes | `#56676d` · 5,9:1 | `#8aa6ae` · 6,0:1 |
+| Verde | `#1e6b00` · 6,7:1 | `#95e891` |
+| Peligro | `#a81f26` · 6,2:1 (sobre su fondo) | `#ff8a8f` |
+| Aviso | `#6b4400` · 7,9:1 | `#f2c24c` |
+
+Los separadores y la rejilla de los gráficos (`--borde-suave`, `#7f8f95`) quedan en 3,4:1 a propósito: no son texto.
+
 ## Lo que NO está y hay que pedir a Unicaja
 
 Los colores y la tipografía son los **publicados en su web**, no los de un manual de marca. Para una entrega final

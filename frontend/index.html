@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#005265">
   <title>Unia · asistente de Unicaja</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <!-- texto grande / alto contraste antes de pintar (sin parpadeo); script clásico: la CSP no admite código en línea -->
+  <script src="/static/js/aspecto_previo.js"></script>
   <script src="/static/vendor/chart.umd.min.js"></script>
   <script src="/static/vendor/marked.min.js"></script>
   <script src="/static/vendor/purify.min.js"></script>
@@ -35,9 +37,22 @@
 
       <div class="cabecera-acciones">
         <label class="tts-toggle" title="Leer las respuestas en voz alta">
-          <input type="checkbox" id="tts-check" checked>
+          <input type="checkbox" id="tts-check" role="switch" checked>
           <span class="interruptor" aria-hidden="true"></span>
-          <span>Voz</span>
+          <svg class="icono-interruptor" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+          <span class="texto-interruptor">Voz</span>
+        </label>
+        <label class="tts-toggle" title="Aumentar el tamaño del texto">
+          <input type="checkbox" role="switch" data-aspecto="texto-grande">
+          <span class="interruptor" aria-hidden="true"></span>
+          <svg class="icono-interruptor" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 20 6-16 6 16M4.5 14h7M18 8v8M14 12h8"/></svg>
+          <span class="texto-interruptor">Texto grande</span>
+        </label>
+        <label class="tts-toggle" title="Subir el contraste de textos, bordes y botones">
+          <input type="checkbox" role="switch" data-aspecto="alto-contraste">
+          <span class="interruptor" aria-hidden="true"></span>
+          <svg class="icono-interruptor" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+          <span class="texto-interruptor">Alto contraste</span>
         </label>
         <button type="button" id="btn-movil" class="btn-cabecera" title="Mi móvil: aquí llegan los códigos de confirmación" aria-label="Mi móvil">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
@@ -120,6 +135,10 @@
       </ul>
     </div>
     <div class="login-formulario">
+      <div class="aspecto-login" role="group" aria-label="Ver mejor">
+        <label class="casilla"><input type="checkbox" role="switch" data-aspecto="texto-grande"> Texto grande</label>
+        <label class="casilla"><input type="checkbox" role="switch" data-aspecto="alto-contraste"> Alto contraste</label>
+      </div>
       <h2>Accede a tu cuenta</h2>
       <p class="texto-suave">Inicia sesión para ver tus cuentas y hablar con <span data-marca="nombre">Unia</span>.</p>
       <form id="formulario-login" autocomplete="off">
