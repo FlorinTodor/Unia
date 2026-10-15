@@ -1,5 +1,5 @@
 % Anexo: cómo probarlo.
-\enlargethispage{3\baselineskip}
+\enlargethispage{5\baselineskip}
 \section{Cómo probarlo}\label{sec:anexo}
 
 \begin{lstlisting}[language=bash,basicstyle=\ttfamily\footnotesize]
@@ -7,10 +7,9 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt            # requirements-voz.txt es opcional (OmniVoice, GPU)
 cp .env.example .env                       # CONTRASENA_ADMIN (12+ caracteres) y, si se quiere, GROQ_API_KEY
 uvicorn backend.main:app --no-proxy-headers
+pip install -r requirements-dev.txt && python -m pytest -q   # tests, sin red ni clave
 \end{lstlisting}
 
 Abrir \url{http://localhost:8000} y entrar con \cod{alex}, \cod{ana}, \cod{marta} o \cod{jose}. La contraseña de demostración es el usuario
-seguido de 2026, salvo que \cod{.env} defina otra. La clave de Groq no tiene por qué ir en \cod{.env}: el perfil
-\cod{admin} (contraseña \ruta{CONTRASENA_ADMIN}) puede pegarla en el panel de ajustes de la propia aplicación, que la
-valida, la guarda en el servidor y la usa tanto para el chat como para la voz. Si está en \cod{.env}, se carga sola la
-primera vez. Tests: \cod{pip install -r requirements-dev.txt \&\& python -m pytest -q}.
+seguido de 2026, salvo que \cod{.env} defina otra. La clave de Groq puede ir en \cod{.env} o pegarse en el panel de ajustes con el
+perfil \cod{admin} (contraseña \ruta{CONTRASENA_ADMIN}): la aplicación la valida, la guarda en el servidor y la usa para el chat y la voz.
