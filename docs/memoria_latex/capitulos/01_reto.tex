@@ -83,3 +83,10 @@ De ahí salen tres límites que se repiten en la memoria: las esperas cuando Gro
 necesita el modelo local de 8B porque se equivoca más que los grandes, y el reparto de la GPU entre el modelo local y
 la voz. Son límites del presupuesto, no de la arquitectura. Con una clave de pago o una GPU de servidor desaparecen
 cambiando la configuración, sin tocar el código, porque cada proveedor es un adaptador (apartado~\ref{sec:cadena}).
+
+Conviene tenerlo presente al leer el resto: esto es un prototipo hecho con los recursos mínimos, y una parte del
+trabajo existe solo por eso. Varias de las guardas que describo en el apartado~\ref{sec:bucle} (obligar al modelo a
+consultar antes de dar cifras, ejecutar desde el servidor una orden clara que el modelo dice haber cumplido sin
+hacerlo, las respuestas fijas) nacieron de errores que cometía el modelo local de 8B y que con los modelos grandes de
+Groq no aparecían o eran raros. Las he mantenido porque no estorban y porque hacen que el sistema aguante con un
+modelo peor, pero en un despliegue real con un modelo grande garantizado sobrarían casi todas.
