@@ -66,3 +66,20 @@ BD ficticia propia con varios clientes & \ref{sec:reto} y \ref{sec:seguridad} (a
 Accesibilidad & \ref{sec:voz} \\
 \bottomrule
 \end{tabularx}\par}
+
+\subsection{Con qué medios se ha hecho}\label{sec:medios}
+
+Todo el proyecto está hecho sin gastar nada, y eso explica varias de las limitaciones que irán apareciendo. El
+hardware es mi portátil: un ASUS ROG Strix G15 con un Ryzen 9 5900HX, 32~GB de RAM y una RTX 3060 Mobile con 6~GB
+de memoria de vídeo, con Ubuntu 24.04. No hay ningún servidor detrás.
+
+Para el modelo de lenguaje uso la capa gratuita de Groq, que da modelos grandes (gpt-oss-120b y gpt-oss-20b) con mucha
+velocidad pero con cuota por minuto y por día. Cuando esa cuota se agota, o si no hay internet, el asistente pasa a un
+modelo que corre en el propio portátil con Ollama (qwen3:8b), que es el mayor que cabe en esos 6~GB de GPU. La voz de
+entrada va también por la capa gratuita de Groq (Whisper). La voz de salida se genera en el portátil, con OmniVoice en
+la misma GPU o con Piper en CPU, y los modelos de voz son de descarga libre.
+
+De ahí salen tres límites que se repiten en la memoria: las esperas cuando Groq corta por cuota, las guardas extra que
+necesita el modelo local de 8B porque se equivoca más que los grandes, y el reparto de la GPU entre el modelo local y
+la voz. Son límites del presupuesto, no de la arquitectura. Con una clave de pago o una GPU de servidor desaparecen
+cambiando la configuración, sin tocar el código, porque cada proveedor es un adaptador (apartado~\ref{sec:cadena}).
