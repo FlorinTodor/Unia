@@ -36,7 +36,7 @@ El LLM propone y el servidor decide: el dinero solo se mueve con un código OTP.
   prompt de dominio y filtro de audio corto contra alucinaciones). Salida en el servidor
   (`POST /tts`) con **OmniVoice** en la GPU local (opcional: `requirements-voz.txt`, pesos CC-BY-NC)
   y **Piper** de reserva; las voces del navegador quedan como último recurso. El chat escrito
-  funciona siempre. Voz de Piper: `python -m piper.download_voices es_ES-sharvard-medium --data-dir data/voces`
+  funciona siempre. El modelo de Piper y la voz de referencia de OmniVoice van en `data/voces/`, en el repositorio.
 - **Latencia**: streaming SSE token a token + inferencia en Groq (~300-800 tok/s).
 
 ## Análisis de proveedores LLM (resumen)

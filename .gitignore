@@ -4,7 +4,6 @@ __pycache__/
 .venv/
 venv/
 data/*.db
-data/voces/
 data/ajustes.json
 
 # material de la organización (vídeo de 800 MB, transcripción con datos de terceros)
