@@ -47,7 +47,7 @@ De todo esto me llevo algunas lecciones. Hay que diseñar desde el principio pen
 afirman cosas falsas con total seguridad y necesitan guardas en el código. Y un ataque hay que probarlo antes de dar la
 defensa por buena. El system prompt ha acabado siendo el registro de todos los malentendidos que fui encontrando.
 
-El proyecto tiene 752 tests automáticos que no necesitan red ni cuota de LLM (\cod{python -m pytest -q}). Cubren el
+El proyecto tiene 750 tests automáticos que no necesitan red ni cuota de LLM (\cod{python -m pytest -q}). Cubren el
 dominio, los casos de uso, el agente con un LLM falso, SQLite, HTTP, el aislamiento entre clientes, el OTP, las carreras
 con hilos y la regla de dependencias. Además, \ruta{pruebas/} tiene una batería que se lanza contra la app en marcha con
 el modelo real.

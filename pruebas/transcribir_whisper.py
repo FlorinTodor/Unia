@@ -1,13 +1,12 @@
 """Transcribe WAV con faster-whisper (en CPU) y devuelve el texto y las marcas de tiempo de cada palabra.
 
-Lo usan `grabar_video.py` (dividir un párrafo sintetizado en sus frases) y `disenar_voz.py --desde` (texto de la
-voz de referencia). faster-whisper no está en el .venv de la app: se busca un python que lo tenga, por este orden:
+Lo usa `disenar_voz.py --desde` (texto de la voz de referencia). faster-whisper no está en el .venv de la app: se busca un python que lo tenga, por este orden:
 
     1. variable WHISPER_PY (ruta a un python con faster-whisper)
-    2. VIDEO_TMP/whisper-venv/bin/python
+    2. VOZ_TMP/whisper-venv/bin/python
     3. el .venv del proyecto
 
-Para crear el venv: python3 -m venv $VIDEO_TMP/whisper-venv && $VIDEO_TMP/whisper-venv/bin/pip install faster-whisper
+Para crear el venv: python3 -m venv $VOZ_TMP/whisper-venv && $VOZ_TMP/whisper-venv/bin/pip install faster-whisper
 (el modelo «small» se descarga la primera vez a ~/.cache/huggingface). Va en CPU (int8) para no competir por la GPU
 con OmniVoice.
 
@@ -27,7 +26,7 @@ MODELO = os.environ.get("WHISPER_MODELO", "small")
 
 def python_whisper():
     """Primer python con faster-whisper instalado, o None."""
-    tmp = Path(os.environ.get("VIDEO_TMP", "/tmp/unia_video"))
+    tmp = Path(os.environ.get("VOZ_TMP", "/tmp/unia_voz"))
     candidatos = [os.environ.get("WHISPER_PY"), tmp / "whisper-venv" / "bin" / "python", RAIZ / ".venv" / "bin" / "python"]
     for c in candidatos:
         if c and Path(c).exists():
@@ -41,7 +40,7 @@ def transcribir(lote):
     """lote = [{"ruta", "pista"}] -> lista de {"texto", "palabras"}. Lanza RuntimeError si no hay faster-whisper."""
     py = python_whisper()
     if not py:
-        raise RuntimeError("no encuentro faster-whisper (define WHISPER_PY o crea VIDEO_TMP/whisper-venv; ver "
+        raise RuntimeError("no encuentro faster-whisper (define WHISPER_PY o crea VOZ_TMP/whisper-venv; ver "
                            "pruebas/transcribir_whisper.py)")
     r = subprocess.run([py, str(Path(__file__).resolve())], input=json.dumps(lote), capture_output=True, text=True)
     if r.returncode:

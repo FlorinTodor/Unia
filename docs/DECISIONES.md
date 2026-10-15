@@ -431,10 +431,9 @@ necesitarían un candado compartido (base de datos o Redis).
 
 ## 22. Voz realista con OmniVoice en local, Piper de reserva (5-oct)
 
-- **Decisión**: la voz del servidor (`POST /tts`) y la del vídeo pasan a **OmniVoice** (k2-fsa, vía el proyecto VoiceStudio), en la GPU local.
+- **Decisión**: la voz del servidor (`POST /tts`) pasa a **OmniVoice** (k2-fsa, vía el proyecto VoiceStudio), en la GPU local.
   La voz de Unia se eligió entre 12 candidatas de su «diseño de voz» (`pruebas/disenar_voz.py`) y se guarda como referencia en
-  `data/voces/unia_ref.wav`; cada frase **clona esa referencia**, así que siempre suena la misma voz. En el vídeo, otras dos referencias hacen de
-  cliente y de móvil. `SintetizadorConReserva` usa OmniVoice y, si no está instalado, no hay GPU, falta la referencia o falla, **Piper** (sin cambios).
+  `data/voces/unia_ref.wav`; cada frase **clona esa referencia**, así que siempre suena la misma voz. `SintetizadorConReserva` usa OmniVoice y, si no está instalado, no hay GPU, falta la referencia o falla, **Piper** (sin cambios).
   `TTS_MOTOR=piper` fuerza la voz anterior. En la interfaz, «Automática» pasa a usar primero la voz del servidor y la del navegador queda de reserva.
 - **Por qué**: Piper `sharvard` sonaba robótica y acelerada (`TTS_LENGTH_SCALE=0.78`), y edge-tts envía el texto a Microsoft. OmniVoice es local
   (no sale nada del equipo), suena natural y tranquila (`TTS_VELOCIDAD`, 1.0 por defecto: con 0.95 metía más cortes a mitad de frase, ver `.env.example`) y es rápida: ~1,5–1,8 s por frase en una RTX 3060, igual para 3 que para 10 s de audio.

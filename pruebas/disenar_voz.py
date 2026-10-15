@@ -1,19 +1,17 @@
 """Diseña voces candidatas con OmniVoice para elegir la de Unia.
 
-    python pruebas/disenar_voz.py                  # genera candidatas en VIDEO_TMP/voces_candidatas/
+    python pruebas/disenar_voz.py                  # genera candidatas en VOZ_TMP/voces_candidatas/
     python pruebas/disenar_voz.py --elegir 3       # copia la nº 3 como referencia: data/voces/unia_ref.wav (+ .txt)
-    python pruebas/disenar_voz.py --elegir 6 --nombre cliente   # otras voces del vídeo: data/voces/cliente_ref.wav
     python pruebas/disenar_voz.py --desde grabacion.m4a --nombre narrador   # referencia desde TU voz grabada
     python pruebas/disenar_voz.py --desde grabacion.wav --nombre narrador --texto "lo que dices en la grabación"
     python pruebas/disenar_voz.py --autotest       # prueba sin GPU del recorte (WAV sintético con ffmpeg)
 
 OmniVoice no tiene «acento de España» entre sus atributos: se generan varias combinaciones y semillas, se escuchan
-y la elegida se guarda como audio de referencia. A partir de ella la app y el vídeo CLONAN siempre la misma voz
+y la elegida se guarda como audio de referencia. A partir de ella la app CLONA siempre la misma voz
 (diseñar en cada frase daría una voz distinta cada vez).
 
 Referencia desde una grabación real (`--desde`, sin GPU): suena mucho menos a IA que una voz diseñada.
-Qué grabar: 20-30 s leyendo en voz alta un párrafo del guion (pruebas/guion_locucion.json, por ejemplo el de la
-arquitectura), con tu voz natural y el ritmo de una explicación, sin música ni ruido de fondo, con el micrófono (o el
+Qué grabar: 20-30 s leyendo en voz alta un párrafo cualquiera, con tu voz natural y el ritmo de una explicación, sin música ni ruido de fondo, con el micrófono (o el
 móvil) a unos 20 cm de la boca y en una habitación sin eco (mejor con cortinas, sofá o armarios que en una cocina o un
 baño). Vale WAV, M4A (notas de voz del móvil) u OGG.
 El script la pasa a mono 24 kHz, quita el silencio de los bordes, normaliza el nivel (loudnorm) y se queda como mucho con
@@ -33,7 +31,7 @@ import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-CARPETA = Path(os.environ.get("VIDEO_TMP", "/tmp/unia_video")) / "voces_candidatas"
+CARPETA = Path(os.environ.get("VOZ_TMP", "/tmp/unia_voz")) / "voces_candidatas"
 DESTINO = RAIZ / "data" / "voces" / "unia_ref.wav"
 MAX_REF = 15.0   # s: OmniVoice clona mejor con 8-15 s limpios
 MIN_REF = 8.0
@@ -193,7 +191,7 @@ def autotest():
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--elegir", type=int)
-    p.add_argument("--nombre", default="unia", help="unia (la de la app) u otro papel del vídeo: cliente, movil, narrador…")
+    p.add_argument("--nombre", default="unia", help="nombre de la referencia: unia (la de la app) u otra")
     p.add_argument("--desde", help="grabación tuya (wav, m4a, ogg…) para crear la referencia sin diseñar la voz")
     p.add_argument("--texto", help="con --desde: texto exacto de la grabación (si no, se transcribe con faster-whisper)")
     p.add_argument("--forzar", action="store_true", help="con --desde: sustituye una referencia que ya exista")
