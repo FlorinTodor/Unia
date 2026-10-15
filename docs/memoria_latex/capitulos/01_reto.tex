@@ -11,10 +11,8 @@ Al diseñarlo pensé en cuatro tipos de cliente. El cliente digital con prisa qu
 supermercados este mes?'' sin navegar por menús. Una persona mayor agradece hablar con normalidad, oír respuestas cortas
 en voz alta y poder bloquear la tarjeta diciendo ``he perdido la tarjeta''. Una persona ciega o con baja visión
 puede usarlo con voz de entrada y de salida, oír el código OTP cifra a cifra y aprobar con una huella (simulada).
-Además, la interfaz está preparada para los programas lectores de pantalla que usan estas personas: cuando aparece la
-tarjeta de confirmación el cursor se coloca solo en la casilla del código, y cada SMS se lee en voz alta sin que haya
-que buscarlo. Y quien es sordo o no quiere hablar en público puede hacerlo
-todo por escrito, con el SMS en texto, un aviso visual y vibración.
+La interfaz también está preparada para los lectores de pantalla (el cursor salta solo a la casilla del código y los SMS
+se anuncian), aunque no la he podido probar con uno real.
 
 Antes de entrar en las piezas conviene explicar la regla que lo ordena todo. Un modelo de lenguaje es muy bueno
 entendiendo lo que pide una persona, pero también se equivoca, inventa cifras y se le puede engañar con un mensaje
@@ -27,7 +25,9 @@ que quiera, lo más que obtiene es una operación pendiente que nadie ha confirm
 de esta regla.
 
 El asistente tiene ocho herramientas, definidas en \ruta{backend/aplicacion/herramientas/} y registradas en
-\ruta{backend/composicion.py}. Cada una declara su nivel de riesgo.
+\ruta{backend/composicion.py}. Cada una declara qué puede hacer con la cuenta del cliente: solo leer, escribir (mover
+dinero o cambiar algo, y entonces exige el código de confirmación) o proteger (cambiar algo en la dirección segura, como
+bloquear una tarjeta, sin código).
 
 {\small
 \begin{tabularx}{\textwidth}{@{}P{4.1cm}LP{3.1cm}@{}}
@@ -49,9 +49,7 @@ El asistente tiene ocho herramientas, definidas en \ruta{backend/aplicacion/herr
 
 La base de datos tiene cuatro clientes con vidas distintas (\ruta{backend/adaptadores/salida/sqlite/perfiles.py}). Alex
 es un trabajador joven, Ana es estudiante, Marta tiene una familia con hijos y José Luis está jubilado. Cada uno tiene
-ingresos, recibos, hábitos de gasto, contactos Bizum y una o dos tarjetas. El generador crea dos años de movimientos con
-semilla fija (\cod{ANOS\_HISTORIAL = 2} en \ruta{sqlite/esquema.py}). Al arrancar desplaza las fechas para que el último
-movimiento sea de hoy, y así la demo siempre habla del mes en curso.
+ingresos, recibos, hábitos de gasto, contactos Bizum, una o dos tarjetas y dos años de movimientos.
 
 La tabla siguiente indica en qué apartado trato cada requisito del reto.
 

@@ -1,7 +1,8 @@
 % Apartado 2: arquitectura y comunicación entre componentes.
 \section{Arquitectura y comunicación entre componentes}\label{sec:arquitectura}
 
-El frontend está escrito en JavaScript sin framework, con módulos ES. El backend usa FastAPI y los datos están en SQLite.
+El frontend está escrito en JavaScript sin framework, organizado en módulos ES (los módulos estándar del propio
+lenguaje, con \cod{import} y \cod{export}, sin empaquetador). El backend usa FastAPI y los datos están en SQLite.
 El chat va por \cod{POST /chat} y la respuesta llega en streaming con Server-Sent Events. El resto de la comunicación es
 REST (login, voz, banco, operaciones, móvil simulado y ajustes).
 
