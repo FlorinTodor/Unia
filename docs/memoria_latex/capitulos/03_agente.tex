@@ -59,7 +59,8 @@ El primero es el camino habitual, en el que los números los pone el servidor. E
 categoría, del mes actual, en tarta, con el título Gastos de octubre''. El servidor consulta la base de datos del
 cliente, suma los gastos por categoría y construye el gráfico. El modelo no ha escrito ni una sola cifra. Hay cuatro
 consultas de este tipo (gastos por categoría, gastos por mes, ingresos frente a gastos y gastos por comercio) y siete
-periodos (mes actual, mes anterior, últimos tres meses, último año, todo el historial, etc.).
+periodos (último mes, mes actual, mes anterior, últimos tres meses, últimos doce meses naturales, últimos 365 días y
+todo el historial).
 
 El segundo es el camino libre, para lo que esas cuatro consultas no cubren. Si el cliente pide ``compara lo que gasté
 en bares en marzo y en julio'', el modelo consulta primero los movimientos con SQL (apartado~\ref{sec:nlsql}) y después
@@ -141,7 +142,8 @@ El agente decide qué hacer según el fallo (las constantes están al principio 
 
 \subsection{Control del gasto de tokens}\label{sec:tokens}
 
-Una consulta gasta unos 4.000 tokens, porque el prompt y las herramientas (≈1.900 tokens) se reenvían en cada ronda.
+Una pregunta sencilla gasta unos 3.500 tokens y una de dos rondas (consultar y luego dibujar) unos 6.500, porque el
+prompt y los esquemas de las ocho herramientas (unos 3.000 tokens) se reenvían en cada ronda.
 Cada llamada se mide con el dato real del proveedor y el gasto se limita en varios niveles. Los valores por defecto
 están en \ruta{backend/dominio/uso.py} y se pueden cambiar con variables de entorno.
 

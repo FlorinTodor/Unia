@@ -103,7 +103,7 @@ la primera versión (antes de las revisiones eran ≈ 675 de producción). El n�
 | **Los adaptadores LLM, voz, ajustes, uso** | ningún puerto cambió |
 
 Lo que **sí** se tocó, aunque «no debía»: el bucle del agente (`Agente.responder`). Primero +17/-10 y, tras las revisiones,
-+40/-12 en total: un empujón y una llamada del servidor cuando el modelo no ejecuta una orden clara (2.4), y los topes de
++69/-12 en total: un empujón y una llamada del servidor cuando el modelo no ejecuta una orden clara (2.4), y los topes de
 las acciones de protección (una por turno y solo si la pregunta habla de tarjetas). Es poco, pero es el fichero más delicado y
 el motivo no es la funcionalidad sino la debilidad del modelo local. **El frontend** tampoco quedó sin tocar: ver 2.2.
 

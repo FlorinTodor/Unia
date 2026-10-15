@@ -11,7 +11,7 @@ dos modelos de Groq antes del local.
 
 Para las preguntas sobre movimientos elegí que el modelo escribiera SQL libre, validado en el servidor, en lugar de un
 catálogo de consultas predefinidas. Las preguntas de la gente no caben en un catálogo. Con los gráficos fui por el camino
-contrario cuando había riesgo. Las fuentes habituales las calcula el servidor, porque el modelo pequeño no encadenaba
+contrario cuando había riesgo. Las cuatro consultas preparadas las calcula el servidor, porque el modelo pequeño no encadenaba
 dos herramientas con fiabilidad y podía inventar cifras. Las respuestas van en streaming por SSE para que la latencia
 percibida sea baja, y compactar el historial redujo un \textasciitilde 90\,\% los tokens por petición. La arquitectura
 hexagonal, que explico en el apartado~\ref{sec:por-que-hexagonal}, la elegí por la seguridad, por poder añadir

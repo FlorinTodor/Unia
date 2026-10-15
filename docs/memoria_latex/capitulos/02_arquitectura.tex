@@ -8,8 +8,8 @@ REST (login, voz, banco, operaciones, móvil simulado y ajustes).
 El backend sigue una arquitectura hexagonal, también llamada de puertos y adaptadores. Las dependencias solo apuntan
 hacia dentro, y el dominio no sabe que existen FastAPI, SQLite, Groq ni la voz. \ruta{backend/composicion.py} es el único
 fichero que conoce todas las implementaciones. \ruta{tests/test_arquitectura.py} analiza los imports y falla si una capa
-interior importa una exterior. La figura~\ref{fig:arquitectura} muestra las piezas y sus dependencias, y la tabla que
-la sigue resume qué hay en cada capa.
+interior importa una exterior. La tabla siguiente resume qué hay en cada capa y la figura~\ref{fig:arquitectura} muestra las piezas y sus
+dependencias.
 
 \begin{figure}[!htb]
   \centering
@@ -102,4 +102,5 @@ Además, un panel de cuenta fijo muestra el saldo, el IBAN enmascarado y los úl
 
 Las sesiones de login, las operaciones pendientes, los SMS del móvil y las conversaciones se guardan en SQLite
 (\ruta{salida/persistencia/sqlite_estado.py}), de modo que sobreviven a un reinicio del servidor. El token de sesión y el
-código OTP se guardan solo como huella, nunca en claro.
+código OTP de la operación se guardan solo como huella, nunca en claro. El SMS del móvil simulado sí lleva el código
+escrito, como lo llevaría un SMS de verdad.

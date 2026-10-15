@@ -178,7 +178,7 @@ un lector de pantalla real** (NVDA, Orca, VoiceOver): es la prueba pendiente má
 
 ## Control del gasto de tokens
 
-Un turno gasta unos 4.000 tokens (≈1.900 de prompt y herramientas **por cada ronda**). Para no agotar la
+Un turno sencillo gasta unos 3.500 tokens y uno de dos rondas unos 6.500 (≈3.000 de prompt y esquemas de herramientas **por cada ronda**, medido en `uso_ia` con gpt-oss-120b). Para no agotar la
 cuota gratuita de Groq (8.000 tokens/min y 100.000/día por modelo) se controla en cuatro niveles:
 
 | Qué | Cómo | Variable (valor por defecto) |
