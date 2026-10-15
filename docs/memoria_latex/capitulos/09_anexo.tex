@@ -1,5 +1,5 @@
 % Anexo: cómo probarlo.
-\enlargethispage{5\baselineskip}
+\enlargethispage{6\baselineskip}
 \section{Cómo probarlo}\label{sec:anexo}
 
 \begin{lstlisting}[language=bash,basicstyle=\ttfamily\footnotesize]
@@ -7,6 +7,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt            # requirements-voz.txt es opcional (OmniVoice, GPU)
 cp .env.example .env                       # CONTRASENA_ADMIN (12+ caracteres) y, si se quiere, GROQ_API_KEY
 uvicorn backend.main:app --no-proxy-headers
+python -m piper.download_voices es_ES-sharvard-medium --data-dir data/voces   # voz del servidor (opcional)
 pip install -r requirements-dev.txt && python -m pytest -q   # tests, sin red ni clave
 \end{lstlisting}
 

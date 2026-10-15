@@ -10,13 +10,29 @@
 \textbf{Sentido} & \textbf{Cómo} & \textbf{Dónde} \\
 \midrule
 Entrada & Grabación en el navegador → \cod{POST /stt} → Whisper \cod{large-v3-turbo} en Groq, en español, con \cod{temperature=0} y un prompt de dominio bancario. Se rechazan los audios de menos de 4.000 bytes, porque con silencio Whisper inventaba frases (``¿Hvað er misal, doctor?'') & \ruta{salida/voz/whisper.py}, \ruta{casos_uso/voz.py} \\
-Salida & \textbf{OmniVoice} en la GPU local, clonando una voz de referencia propia (\ruta{data/voces/unia_ref.wav}). Siempre suena la misma voz, natural, en \textasciitilde 1,5–1,8~s por frase en una RTX 3060. \textbf{Piper} queda de reserva si no hay GPU, falta la referencia o falla una frase, y las voces del navegador son el último recurso & \ruta{salida/voz/omnivoice.py}, \ruta{reserva.py}, \ruta{piper.py} \\
+Salida & \textbf{OmniVoice} en la GPU local, clonando una voz de referencia propia (\ruta{data/voces/unia_ref.wav}). Siempre suena la misma voz, natural, en \textasciitilde 1,5–1,8~s por frase en una RTX 3060. \textbf{Piper} queda de reserva y las voces del navegador son el último recurso (ver los tres niveles más abajo) & \ruta{salida/voz/omnivoice.py}, \ruta{reserva.py}, \ruta{piper.py} \\
 Lectura & El frontend trocea la respuesta por frases. La primera suena en torno a un segundo y las siguientes se sintetizan mientras tanto. Los números se pasan a palabras (``veintiún céntimos'') y las tablas y el código no se leen & \ruta{js/dispositivos/altavoz.js}, \ruta{aplicacion/texto.py} \\
 \bottomrule
 \end{tabularx}}
 
-La síntesis es local, así que el texto de las respuestas bancarias no sale del equipo. La transcripción sí va a Groq,
-como recojo en las limitaciones (apartado~\ref{sec:limitaciones}).
+La voz de salida tiene tres niveles y el servidor elige solo el mejor que tenga instalado (se ve en \cod{GET /estado}).
+Conviene tenerlo claro, porque ni los modelos de voz ni el audio de referencia van en el repositorio:
+
+\begin{enumerate}
+  \item Recién clonado, sin instalar nada más, el servidor no tiene voz y la lectura la hace el navegador con sus propias
+  voces. El chat escrito funciona siempre igual.
+  \item Con \textbf{Piper} (un solo comando del README que descarga a \ruta{data/voces/} un modelo de voz en
+  español) la voz pasa a sintetizarse en el servidor, en CPU y sin GPU. Suena algo robótica, pero es local y
+  no depende de ningún servicio externo. Lo comprobé con una instalación limpia desde GitHub: en cuanto se descarga, la
+  siguiente respuesta ya sale con esa voz, sin reiniciar.
+  \item Con \textbf{OmniVoice} (dependencias de \ruta{requirements-voz.txt}, GPU NVIDIA y una grabación de referencia en
+  \ruta{data/voces/unia_ref.wav}, que se crea con \ruta{pruebas/disenar_voz.py}) la voz se clona de esa referencia y suena
+  natural. Es la que se oye en el vídeo de la demo. Si falta cualquiera de las tres cosas, o falla una frase, se usa Piper.
+\end{enumerate}
+
+En los niveles 2 y 3 la síntesis es local, así que el texto de las respuestas bancarias no sale del equipo. La
+transcripción de la voz de entrada sí va a Groq, con la misma clave que el chat, como recojo en las limitaciones
+(apartado~\ref{sec:limitaciones}).
 
 \subsection{Accesibilidad}\label{sec:accesibilidad}
 
