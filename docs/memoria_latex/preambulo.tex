@@ -1,0 +1,109 @@
+% Preámbulo: paquetes y estilos de la memoria. Compila con pdflatex.
+
+% --- Codificación, idioma y tipografía ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+% es-noshorthands: las comillas " y los signos < > no se vuelven activos
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage[a4paper,margin=2.5cm,headheight=14pt]{geometry}
+\usepackage{placeins}
+\usepackage{microtype}
+
+% Caracteres UTF-8 del texto que inputenc no conoce por defecto
+\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+
+% --- Color, tablas, listas, figuras ---
+\usepackage{xcolor}
+\input{colores}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{caption}
+\captionsetup{font=small,labelfont={bf,color=unicajaPetroleo}}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,arrows.meta,calc,shapes.geometric}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{needspace}
+
+% --- Enlaces y rutas ---
+\usepackage{url}
+\usepackage[colorlinks=true,linkcolor=unicajaPetroleo,urlcolor=unicajaVerde,
+            citecolor=unicajaPetroleo,pdfauthor={Florin Emanuel Todor Gliga},
+            pdftitle={Unia, el asistente de Unicaja. Memoria técnica}]{hyperref}
+
+% \ruta{...}: rutas e identificadores con guiones bajos, sin escapar y con
+% cortes de línea permitidos en / . _ (solo para textos sin espacios ni
+% caracteres no ASCII).
+\DeclareUrlCommand\ruta{\urlstyle{tt}}
+% \cod{...}: código en línea normal (hay que escapar los caracteres especiales).
+% Permite estirar un poco el espacio entre caracteres de \ruta para justificar sin desbordar.
+\Urlmuskip=0mu plus 2mu
+\setlength{\emergencystretch}{2em}
+\newcommand{\cod}[1]{\texttt{#1}}
+
+% --- Títulos de apartado con el color de Unicaja ---
+\titleformat{\section}{\Large\bfseries\color{unicajaPetroleo}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{unicajaPetroleoOscuro}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.6ex plus .5ex}{1ex}
+\titlespacing*{\subsection}{0pt}{1.4ex plus .4ex}{.8ex}
+% Sin \needspace en los títulos: dentro de \titleformat dejaba páginas a medias y descolocaba las longtable.
+
+% --- Párrafos ---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+
+% --- Tablas: un poco más de aire y columnas ajustadas ---
+\renewcommand{\arraystretch}{1.18}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\LTpre}{0.4em}
+\setlength{\LTpost}{0.4em}
+
+% --- Listas compactas ---
+\setlist{itemsep=2pt,topsep=3pt}
+
+% --- Encabezado y pie ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{unicajaPetroleo}Unia · Memoria técnica}
+\fancyhead[R]{\small\color{unicajaPetroleo}Reto ``Habla con tu dinero''}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{{\color{unicajaPetroleo}\hrule height \headrulewidth width \headwidth}}
+
+% --- Código: listings con acentos UTF-8 ---
+\lstdefinestyle{unia}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{unicajaFondo},
+  frame=single,
+  rulecolor=\color{unicajaBorde},
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  keywordstyle=\color{unicajaPetroleo}\bfseries,
+  commentstyle=\color{unicajaAviso}\itshape,
+  stringstyle=\color{unicajaExito},
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  upquote=true,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+           {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {ü}{{\"u}}1 {…}{{\ldots}}1
+}
+\lstset{style=unia}
+
+% --- Caja destacada (para la idea central del diseño) ---
+\newtcolorbox{destacado}{colback=unicajaInfoClaro,colframe=unicajaPetroleo,
+  boxrule=0.6pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt}

@@ -2,7 +2,7 @@
 
 Reto «Habla con tu dinero» · Cátedra Unicaja · UGR
 Autor: **Florin Emanuel Todor Gliga** · florintodor.dev
-Versión descrita: commit `00d7b96` (9 de octubre de 2026)
+Código: https://github.com/FlorinTodor/Unia · Octubre de 2026
 
 Esta memoria resume y enlaza. El detalle está en `docs/ARQUITECTURA.md` (capas, puertos, endpoints),
 `docs/DECISIONES.md` (22 decisiones con sus alternativas), `docs/INCIDENCIAS.md` (111 problemas reales y su arreglo) y

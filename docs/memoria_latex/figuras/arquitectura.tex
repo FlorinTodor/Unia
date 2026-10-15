@@ -1,0 +1,107 @@
+% Diagrama de arquitectura en TikZ.
+% Cajas por capa: navegador, adaptadores de entrada, aplicación, dominio, adaptadores de salida y
+% proveedores de modelos. Flecha continua: llamada o dependencia. Discontinua: implementa.
+% Capa fondo por debajo de background para que la caja de backend/ no tape las de cada capa.
+\pgfdeclarelayer{fondo}
+\pgfsetlayers{fondo,background,main}
+\resizebox{0.8\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    pieza/.style={draw=unicajaPetroleo, fill=white, rounded corners=2pt, align=center,
+                  text width=3.4cm, minimum height=1.05cm, inner sep=3pt,
+                  execute at begin node={\hyphenpenalty=10000\exhyphenpenalty=10000}},
+    externo/.style={pieza, fill=unicajaAvisoClaro, draw=unicajaAviso},
+    capa/.style={draw=#1, rounded corners=4pt, inner sep=7pt, line width=0.7pt},
+    etiqueta/.style={font=\sffamily\footnotesize\bfseries, anchor=south west, inner sep=2pt},
+    flecha/.style={-{Stealth[length=2.4mm]}, line width=0.6pt, draw=unicajaTinta},
+    implementa/.style={-{Stealth[length=2.4mm]}, dashed, line width=0.6pt, draw=unicajaVerde},
+    texto flecha/.style={font=\sffamily\scriptsize, fill=white, inner sep=1.5pt},
+  ]
+
+  % ---------- Navegador (frontend/js) ----------
+  \node[pieza] (UI)  at (0,0)    {ui/ · tarjetas,\\ gráficos, móvil simulado};
+  \node[pieza] (APP) at (4.4,0)  {aplicacion/\\conversacion.js};
+  \node[pieza] (API) at (8.8,0)  {api/ · fetch + SSE};
+  \node[pieza] (DIS) at (13.2,0) {dispositivos/ ·\\ micrófono, altavoz};
+
+  % ---------- Adaptadores de entrada ----------
+  \node[pieza] (R) at (8.8,-3.2) {rutas FastAPI · SSE ·\\ errores → HTTP};
+
+  % ---------- Aplicación ----------
+  \node[pieza] (CU)  at (0,-5.6)    {casos de uso: banco, bizum, tarjetas, acceso, voz, uso};
+  \node[pieza] (REG) at (4.4,-5.6)  {RegistroHerramientas};
+  \node[pieza] (AG)  at (8.8,-5.6)  {Agente (bucle de\\ tool calling)};
+  \node[pieza] (CH)  at (13.2,-5.6) {ServicioChat};
+  \node[pieza, fill=unicajaInfoClaro] (P) at (6.6,-7.5) {puertos (Protocol)};
+
+  % ---------- Dominio y composición ----------
+  \node[pieza, fill=unicajaExitoClaro, text width=3.6cm] (D) at (0,-9.9)
+        {reglas · modelos · errores · uso · operaciones OTP};
+  \node[pieza, fill=unicajaFondo] (COMP) at (13.2,-9.9) {composicion.py\\(cablea todo)};
+
+  % ---------- Adaptadores de salida ----------
+  \node[pieza] (SQL) at (0,-12.6)    {sqlite/ · repositorios,\\ consultor NL→SQL,\\ auditoría};
+  \node[pieza] (LLM) at (4.4,-12.6)  {llm/ · cliente\\ OpenAI-compatible};
+  \node[pieza] (VOZ) at (8.8,-12.6)  {voz/ · Whisper,\\ OmniVoice, Piper};
+  \node[pieza] (SEG) at (13.2,-12.6) {seguridad/ · scrypt,\\ códigos, sesiones};
+
+  % ---------- Proveedores de modelos ----------
+  \node[externo] (GROQ) at (2.2,-15.4) {Groq (nube)};
+  \node[externo] (OLL)  at (6.6,-15.4) {Ollama (local)};
+
+  % ---------- Cajas de capa ----------
+  \begin{scope}[on background layer]
+    \node[capa=unicajaPetroleo, fill=unicajaInfoClaro!60, fit=(UI)(APP)(API)(DIS)] (NAV) {};
+    \node[etiqueta, text=unicajaPetroleo] at (NAV.north west) {Navegador (frontend/js)};
+
+    \node[capa=unicajaPetroleoOscuro, fill=unicajaBordeClaro, fit=(R)] (ENT) {};
+    \node[etiqueta, text=unicajaPetroleoOscuro] at (ENT.north west) {adaptadores/entrada/http};
+
+    \node[capa=unicajaPetroleoOscuro, fill=unicajaBordeClaro, fit=(CU)(REG)(AG)(CH)(P)] (APLI) {};
+    \node[etiqueta, text=unicajaPetroleoOscuro] at (APLI.north west) {aplicacion};
+
+    \node[capa=unicajaVerde, fill=unicajaExitoClaro!60, fit=(D)] (DOM) {};
+    \node[etiqueta, text=unicajaVerde] at (DOM.north west) {dominio};
+
+    \node[capa=unicajaPetroleoOscuro, fill=unicajaBordeClaro, fit=(SQL)(LLM)(VOZ)(SEG)] (SAL) {};
+    \node[etiqueta, text=unicajaPetroleoOscuro] at (SAL.north west) {adaptadores/salida};
+
+  \end{scope}
+  \begin{pgfonlayer}{fondo}
+    \node[capa=unicajaPetroleo, fill=unicajaFondo, inner sep=14pt,
+          fit=(ENT)(APLI)(DOM)(SAL)(COMP)] (BACK) {};
+    \node[etiqueta, text=unicajaPetroleo] at (BACK.north west) {backend/};
+  \end{pgfonlayer}
+
+  % ---------- Flechas dentro del navegador ----------
+  \draw[flecha] (UI) -- (APP);
+  \draw[flecha] (APP) -- (API);
+
+  % ---------- Navegador → backend ----------
+  \draw[flecha] (API) -- node[texto flecha, right=2pt, fill=none] {REST + SSE} (R);
+
+  % ---------- Entrada → aplicación ----------
+  \draw[flecha] (R.east) -| (CH.north);
+  \draw[flecha] (R.west) -| (CU.north);
+
+  % ---------- Dentro de la aplicación ----------
+  \draw[flecha] (CH) -- (AG);
+  \draw[flecha] (AG) -- (REG);
+  \draw[flecha] (REG) -- (CU);
+  \draw[flecha] (CU) -- (P);
+  \draw[flecha] (AG) -- (P);
+
+  % ---------- Casos de uso → dominio ----------
+  \draw[flecha] (CU) -- (D);
+
+  % ---------- Adaptadores de salida que implementan los puertos ----------
+  \draw[implementa] (SQL) -- node[texto flecha, pos=0.35, sloped] {implementa} (P);
+  \draw[implementa] (LLM) -- node[texto flecha, pos=0.35, sloped] {implementa} (P);
+  \draw[implementa] (VOZ) -- node[texto flecha, pos=0.35, sloped] {implementa} (P);
+  \draw[implementa] (SEG) -- node[texto flecha, pos=0.35, sloped] {implementa} (P);
+
+  % ---------- LLM → proveedores ----------
+  \draw[flecha] (LLM) -- (GROQ);
+  \draw[flecha] (LLM) -- (OLL);
+\end{tikzpicture}%
+}

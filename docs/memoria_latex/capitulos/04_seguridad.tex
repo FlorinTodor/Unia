@@ -1,0 +1,72 @@
+% Apartado 4: seguridad (el LLM no autoriza).
+\section{Seguridad: el LLM no autoriza}\label{sec:seguridad}
+
+La seguridad es simulada, porque no hay un banco real detrás, pero el diseño es el de un banco. Aunque alguien engañe al
+modelo, el modelo no tiene forma de mover dinero ni de ver datos ajenos.
+
+\subsection{Identidad}\label{sec:identidad}
+
+El cliente entra con usuario y contraseña. La contraseña se guarda con hash \textbf{scrypt} y sal
+(\ruta{salida/seguridad/hasheador.py}). La sesión va en una cookie \cod{HttpOnly} y \cod{SameSite=Strict}, y el servidor
+solo guarda la huella sha256 del token.
+
+Las contraseñas de demostración no están en el código. Se leen de \cod{CONTRASENA\_<USUARIO>} en \cod{.env} y, si no
+existe, son el usuario seguido de 2026. El administrador no tiene contraseña por defecto, y sin \ruta{CONTRASENA_ADMIN}
+(12 caracteres como mínimo) ese perfil no existe. El administrador solo gestiona la IA y los tokens. No tiene cuenta ni
+chat, y los clientes reciben un 403 si piden \cod{/ajustes}.
+
+Tras 5 fallos de un usuario, o 100 fallos en 15 minutos desde un mismo origen, el acceso se bloquea 5 minutos
+(\ruta{dominio/acceso.py}). El intento se reserva antes de verificar la contraseña, bajo un cerrojo. Sin esa reserva,
+40 intentos en paralelo llegaban a probar 160 contraseñas. El mensaje es el mismo para un usuario que no existe y para
+una contraseña errónea.
+
+\subsection{Aislamiento por cliente}\label{sec:aislamiento}
+
+Todo puerto y caso de uso recibe el \ruta{cliente_id} de la sesión, nunca del modelo. Las herramientas reciben el
+\cod{Cliente} ya autenticado y su esquema no tiene ningún campo para elegir otro. En SQL, las escrituras llevan
+\cod{WHERE id = ? AND cliente\_id = ?}, y el SQL que escribe el modelo corre en la copia en memoria del
+apartado~\ref{sec:nlsql}. Una operación de otro cliente responde 404, igual que una que no existe.
+
+\subsection{Operaciones con OTP: el flujo de un Bizum}\label{sec:otp}
+
+\ruta{transferencia_bizum} \textbf{no envía dinero}. Valida el importe, el saldo y los topes, crea una operación pendiente
+y manda un código de 6 dígitos a un ``móvil simulado'', que es un canal distinto del chat. El cliente lo teclea en la
+tarjeta de confirmación, que llama a un endpoint aparte. El código nunca pasa por el modelo, ni por el historial, ni por
+los eventos SSE (figura~\ref{fig:secuencia-bizum}).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figuras/secuencia_bizum}
+  \caption{Flujo de un Bizum con OTP. Las flechas continuas son peticiones y las discontinuas, respuestas.}
+  \label{fig:secuencia-bizum}
+\end{figure}
+
+El código caduca a los 5 minutos, admite 3 intentos y sirve una sola vez. Al tercer fallo la operación se cancela y
+responde 423 (\ruta{dominio/operaciones.py}). Las reglas de riesgo están en \ruta{dominio/reglas.py}. Un Bizum no puede
+pasar de 1.000~€ por operación ni de 1.500~€ al día, y la tarjeta muestra un aviso si el destinatario es nuevo o el
+importe es de 300~€ o más. Confirmar, aprobar y cancelar comparten un cerrojo por cliente. Antes de ponerlo, ocho
+aprobaciones en paralelo restaban 80~€ en vez de 10~€.
+
+Con las tarjetas hay una asimetría a propósito. Bloquear no pide código, porque no mueve dinero, va en la dirección
+segura y quien ha perdido la cartera tiene prisa. Desbloquear sí lo pide, con el mismo flujo que el Bizum, porque es
+justo lo que querría quien la ha robado. El servidor elige la tarjeta (si hay varias, pregunta) y solo bloquea ante una
+orden explícita en primera persona. ``A mi madre le han robado la tarjeta'' no bloquea la del cliente.
+
+\subsection{Otras capas}\label{sec:otras-capas}
+
+{\small
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}L@{}}
+\toprule
+\textbf{Capa} & \textbf{Qué hace} \\
+\midrule
+Un turno a la vez por cliente & Una segunda pregunta mientras hay otra en curso recibe 429. Así no se puede saltar el tope diario con peticiones en paralelo \\
+Marca \cod{[auto]} reservada & Los avisos internos del servidor al modelo llevan esa marca. Si un usuario la escribe, en cualquier variante Unicode, el mensaje se rechaza \\
+Auditoría & Login, intentos de inyección, OTP, Bizum, bloqueos, consultas SQL y cambios de ajustes (\ruta{salida/sqlite/auditoria.py}). Los números de tarjeta largos se enmascaran \\
+Navegador & CSP \cod{script-src \textquotesingle self\textquotesingle} (librerías servidas desde el propio servidor), HSTS, \cod{X-Frame-Options: DENY}, \cod{no-store} y Swagger apagado por defecto \\
+Origen de la IP & Se arranca con \cod{-{}-no-proxy-headers} y el código ignora \cod{X-Forwarded-For} salvo con \ruta{PROXY_DE_CONFIANZA=1} \\
+Errores & Cada error de dominio tiene su código HTTP y el 500 no filtra detalles internos \\
+\bottomrule
+\end{tabularx}}
+
+El código pasó tres rondas de revisión de seguridad. Cada fallo que apareció está corregido y tiene su test de
+regresión.

@@ -1,0 +1,72 @@
+% Apartado 1: reto y enfoque.
+\section{Reto y enfoque}\label{sec:reto}
+
+Unia es un asistente bancario conversacional, por voz y por texto, que trabaja sobre una base de datos ficticia
+propia. Responde preguntas libres sobre los movimientos, dibuja gráficos y prepara Bizum, que es lo que pedía el reto.
+También bloquea y desbloquea tarjetas. Esa función no estaba en el enunciado. La añadí al final, con el resto ya
+terminado, como prueba de lo sencillo que es meter una funcionalidad nueva con esta arquitectura, y en el apartado~\ref{sec:escalabilidad}
+cuento qué costó exactamente.
+
+Al diseñarlo pensé en cuatro tipos de cliente. El cliente digital con prisa quiere preguntar ``¿cuánto gasté en
+supermercados este mes?'' sin navegar por menús. Una persona mayor agradece hablar con normalidad, oír respuestas cortas
+en voz alta y poder bloquear la tarjeta diciendo ``he perdido la tarjeta''. Una persona ciega o con baja visión
+puede usarlo con voz de entrada y de salida, oír el código OTP cifra a cifra y aprobar con una huella (simulada).
+Además, la interfaz está preparada para los programas lectores de pantalla que usan estas personas: cuando aparece la
+tarjeta de confirmación el cursor se coloca solo en la casilla del código, y cada SMS se lee en voz alta sin que haya
+que buscarlo. Y quien es sordo o no quiere hablar en público puede hacerlo
+todo por escrito, con el SMS en texto, un aviso visual y vibración.
+
+Antes de entrar en las piezas conviene explicar la regla que lo ordena todo. Un modelo de lenguaje es muy bueno
+entendiendo lo que pide una persona, pero también se equivoca, inventa cifras y se le puede engañar con un mensaje
+preparado. En un banco eso no es admisible, así que repartí los papeles desde el principio: el modelo propone y el
+servidor decide. El modelo solo interpreta la petición y elige qué herramienta llamar y con qué argumentos (por ejemplo,
+``transferencia a Dani de 20 euros''). Lo que pasa a partir de ahí es código normal, sin modelo por medio: el servidor
+comprueba el saldo y los topes, usa siempre el cliente que ha iniciado sesión y no el que diga el texto, y para mover
+dinero exige un código de confirmación que el modelo nunca ve. Por eso, aunque alguien consiga que el modelo diga lo
+que quiera, lo más que obtiene es una operación pendiente que nadie ha confirmado. Casi todo el diseño que sigue sale
+de esta regla.
+
+El asistente tiene ocho herramientas, definidas en \ruta{backend/aplicacion/herramientas/} y registradas en
+\ruta{backend/composicion.py}. Cada una declara su nivel de riesgo.
+
+{\small
+\begin{tabularx}{\textwidth}{@{}P{4.1cm}LP{3.1cm}@{}}
+\toprule
+\textbf{Herramienta} & \textbf{Qué hace} & \textbf{Riesgo declarado} \\
+\midrule
+\ruta{consultar_saldo} & Saldo, IBAN y titular & lectura \\
+\ruta{listar_contactos_bizum} & Agenda Bizum del cliente & lectura \\
+\ruta{consultar_movimientos} & Pregunta libre → SQL de solo lectura (NL→SQL) & lectura \\
+\ruta{generar_grafico} & Gráfico calculado por el servidor o configuración Chart.js libre & lectura \\
+\ruta{transferencia_bizum} & \textbf{Prepara} un Bizum: operación pendiente + código al móvil & escritura (exige OTP) \\
+\midrule
+\multicolumn{3}{@{}l@{}}{\textit{Añadidas al final como demostración de extensibilidad (apartado~\ref{sec:prueba-tarjeta}):}} \\
+\ruta{consultar_tarjetas} & Tarjetas del cliente y su estado & lectura \\
+\ruta{bloquear_tarjeta} & Bloquea al instante, sin código, auditado & protección \\
+\ruta{desbloquear_tarjeta} & \textbf{Prepara} el desbloqueo: operación pendiente + código & escritura (exige OTP) \\
+\bottomrule
+\end{tabularx}}
+
+La base de datos tiene cuatro clientes con vidas distintas (\ruta{backend/adaptadores/salida/sqlite/perfiles.py}). Alex
+es un trabajador joven, Ana es estudiante, Marta tiene una familia con hijos y José Luis está jubilado. Cada uno tiene
+ingresos, recibos, hábitos de gasto, contactos Bizum y una o dos tarjetas. El generador crea dos años de movimientos con
+semilla fija (\cod{ANOS\_HISTORIAL = 2} en \ruta{sqlite/esquema.py}). Al arrancar desplaza las fechas para que el último
+movimiento sea de hoy, y así la demo siempre habla del mes en curso.
+
+La tabla siguiente indica en qué apartado trato cada requisito del reto.
+
+{\small
+\begin{tabularx}{\textwidth}{@{}LP{5.2cm}@{}}
+\toprule
+\textbf{Criterio} & \textbf{Apartado} \\
+\midrule
+Conversación cómoda y fluida, por voz y por texto, con poca latencia & \ref{sec:agente} (streaming, guardas) y \ref{sec:voz} (voz) \\
+Operaciones: saldo y Bizum, con seguridad simulada & \ref{sec:seguridad} (Bizum con OTP, bloqueo de tarjeta) \\
+Consultas en lenguaje natural sobre los datos (NL→SQL) & \ref{sec:nlsql} \\
+Gráficos dinámicos: la IA decide cuál, sin plantillas & \ref{sec:graficos} \\
+Refuerzo visual en pantalla & \ref{sec:arquitectura} (eventos SSE \cod{grafico}, \cod{tarjeta}, \cod{operacion}) \\
+``Si mañana son 40 funciones, ¿hay que rehacer el agente?'' & \ref{sec:escalabilidad} (con el bloqueo de tarjeta como prueba real) \\
+BD ficticia propia con varios clientes & \ref{sec:reto} y \ref{sec:seguridad} (aislamiento) \\
+Accesibilidad & \ref{sec:voz} \\
+\bottomrule
+\end{tabularx}\par}

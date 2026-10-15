@@ -1,0 +1,32 @@
+% Apartado 8: limitaciones y siguientes pasos.
+\needspace{14\baselineskip}
+\section{Limitaciones y siguientes pasos}\label{sec:limitaciones}
+
+El prototipo tiene límites que conozco. Los recojo en la tabla junto con lo que haría a continuación.
+
+{\small
+\begin{longtable}{@{}P{4.0cm}P{5.3cm}P{5.6cm}@{}}
+\toprule
+\textbf{Limitación} & \textbf{Consecuencia} & \textbf{Siguiente paso} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Limitación} & \textbf{Consecuencia} & \textbf{Siguiente paso} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Cuotas gratuitas de Groq (8.000 tokens/min y cuota diaria, por modelo) & Con tráfico, esperas de hasta 40~s por turno o caída al modelo local, menos fiable & Plan de pago o modelo propio en servidor, y selección de herramientas por categoría para gastar menos tokens por ronda \\
+Modelo local de 8B & Necesita guardas y respuestas fijas, y rinde peor en preguntas complejas & Modelo local mayor si hay GPU (las guardas ya son genéricas) \\
+Pesos de OmniVoice con licencia CC-BY-NC & Válido para el reto académico, no para producción comercial & Cambiar el adaptador \cod{Sintetizador} por un modelo con licencia comercial (una función en \ruta{composicion.py}) \\
+Voz de entrada por Groq & El audio sale del equipo hacia un tercero & Whisper local en GPU \\
+OTP y huella simulados & El ``móvil'' vive en la misma página y no es SCA real de la PSD2 & App móvil con clave del dispositivo, o TOTP \\
+La huella no pide el código & Quien tenga la sesión abierta puede aprobar (riesgo aceptado) & Firma desde el dispositivo del cliente \\
+Un solo proceso & Cerrojos, turno único, intentos de login y limitador en memoria & Redis o base de datos de servidor para estado compartido \\
+Sin MCP ni A2A & Solo el propio agente usa las herramientas & MCP como adaptador de entrada y A2A para servicios externos \\
+Sin selección de herramientas & Cada ronda envía las 8 & Filtro por categoría en \cod{RegistroHerramientas} \\
+Detectores de órdenes con expresiones regulares en español & Alguna frase se escapará, en ambos sentidos & Ya mitigado, porque el servidor solo actúa tras un empujón fallido y solo en la dirección segura \\
+Texto falso en el streaming & A veces aparece ``tarjeta bloqueada'' antes de que el servidor lo confirme, y el \cod{fin} lo corrige & Retener los \cod{delta} cuando la ronda acaba en una herramienta con respuesta fija \\
+Accesibilidad sin validar con usuarios & No se ha probado con un lector de pantalla real (NVDA, Orca, VoiceOver) & Prueba con lectores y con usuarios reales \\
+Marca & Colores sacados de la web de Unicaja y logotipo de Wikimedia Commons, que no es el oficial & Confirmar con la Cátedra \\
+\end{longtable}}

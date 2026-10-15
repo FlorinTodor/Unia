@@ -1,0 +1,41 @@
+% Apartado 6: voz y accesibilidad.
+\needspace{8\baselineskip}
+\section{Voz y accesibilidad}\label{sec:voz}
+
+\subsection{Voz}\label{sec:voz-detalle}
+
+{\small
+\begin{tabularx}{\textwidth}{@{}P{1.5cm}LP{3.6cm}@{}}
+\toprule
+\textbf{Sentido} & \textbf{Cómo} & \textbf{Dónde} \\
+\midrule
+Entrada & Grabación en el navegador → \cod{POST /stt} → Whisper \cod{large-v3-turbo} en Groq, en español, con \cod{temperature=0} y un prompt de dominio bancario. Se rechazan los audios de menos de 4.000 bytes, porque con silencio Whisper inventaba frases (``¿Hvað er misal, doctor?'') & \ruta{salida/voz/whisper.py}, \ruta{casos_uso/voz.py} \\
+Salida & \textbf{OmniVoice} en la GPU local, clonando una voz de referencia propia (\ruta{data/voces/unia_ref.wav}). Siempre suena la misma voz, natural, en \textasciitilde 1,5–1,8~s por frase en una RTX 3060. \textbf{Piper} queda de reserva si no hay GPU, falta la referencia o falla una frase, y las voces del navegador son el último recurso & \ruta{salida/voz/omnivoice.py}, \ruta{reserva.py}, \ruta{piper.py} \\
+Lectura & El frontend trocea la respuesta por frases. La primera suena en torno a un segundo y las siguientes se sintetizan mientras tanto. Los números se pasan a palabras (``veintiún céntimos'') y las tablas y el código no se leen & \ruta{js/dispositivos/altavoz.js}, \ruta{aplicacion/texto.py} \\
+\bottomrule
+\end{tabularx}}
+
+La síntesis es local, así que el texto de las respuestas bancarias no sale del equipo. La transcripción sí va a Groq,
+como recojo en las limitaciones (apartado~\ref{sec:limitaciones}).
+
+\subsection{Accesibilidad}\label{sec:accesibilidad}
+
+Quise que confirmar una operación no dependiera de un solo sentido. Para una persona ciega, al aparecer la tarjeta de
+confirmación el foco va al campo del código y el lector de pantalla anuncia el resumen. Cada SMS se anuncia una vez
+(\cod{aria-live}) y el móvil puede \textbf{leer el código en voz alta, cifra a cifra}, después de la respuesta del
+asistente. Quien no puede teclear o mirar la pantalla puede \textbf{aprobar con huella} (simulada) mediante
+\cod{POST /operaciones/\{id\}/aprobar}, que aplica las mismas reglas que el código. Para una persona sorda nada depende
+del sonido. El SMS llega en texto, el icono parpadea y el móvil vibra.
+
+También cuidé la motricidad, con objetivos táctiles de 44~px, foco visible, todo operable con teclado y un enlace para
+saltar al mensaje. Quien no puede hablar, o no quiere hacerlo en público, tiene la app entera por escrito, y las
+animaciones se desactivan con \cod{prefers-reduced-motion}.
+
+No ofrezco dictar el código al micrófono, y es a propósito, porque iría a un servicio de transcripción externo. Medí el
+contraste de la paleta con la fórmula de WCAG 2.1. Cumple AA en texto, y el único par de colores que no llegaba lo
+sustituí.
+
+Dos interruptores, en la cabecera y en el login, activan el \textbf{texto grande} (raíz al 120\,\%) y el \textbf{alto
+contraste}, que usa la paleta de Unicaja con textos más oscuros y bordes visibles, también en modo oscuro. Se recuerdan
+en el navegador y se aplican antes de pintar la página. Si el usuario no ha elegido, el alto contraste sigue a
+\cod{prefers-contrast: more}. Me queda pendiente un modo manos libres completo, con conversación continua por voz.

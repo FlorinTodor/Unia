@@ -1,0 +1,13 @@
+% Anexo: cómo probarlo.
+\enlargethispage{3\baselineskip}
+\section{Cómo probarlo}\label{sec:anexo}
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\footnotesize]
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt            # requirements-voz.txt es opcional (OmniVoice, GPU)
+cp .env.example .env                       # poner la clave de Groq
+uvicorn backend.main:app --no-proxy-headers
+\end{lstlisting}
+
+Abrir \url{http://localhost:8000} y entrar con \cod{alex}, \cod{ana}, \cod{marta} o \cod{jose}. La contraseña de demostración es el usuario
+seguido de 2026, salvo que \cod{.env} defina otra. Tests: \cod{pip install -r requirements-dev.txt \&\& python -m pytest -q}.

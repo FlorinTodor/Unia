@@ -1,0 +1,78 @@
+% Apartado 5: escalabilidad (la pregunta de las 40 funciones).
+\section{Escalabilidad}\label{sec:escalabilidad}
+
+El reto pregunta qué pasaría si mañana hubiera 40 funciones en vez de unas pocas, y si habría que rehacer el agente. No
+haría falta. La arquitectura hexagonal separa el dominio (las reglas del banco), la aplicación (los casos de uso y el
+agente) y los adaptadores (HTTP, SQLite, el modelo de lenguaje y la voz). Una función nueva es un caso de uso nuevo y
+una herramienta que lo expone al agente. Si necesita datos que aún no existen, hace falta también un adaptador. Después
+se cablea en \ruta{composicion.py}.
+
+El agente no conoce ninguna herramienta por su nombre. Lo único que hace es recorrer el registro de
+herramientas (\cod{RegistroHerramientas}). El login, el
+flujo OTP, el aislamiento por cliente y la voz tampoco dependen de qué herramientas haya. Por eso pasar de 8 funciones a
+40 es repetir el mismo camino muchas veces.
+
+\begin{lstlisting}[language=Python]
+herramientas = RegistroHerramientas([
+    saldo.crear(consultar_saldo),
+    ...
+    *tarjetas.crear(consultar_tarjetas, BloquearTarjeta(...), SolicitarDesbloqueoTarjeta(...)),
+])
+\end{lstlisting}
+
+Crecer tampoco debilita la seguridad. Cada herramienta declara su nivel de riesgo, y una herramienta de escritura solo
+puede dejar una operación pendiente de OTP. Un test (\ruta{tests/test_seguridad_chat.py}) falla si el registro real tiene
+más herramientas de escritura de las esperadas.
+
+\subsection{La prueba: añadir el bloqueo de tarjeta}\label{sec:prueba-tarjeta}
+
+El reto pedía saldo, Bizum, consultas y gráficos, y todo eso ya estaba hecho. Para comprobar que lo anterior era cierto
+y no solo una promesa, añadí a propósito una función completa que nadie pedía: consultar, bloquear y desbloquear
+tarjetas. La elegí porque toca todas las capas (una tabla nueva, reglas propias, una operación con OTP y una tarjeta
+visual en el chat), así que si algo iba a obligar a rehacer el agente, era esto. Siguió el camino previsto. Hubo un caso de uso (\ruta{casos_uso/tarjetas.py}), un módulo de herramientas
+(\ruta{herramientas/tarjetas.py}) y su línea de cableado. A eso se suma lo que toda función necesita por dentro, que es
+la entidad y sus reglas en el dominio y un puerto con su adaptador SQLite. El desbloqueo reutilizó el flujo OTP del
+Bizum en vez de duplicarlo, y la tabla nueva quedó fuera del SQL del modelo sin hacer nada especial.
+
+Hubo dos cosas que no salieron tan bien. El bucle del agente recibió una guarda genérica
+(\ruta{Herramienta.orden_directa}). No la necesitaba la función en sí. La necesitaba el modelo local, que respondía
+``tarjeta bloqueada'' sin llamar a la herramienta, y ahora sirve para cualquier herramienta futura. La otra es que la
+operación pendiente conserva la forma de un Bizum. Con un tercer tipo de operación habría que pasar a un registro de
+ejecutores. La tabla recoge el coste medido.
+
+{\small
+\begin{tabularx}{\textwidth}{@{}P{4.2cm}L@{}}
+\toprule
+\textbf{Qué} & \textbf{Coste medido} \\
+\midrule
+Backend nuevo & 3 ficheros (caso de uso, cerrojos, herramientas) \\
+Backend tocado & 24 ficheros, +558 / −77 líneas \\
+De ellas, en el agente & +69 / −12 (la guarda para el modelo local) \\
+Frontend & 1 componente nuevo (tarjeta visual) y 8 ficheros tocados \\
+Tests & 167 pruebas en \ruta{tests/test_tarjetas.py} \\
+No se tocó & Rondas, cadena de respaldo, streaming y límites del agente, protocolo SSE, login, aislamiento NL→SQL, flujo OTP y adaptadores de LLM y voz \\
+\bottomrule
+\end{tabularx}}
+
+\subsection{Qué haría falta con 40 herramientas}\label{sec:cuarenta}
+
+Con cuarenta herramientas habría problemas que hoy no existen. Esta tabla resume cómo los resolvería y en qué estado
+están.
+
+{\small
+\begin{tabularx}{\textwidth}{@{}P{3.9cm}LP{3.3cm}@{}}
+\toprule
+\textbf{Necesidad} & \textbf{Solución} & \textbf{Estado} \\
+\midrule
+No mandar 40 esquemas en cada ronda (tokens, confusión del modelo) & Un paso previo barato que elige la categoría (cuentas, pagos, tarjetas, análisis) y un filtro en \cod{RegistroHerramientas.esquemas()} & Diseñado, no implementado. Hoy se mandan las 8 \\
+Varios tipos de operación con OTP & Registro de ejecutores por tipo en \cod{ConfirmarOperacion} & No implementado (con 2 tipos no compensa) \\
+Que otros clientes de IA usen las herramientas & \textbf{MCP} como un adaptador de entrada más (\ruta{entrada/mcp/}) que llama a los mismos casos de uso & Descartado para la entrega \\
+Tareas fuera del banco (reservar mesa, un tren) & \textbf{A2A} para delegar en un agente especializado. El banco aporta datos con permiso y el OTP del pago & Descartado para la entrega \\
+\bottomrule
+\end{tabularx}}
+
+Dejé fuera MCP y A2A de esta entrega por una razón práctica. Hoy las herramientas solo las usa el propio agente, en el
+mismo proceso, y solo hay un proveedor, el banco. MCP añadiría red y serialización sin nadie al otro lado. A2A tiene
+sentido cuando un agente de otra organización trabaja en nombre del cliente, y bloquear una tarjeta debe ser algo interno
+y determinista. Los dos son el siguiente paso natural, y con esta arquitectura entrarían como adaptadores nuevos sin
+reescribir los casos de uso.

@@ -1,0 +1,30 @@
+% Memoria técnica de Unia (Reto ``Habla con tu dinero'', Cátedra Unicaja · UGR).
+% Fichero raíz: compilar con pdflatex dos veces (índice y referencias).
+\documentclass[11pt,a4paper]{article}
+
+\input{preambulo}
+
+\begin{document}
+
+% Sin ancla de página en la portada: evita el destino page.1 duplicado
+\hypersetup{pageanchor=false}
+\input{portada}
+\hypersetup{pageanchor=true}
+
+\tableofcontents
+\clearpage
+
+\input{capitulos/00_introduccion}
+\input{capitulos/01_reto}
+\input{capitulos/02_arquitectura}
+\input{capitulos/03_agente}
+\input{capitulos/04_seguridad}
+\input{capitulos/05_escalabilidad}
+\input{capitulos/06_voz_accesibilidad}
+\input{capitulos/07_decisiones}
+\input{capitulos/08_limitaciones}
+
+\appendix
+\input{capitulos/09_anexo}
+
+\end{document}

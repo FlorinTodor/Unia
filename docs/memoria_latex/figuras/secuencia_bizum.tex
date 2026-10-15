@@ -1,0 +1,69 @@
+% Diagrama de secuencia del Bizum con OTP, en TikZ: participantes arriba, líneas de vida punteadas y mensajes horizontales.
+% Flecha continua: petición. Discontinua: respuesta.
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    participante/.style={draw=unicajaPetroleo, fill=unicajaInfoClaro, rounded corners=2pt,
+                         align=center, text width=2.4cm, minimum height=1.1cm, inner sep=3pt},
+    actor/.style={participante, fill=unicajaLima!60, draw=unicajaPetroleoOscuro},
+    vida/.style={densely dotted, line width=0.6pt, draw=unicajaPetroleo!70},
+    peticion/.style={-{Stealth[length=2.4mm]}, line width=0.6pt, draw=unicajaTinta},
+    respuesta/.style={-{Stealth[length=2.4mm]}, dashed, line width=0.6pt, draw=unicajaVerde},
+    texto/.style={font=\sffamily\footnotesize, align=center, inner sep=1.5pt, fill=white,
+                   execute at begin node={\hyphenpenalty=10000\exhyphenpenalty=10000}},
+  ]
+
+  % Separación horizontal entre líneas de vida y vertical entre mensajes
+  \def\dx{2.9}
+  \def\dy{1.2}
+
+  % ---------- Participantes ----------
+  \node[actor]        (C) at (0*\dx,0) {Cliente\\[-1pt]{\scriptsize (actor)}};
+  \node[participante] (F) at (1*\dx,0) {Navegador};
+  \node[participante] (S) at (2*\dx,0) {ServicioChat\\ + Agente};
+  \node[participante] (M) at (3*\dx,0) {Modelo (LLM)};
+  \node[participante] (B) at (4*\dx,0) {SolicitarBizum};
+  \node[participante] (T) at (5*\dx,0) {Móvil simulado};
+  \node[participante] (K) at (6*\dx,0) {Confirmar\-Operacion};
+
+  % ---------- Líneas de vida ----------
+  \def\vidaFin{-22.5}
+  \foreach \p in {C,F,S,M,B,T,K} {
+    \draw[vida] (\p.south) -- (\p.south |- 0,\vidaFin);
+  }
+
+  % Mensaje entre dos líneas de vida: \mensajeSec{estilo}{origen}{destino}{fila}{texto}
+  \newcommand{\mensajeSec}[5]{%
+    \draw[#1] (#2.south |- 0,{-#4*\dy-0.4}) -- node[texto, above] {#5} (#3.south |- 0,{-#4*\dy-0.4});
+  }
+  % Mensaje a sí mismo: \propioSec{participante}{fila}{texto}
+  \newcommand{\propioSec}[3]{%
+    \draw[peticion] (#1.south |- 0,{-#2*\dy-0.25}) -- ++(0.45,0) -- ++(0,-0.45) -- ++(-0.45,0);
+    \node[texto, anchor=west, align=left, text width=2.2cm] at ($(#1.south |- 0,{-#2*\dy-0.47})+(0.55,0)$) {#3};
+  }
+
+  % ---------- Mensajes ----------
+  \mensajeSec{peticion}{C}{F}{1}{``Envía 5 euros a Dani''\\(voz o texto)}
+  \mensajeSec{peticion}{F}{S}{2}{POST /chat\\(cookie de sesión)}
+  \mensajeSec{peticion}{S}{M}{3}{historial +\\herramientas}
+  \mensajeSec{respuesta}{M}{S}{4}{llamada transferencia\_bizum\\(destinatario, importe)}
+  \mensajeSec{peticion}{S}{B}{5}{cliente de la sesión + argumentos}
+  \propioSec{B}{6}{busca el contacto, valida importe, saldo y topes}
+  \mensajeSec{peticion}{B}{T}{7.8}{SMS con código de 6 dígitos\\(se guarda solo su huella)}
+  \mensajeSec{respuesta}{B}{S}{8.8}{operación pendiente (sin código)}
+  \mensajeSec{respuesta}{S}{F}{9.8}{SSE operacion + fin\\``He preparado el Bizum…''}
+  \mensajeSec{peticion}{F}{T}{10.8}{GET /movil/mensajes}
+  \mensajeSec{respuesta}{T}{C}{11.8}{código (en pantalla o leído en voz alta)}
+  \mensajeSec{peticion}{C}{F}{12.8}{teclea el código o\\aprueba con huella}
+  \mensajeSec{peticion}{F}{K}{13.8}{POST /operaciones/\{id\}/confirmar}
+  \propioSec{K}{14.8}{operación propia, pendiente, no caducada, código correcto}
+  \mensajeSec{respuesta}{K}{F}{16.8}{comprobante: Bizum enviado, saldo actualizado}
+
+  % ---------- Nota sobre M … K ----------
+  \node[draw=unicajaAviso, fill=unicajaAvisoClaro, texto, font=\sffamily\small\bfseries,
+        minimum height=0.7cm, inner xsep=6pt]
+    at ($(M.south |- 0,-21.9)!0.5!(K.south |- 0,-21.9)$)
+    [minimum width=11.2cm]
+    {El modelo nunca ve el código ni puede llamar a /confirmar};
+\end{tikzpicture}%
+}
