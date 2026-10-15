@@ -20,9 +20,12 @@ herramientas = RegistroHerramientas([
 ])
 \end{lstlisting}
 
-Crecer tampoco debilita la seguridad. Cada herramienta declara su nivel de riesgo, y una herramienta de escritura solo
-puede dejar una operación pendiente de OTP. Un test (\ruta{tests/test_seguridad_chat.py}) falla si el registro real tiene
-más herramientas de escritura de las esperadas.
+Crecer tampoco debilita la seguridad. Cada herramienta declara si solo lee, si protege (bloquear una tarjeta, que va
+en la dirección segura) o si escribe. Una herramienta de escritura nunca ejecuta la acción. Solo deja la operación
+pendiente de que el cliente la confirme con su código. Los tests de \ruta{tests/test_seguridad_chat.py} lo vigilan.
+Uno comprueba que las herramientas de escritura solo dejan una operación pendiente. Otro cuenta las herramientas de
+escritura que hay en el registro real, que hoy son dos (el Bizum y el desbloqueo de tarjeta). Si alguien añade una
+que mueva dinero sin pasar por el código, el test falla y le avisa.
 
 \subsection{La prueba: añadir el bloqueo de tarjeta}\label{sec:prueba-tarjeta}
 
@@ -34,45 +37,33 @@ visual en el chat), así que si algo iba a obligar a rehacer el agente, era esto
 la entidad y sus reglas en el dominio y un puerto con su adaptador SQLite. El desbloqueo reutilizó el flujo OTP del
 Bizum en vez de duplicarlo, y la tabla nueva quedó fuera del SQL del modelo sin hacer nada especial.
 
-Hubo dos cosas que no salieron tan bien. El bucle del agente recibió una guarda genérica
-(\ruta{Herramienta.orden_directa}). No la necesitaba la función en sí. La necesitaba el modelo local, que respondía
-``tarjeta bloqueada'' sin llamar a la herramienta, y ahora sirve para cualquier herramienta futura. La otra es que la
-operación pendiente conserva la forma de un Bizum. Con un tercer tipo de operación habría que pasar a un registro de
-ejecutores. La tabla recoge el coste medido.
+Hubo dos cosas que no salieron tan bien. La primera es que el bucle del agente recibió una guarda genérica
+(\ruta{Herramienta.orden_directa}). No la necesitaba la función en sí. La necesitaba el modelo local de 8B, el respaldo
+que uso por falta de recursos (apartado~\ref{sec:medios}), que contestaba ``tarjeta bloqueada'' sin haber llamado a la
+herramienta. Con los modelos grandes de Groq eso no pasaba. La guarda se quedó porque es genérica y vale para
+cualquier herramienta futura. La segunda es que la operación pendiente conserva la forma de un Bizum, algo que
+retomo en el apartado siguiente.
 
-{\small
-\begin{tabularx}{\textwidth}{@{}P{4.2cm}L@{}}
-\toprule
-\textbf{Qué} & \textbf{Coste medido} \\
-\midrule
-Backend nuevo & 3 ficheros (caso de uso, cerrojos, herramientas) \\
-Backend tocado & 24 ficheros, +558 / −77 líneas \\
-De ellas, en el agente & +69 / −12 (la guarda para el modelo local) \\
-Frontend & 1 componente nuevo (tarjeta visual) y 8 ficheros tocados \\
-Tests & 167 pruebas en \ruta{tests/test_tarjetas.py} \\
-No se tocó & Rondas, cadena de respaldo, streaming y límites del agente, protocolo SSE, login, aislamiento NL→SQL, flujo OTP y adaptadores de LLM y voz \\
-\bottomrule
-\end{tabularx}}
+Quitando esa guarda, que vino del modelo local y no de la función, añadir el bloqueo de tarjeta no obligó a tocar el
+bucle del agente, la cadena de modelos, el streaming, el login, el aislamiento ni el flujo OTP.
 
 \subsection{Qué haría falta con 40 herramientas}\label{sec:cuarenta}
 
-Con cuarenta herramientas habría problemas que hoy no existen. Esta tabla resume cómo los resolvería y en qué estado
-están.
+Con cuarenta herramientas aparecerían dos problemas que hoy no existen.
 
-{\small
-\begin{tabularx}{\textwidth}{@{}P{3.9cm}LP{3.3cm}@{}}
-\toprule
-\textbf{Necesidad} & \textbf{Solución} & \textbf{Estado} \\
-\midrule
-No mandar 40 esquemas en cada ronda (tokens, confusión del modelo) & Un paso previo barato que elige la categoría (cuentas, pagos, tarjetas, análisis) y un filtro en \cod{RegistroHerramientas.esquemas()} & Diseñado, no implementado. Hoy se mandan las 8 \\
-Varios tipos de operación con OTP & Registro de ejecutores por tipo en \cod{ConfirmarOperacion} & No implementado (con 2 tipos no compensa) \\
-Que otros clientes de IA usen las herramientas & \textbf{MCP} como un adaptador de entrada más (\ruta{entrada/mcp/}) que llama a los mismos casos de uso & Descartado para la entrega \\
-Tareas fuera del banco (reservar mesa, un tren) & \textbf{A2A} para delegar en un agente especializado. El banco aporta datos con permiso y el OTP del pago & Descartado para la entrega \\
-\bottomrule
-\end{tabularx}}
+El primero son los esquemas, la descripción de cada herramienta que el modelo recibe para saber qué puede usar. Hoy
+se mandan los de las 8 herramientas en cada ronda. Con 40 no tendría sentido mandarlos todos. Se gastarían muchos más
+tokens en cada ronda, y un modelo con tantas opciones delante se confunde más al elegir. La solución que tengo pensada
+es un paso previo y barato que decida de qué categoría es la pregunta (cuentas, pagos, tarjetas o análisis). Después
+se mandarían al modelo solo las herramientas de esa categoría, con un filtro en
+\cod{RegistroHerramientas.esquemas()}. Está diseñada, pero no hecha.
 
-Dejé fuera MCP y A2A de esta entrega por una razón práctica. Hoy las herramientas solo las usa el propio agente, en el
-mismo proceso, y solo hay un proveedor, el banco. MCP añadiría red y serialización sin nadie al otro lado. A2A tiene
-sentido cuando un agente de otra organización trabaja en nombre del cliente, y bloquear una tarjeta debe ser algo interno
-y determinista. Los dos son el siguiente paso natural, y con esta arquitectura entrarían como adaptadores nuevos sin
-reescribir los casos de uso.
+El segundo afecta a las operaciones que se confirman con código. Hoy hay dos tipos, el Bizum y el desbloqueo de
+tarjeta, y \cod{ConfirmarOperacion} los distingue con una simple comprobación del tipo. Con más tipos, lo ordenado
+sería un registro de ejecutores, una tabla que asocia cada tipo de operación con la función que la ejecuta, y que la
+confirmación eligiera el ejecutor según el tipo. Con dos tipos todavía no compensa.
+
+En la reunión con el jurado salieron dos protocolos, MCP y A2A. MCP sirve para que otros asistentes de IA usen
+nuestras herramientas, y A2A para que nuestro agente delegue tareas en agentes de otras empresas. No están en esta
+entrega porque hoy las herramientas solo las usa el propio agente y el único proveedor es el banco, así que no habría
+nadie al otro lado. Con esta arquitectura entrarían como adaptadores nuevos, sin reescribir los casos de uso.

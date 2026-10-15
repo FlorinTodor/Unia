@@ -47,6 +47,8 @@ lugar de un puerto propio.
 Elegí la arquitectura hexagonal sobre todo por la seguridad. El cliente entra por la sesión y llega como parámetro a
 cada puerto y a cada caso de uso. Las herramientas no tienen ningún campo para elegir otro cliente, así que el modelo no
 tiene por dónde pedir datos ajenos. Eso no depende del prompt.
+La conocí en las prácticas extracurriculares que estoy haciendo ahora mismo, y al aplicarla en este proyecto vi de
+verdad su utilidad.
 
 También quería poder probarlo todo sin red. Como cada adaptador se puede sustituir, los tests usan un LLM falso que
 sigue un guion, repositorios en memoria y una SQLite temporal. Pruebo el agente, el OTP o el aislamiento entre clientes
@@ -92,6 +94,11 @@ refuerzo visual sin que el modelo escriba HTML.
 \bottomrule
 \end{tabularx}}
 
+Las sesiones de login, las operaciones pendientes, los SMS del móvil y las conversaciones se guardan en SQLite
+(\ruta{salida/persistencia/sqlite_estado.py}), de modo que sobreviven a un reinicio del servidor. El token de sesión y el
+código OTP de la operación se guardan solo como huella, nunca en claro. El SMS del móvil simulado sí lleva el código
+escrito, como lo llevaría un SMS de verdad.
+
 Además, un panel de cuenta fijo muestra el saldo, el IBAN enmascarado y los últimos movimientos. La figura~\ref{fig:chat} muestra el conjunto: el panel de cuenta a la izquierda y, en el chat, un gráfico seguido de su explicación en prosa y las sugerencias de preguntas.
 
 \begin{figure}[!htb]
@@ -100,8 +107,3 @@ Además, un panel de cuenta fijo muestra el saldo, el IBAN enmascarado y los úl
   \caption{La interfaz tras pedir un gráfico de gastos del mes. El gráfico llega como un evento SSE propio y el modelo lo acompaña de una conclusión en prosa, que es lo que se lee en voz alta.}
   \label{fig:chat}
 \end{figure}
-
-Las sesiones de login, las operaciones pendientes, los SMS del móvil y las conversaciones se guardan en SQLite
-(\ruta{salida/persistencia/sqlite_estado.py}), de modo que sobreviven a un reinicio del servidor. El token de sesión y el
-código OTP de la operación se guardan solo como huella, nunca en claro. El SMS del móvil simulado sí lleva el código
-escrito, como lo llevaría un SMS de verdad.

@@ -1,13 +1,14 @@
 % Apartado 4: seguridad (el LLM no autoriza).
 \section{Seguridad: el LLM no autoriza}\label{sec:seguridad}
 
-La seguridad es simulada, porque no hay un banco real detrás, pero el diseño es el de un banco. Aunque alguien engañe al
-modelo, el modelo no tiene forma de mover dinero ni de ver datos ajenos.
-
 \subsection{Identidad}\label{sec:identidad}
 
-El cliente entra con usuario y contraseña. La contraseña se guarda con hash \textbf{scrypt} y sal
-(\ruta{salida/seguridad/hasheador.py}). La sesión va en una cookie \cod{HttpOnly} y \cod{SameSite=Strict}, y el servidor
+El cliente entra con usuario y contraseña. La contraseña no se guarda nunca. Se guarda su hash, una huella que se
+calcula a partir de ella y de la que no se puede volver atrás. Al entrar, el servidor calcula la huella de lo tecleado
+y la compara con la guardada. Antes de calcularla mezcla la contraseña con una sal, un valor aleatorio distinto para
+cada usuario. Así dos usuarios con la misma contraseña no tienen la misma huella, y no sirven las tablas
+precalculadas con las huellas de las contraseñas más comunes. El algoritmo es scrypt, lento a propósito para que
+probar contraseñas en masa salga caro (\ruta{salida/seguridad/hasheador.py}). La sesión va en una cookie \cod{HttpOnly} y \cod{SameSite=Strict}, y el servidor
 solo guarda la huella sha256 del token.
 
 Las contraseñas de demostración no están en el código. Se leen de \cod{CONTRASENA\_<USUARIO>} en \cod{.env} y, si no
@@ -15,10 +16,15 @@ existe, son el usuario seguido de 2026. El administrador no tiene contraseña po
 (12 caracteres como mínimo) ese perfil no existe. El administrador solo gestiona la IA y los tokens. No tiene cuenta ni
 chat, y los clientes reciben un 403 si piden \cod{/ajustes}.
 
-Tras 5 fallos de un usuario, o 100 fallos en 15 minutos desde un mismo origen, el acceso se bloquea 5 minutos
-(\ruta{dominio/acceso.py}). El intento se reserva antes de verificar la contraseña, bajo un cerrojo. Sin esa reserva,
-40 intentos en paralelo llegaban a probar 160 contraseñas. El mensaje es el mismo para un usuario que no existe y para
-una contraseña errónea.
+Para frenar a quien intenta adivinar contraseñas hay dos contadores de fallos (\ruta{dominio/acceso.py}). El
+primero es por usuario. Tras 5 contraseñas erróneas para la misma cuenta, esa cuenta queda bloqueada 5 minutos. Frena
+a quien va a por una persona concreta. El segundo es por origen, la dirección desde la que llegan las peticiones. Tras
+100 fallos en 15 minutos desde el mismo sitio, ese origen queda bloqueado 5 minutos. Frena a quien prueba unas pocas
+contraseñas contra muchos usuarios distintos, algo que el contador por usuario no ve porque ninguna cuenta llega a 5.
+Su límite es mucho más alto porque varias personas pueden compartir dirección, por ejemplo en la wifi de una sala.
+Mientras dura un bloqueo, el servidor rechaza cualquier intento sin llegar a comprobar la contraseña, aunque sea la
+buena, y responde con un error 429 que indica cuántos minutos faltan. Al acertar se pone a cero el contador del
+usuario, pero no el del origen, que se vacía solo con el paso del tiempo.
 
 \subsection{Aislamiento por cliente}\label{sec:aislamiento}
 
@@ -30,8 +36,10 @@ apartado~\ref{sec:nlsql}. Una operación de otro cliente responde 404, igual que
 \subsection{Operaciones con OTP: el flujo de un Bizum}\label{sec:otp}
 
 \ruta{transferencia_bizum} \textbf{no envía dinero}. Valida el importe, el saldo y los topes, crea una operación pendiente
-y manda un código de 6 dígitos a un ``móvil simulado'', que es un canal distinto del chat. El cliente lo teclea en la
-tarjeta de confirmación, que llama a un endpoint aparte. El código nunca pasa por el modelo, ni por el historial, ni por
+y manda un código de 6 dígitos a un ``móvil simulado'', que es un canal distinto del chat. El cliente puede teclear el
+código en la tarjeta de confirmación o aprobar con la huella dactilar simulada. Cada opción llama a su propio endpoint, una
+dirección del servidor distinta de la del chat (\cod{POST /operaciones/\{id\}/confirmar} y \cod{POST /operaciones/\{id\}/aprobar}), y el modelo no
+interviene en ninguno de los dos. El código nunca pasa por el modelo, ni por el historial, ni por
 los eventos SSE (figura~\ref{fig:secuencia-bizum}).
 
 \begin{figure}[htbp]
@@ -41,32 +49,61 @@ los eventos SSE (figura~\ref{fig:secuencia-bizum}).
   \label{fig:secuencia-bizum}
 \end{figure}
 
+La figura se lee de arriba abajo. El cliente pide el Bizum por voz o por texto, por ejemplo ``envía 5 euros a Dani''.
+El servidor pasa la petición al modelo junto con la lista de herramientas que puede usar. El modelo no envía nada.
+Solo contesta que quiere usar la herramienta \ruta{transferencia_bizum}, con un destinatario y un importe. El servidor
+busca ese nombre entre los contactos del cliente y comprueba el importe, el saldo y los topes. Si todo cuadra, crea la
+operación pendiente y manda un SMS con el código al móvil simulado. Del código solo guarda la huella, como con las
+contraseñas. En el chat aparece entonces la tarjeta de confirmación. El cliente lee el código en el móvil y lo teclea
+en la tarjeta, o aprueba con la huella dactilar. Esa petición va a un endpoint aparte, que comprueba que la operación
+es suya, que sigue pendiente, que no ha caducado y que el código es correcto. Solo entonces se mueve el dinero. Desde
+que propuso la operación, el modelo no vuelve a intervenir.
+
 El código caduca a los 5 minutos, admite 3 intentos y sirve una sola vez. Al tercer fallo la operación se cancela y
 responde 423 (\ruta{dominio/operaciones.py}). Las reglas de riesgo están en \ruta{dominio/reglas.py}. Un Bizum no puede
 pasar de 1.000~€ por operación ni de 1.500~€ al día, y la tarjeta muestra un aviso si el destinatario es nuevo o el
-importe es de 300~€ o más. Confirmar, aprobar y cancelar comparten un cerrojo por cliente. Antes de ponerlo, ocho
-aprobaciones en paralelo restaban 80~€ en vez de 10~€.
+importe es de 300~€ o más.
+
+Confirmar una operación son tres pasos: leerla, comprobar que sigue pendiente y marcarla como hecha. Al probar
+peticiones en paralelo encontré un fallo. Si llegaban varias confirmaciones de la misma operación a la vez, cada una
+hacía la comprobación antes de que las otras la marcaran. Todas la veían pendiente y el Bizum se ejecutaba varias
+veces. En la prueba, ocho aprobaciones de un Bizum de 10~€ restaron 80~€. La solución fue un cerrojo por cliente
+(\ruta{casos_uso/cerrojos.py}), que comparten confirmar, aprobar y cancelar. Con él, las confirmaciones de un mismo
+cliente se atienden de una en una. La segunda ya encuentra la operación confirmada y la rechaza.
 
 Con las tarjetas hay una asimetría a propósito. Bloquear no pide código, porque no mueve dinero, va en la dirección
 segura y quien ha perdido la cartera tiene prisa. Desbloquear sí lo pide, con el mismo flujo que el Bizum, porque es
-justo lo que querría quien la ha robado. El servidor elige la tarjeta (si hay varias, pregunta) y solo bloquea ante una
-orden explícita en primera persona. ``A mi madre le han robado la tarjeta'' no bloquea la del cliente.
+justo lo que querría quien la ha robado.
+
+El modelo tampoco decide qué tarjeta bloquear ni si hay que bloquearla (\ruta{herramientas/tarjetas.py}). Como mucho
+pasa cómo la nombró el cliente: los últimos 4 dígitos, la marca o si es de débito o de crédito. El servidor mira las
+tarjetas del cliente y, si tiene varias y no está claro cuál, le pregunta. Además solo bloquea cuando la frase es una
+orden clara del propio cliente sobre su tarjeta, como ``he perdido mi tarjeta'' o ``bloquea mi tarjeta''. Si el
+cliente cuenta que a su madre le han robado la tarjeta, la suya no se bloquea, aunque el modelo llame a la
+herramienta.
 
 \subsection{Otras capas}\label{sec:otras-capas}
 
-{\small
-\begin{tabularx}{\textwidth}{@{}P{3.6cm}L@{}}
-\toprule
-\textbf{Capa} & \textbf{Qué hace} \\
-\midrule
-Un turno a la vez por cliente & Una segunda pregunta mientras hay otra en curso recibe 429. Así no se puede saltar el tope diario con peticiones en paralelo \\
-Marca \cod{[auto]} reservada & Los avisos internos del servidor al modelo llevan esa marca. Si un usuario la escribe, en cualquier variante Unicode, el mensaje se rechaza \\
-Auditoría & Login, intentos de inyección, OTP, Bizum, bloqueos, consultas SQL y cambios de ajustes (\ruta{salida/sqlite/auditoria.py}). Los números de tarjeta largos se enmascaran \\
-Navegador & CSP \cod{script-src \textquotesingle self\textquotesingle} (librerías servidas desde el propio servidor), HSTS, \cod{X-Frame-Options: DENY}, \cod{no-store} y Swagger apagado por defecto \\
-Origen de la IP & Se arranca con \cod{-{}-no-proxy-headers} y el código ignora \cod{X-Forwarded-For} salvo con \ruta{PROXY_DE_CONFIANZA=1} \\
-Errores & Cada error de dominio tiene su código HTTP y el 500 no filtra detalles internos \\
-\bottomrule
-\end{tabularx}}
+Cada cliente solo puede tener una pregunta en curso. Si manda otra mientras el asistente aún responde la anterior,
+recibe un error 429 (``demasiadas peticiones''). El motivo es el tope diario de tokens. El gasto de una pregunta se
+anota al terminar, así que si alguien lanzaba muchas preguntas a la vez, todas pasaban la comprobación del tope antes
+de que ninguna lo gastara (\ruta{aplicacion/chat.py}).
 
-El código pasó tres rondas de revisión de seguridad. Cada fallo que apareció está corregido y tiene su test de
-regresión.
+A veces el propio servidor mete avisos en la conversación para el modelo, por ejemplo el resultado de un Bizum que
+el cliente acaba de confirmar. Esos avisos empiezan por la marca \cod{[auto]}. Si un usuario escribe esa marca en su
+mensaje, también disfrazada con letras de otros alfabetos que se ven iguales, el mensaje se rechaza. Así nadie puede
+hacerse pasar por el servidor ante el modelo. Además, la auditoría (\ruta{salida/sqlite/auditoria.py}) deja
+constancia de los logins, los intentos de saltarse las normas, los códigos OTP, los Bizum, los bloqueos de tarjeta,
+las consultas SQL y los cambios de ajustes. Si en lo registrado aparece un número de tarjeta largo, se guarda
+enmascarado.
+
+El servidor también manda al navegador unas cabeceras de seguridad (\ruta{entrada/http/app.py}). La política de
+contenido (CSP) solo deja ejecutar scripts servidos por el propio servidor, así que un script inyectado desde fuera
+no corre. HSTS obliga al navegador a usar siempre HTTPS con el sitio. \cod{X-Frame-Options: DENY} impide que otra web
+meta la aplicación dentro de un marco para engañar al usuario con clics. \cod{no-store} evita que las respuestas con
+datos del cliente se queden en la caché del navegador. La documentación interactiva de la API (Swagger) está apagada
+salvo que se active a mano. El límite de intentos de login depende de la dirección IP, y uvicorn por defecto se fía
+de la cabecera \cod{X-Forwarded-For}, que cualquiera puede inventarse. Por eso se arranca con
+\cod{-{}-no-proxy-headers}, y el código ignora esa cabecera salvo con \ruta{PROXY_DE_CONFIANZA=1}. Por último, cada
+error de dominio tiene su código HTTP, y un fallo inesperado (un 500) responde con un mensaje genérico, sin detalles
+internos que den pistas a un atacante.

@@ -1,5 +1,5 @@
 # Voz realista opcional (OmniVoice, k2-fsa): necesita GPU NVIDIA; trae PyTorch con CUDA (~5 GB) y descarga el modelo (~3,3 GB)
 # la primera vez. Sin esto, o sin GPU, la app habla con Piper (requirements.txt). Pesos CC-BY-NC: uso no comercial.
 #   pip install --no-cache-dir -r requirements-voz.txt
-#   python pruebas/disenar_voz.py && python pruebas/disenar_voz.py --elegir N   # crea data/voces/unia_ref.wav
+#   La voz de referencia (data/voces/unia_ref.wav) ya va en el repositorio; para cambiarla: python pruebas/disenar_voz.py --elegir N
 omnivoice>=0.2.1

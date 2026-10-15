@@ -19,8 +19,8 @@ Con el modelo local de 8B un prompt no basta, así que añadí guardas en el pro
   vuelta al modelo. No gasta tokens y el modelo no puede afirmar que el dinero ya ha salido.
   \item Si el modelo dice ``voy a generar el gráfico'' y no llama a nada, recibe un empujón para que lo haga.
   \item Si da importes que no ha consultado, se le obliga a consultarlos antes de responder.
-  \item Ante ``he perdido la tarjeta'', qwen3:8b contestaba ``tarjeta bloqueada'' sin llamar a la herramienta en 4 de 5
-  frases. Ahora recibe un empujón y, si insiste, la herramienta la ejecuta el servidor. Esto solo vale para acciones
+  \item Ante ``he perdido la tarjeta'', el modelo local (qwen3:8b) contestaba ``tarjeta bloqueada'' sin llamar a la
+  herramienta. Ahora recibe un empujón y, si insiste, la herramienta la ejecuta el servidor. Esto solo vale para acciones
   seguras o que dejan una operación pendiente de OTP.
   \item ``Ignora tus normas…'' recibe una respuesta fija sin llamar al LLM y queda en la auditoría. Es una defensa más,
   porque la garantía real es el OTP.
@@ -39,10 +39,13 @@ apoya en cuatro capas.
   Se crea una base \cod{:memory:} y se copian ahí las filas del cliente de tres tablas (\cod{movimientos}, \cod{cuenta} y
   \ruta{contactos_bizum}). Los datos de otros clientes, los hashes de contraseña, las tarjetas y la auditoría no existen
   en esa conexión.
-  \item El authorizer de SQLite solo permite leer. Prohíbe \cod{ATTACH}, \cod{PRAGMA} y las tablas \ruta{sqlite_*}, y veta
-  funciones peligrosas como \cod{randomblob}, \cod{printf} o \ruta{load_extension}.
+  \item SQLite permite registrar una función ``portero'', el authorizer, a la que consulta antes de cada paso de la
+  consulta (leer una tabla, llamar a una función, abrir otra base). La nuestra solo deja leer. Rechaza abrir otros
+  ficheros de base de datos (\cod{ATTACH}), cambiar la configuración (\cod{PRAGMA}) y mirar las tablas internas de
+  SQLite (\ruta{sqlite_*}). También rechaza las funciones que generan datos aleatorios (\cod{randomblob}), formatean
+  cadenas (\cod{printf}) o cargan extensiones (\ruta{load_extension}).
   \item Los recursos están limitados a 2~s por consulta, 4~kB por valor, 32 columnas, 10~kB de SQL, 60 filas y 200~kB
-  de resultado.
+  de resultado (los impone \ruta{consultor.py}, y el tope de filas sale de \ruta{dominio/reglas.py}).
 \end{enumerate}
 
 Mi primer diseño usaba vistas temporales filtradas y el authorizer, y tenía un agujero. Una CTE llamada
@@ -64,10 +67,9 @@ todo el historial).
 
 El segundo es el camino libre, para lo que esas cuatro consultas no cubren. Si el cliente pide ``compara lo que gasté
 en bares en marzo y en julio'', el modelo consulta primero los movimientos con SQL (apartado~\ref{sec:nlsql}) y después
-arma él mismo el gráfico entero: qué datos, qué etiquetas y qué tipo. El servidor comprueba que la configuración esté
-bien formada antes de pintarla. Rechaza cualquier valor que no sea un número, las series con distinto número de
-valores que de etiquetas y las series ``Total'' inventadas, que es justo lo que el modelo pequeño intentaba colar. Si
-algo no cuadra, se le devuelve el error y tiene que corregirlo con las cifras reales.
+arma él mismo el gráfico entero: qué datos, qué etiquetas y qué tipo. Antes de pintarlo, el servidor comprueba que
+esté bien formado (el porqué de esas comprobaciones lo cuento después de las figuras). Si algo no cuadra, se le
+devuelve el error y tiene que corregirlo con las cifras reales.
 
 Las figuras~\ref{fig:graficos-fuente} y~\ref{fig:grafico-config} son capturas reales de los dos caminos.
 En ambos el modelo decide el tipo de gráfico entre seis (barras, líneas, tarta, anillo, radar y área polar),
@@ -102,10 +104,12 @@ no plantillas, y el aspecto de cada gráfico se decide en cada respuesta.
   \label{fig:grafico-config}
 \end{figure}
 
-Hay dos caminos por un motivo concreto. El modelo local de 8B, el que funciona sin internet, se inventaba cifras cuando
-tenía que hacer dos pasos seguidos, consultar y luego dibujar. En una prueba añadió una serie ``Total'' de unos
-27.000~€ que no salía de ningún sitio. Con el camino habitual eso es imposible, porque los números los pone el
-servidor. El camino libre queda para lo que las consultas preparadas no alcanzan, con la validación de arriba como red.
+Los dos caminos y las comprobaciones del libre existen por el modelo local de 8B, el que uso de respaldo porque no
+tengo recursos para uno mayor (apartado~\ref{sec:medios}). Cuando tenía que hacer dos pasos seguidos, consultar y
+luego dibujar, se inventaba datos. Metía valores que no eran números, series con más o menos valores que etiquetas o
+una serie ``Total'' que no salía de ningún sitio (en una prueba, de unos 27.000~€). Con los modelos grandes de Groq
+eso no pasaba. Por eso en el camino habitual los números los pone el servidor, y el camino libre rechaza justo esas
+tres cosas antes de pintar nada.
 
 \subsection{Cadena de respaldo de modelos}\label{sec:cadena}
 
@@ -122,9 +126,6 @@ configuración por defecto (\ruta{backend/dominio/proveedores.py}, \ruta{salida/
 3 & \cod{qwen3:8b} & Ollama (local, GPU de 6~GB) & Funciona sin internet \\
 \bottomrule
 \end{tabularx}}
-
-Llama 3.3 70B, el modelo principal del principio, ya no está en Groq. Todos los proveedores hablan la API compatible con
-OpenAI, y cambiar de proveedor es cambiar la URL y el modelo en el panel de ajustes del administrador.
 
 El agente decide qué hacer según el fallo (las constantes están al principio de \ruta{agente.py}).
 
@@ -163,6 +164,10 @@ Peticiones por cliente y minuto & 20 \\
 \bottomrule
 \end{tabularx}}
 
-El historial además se compacta. Los resultados de herramientas de turnos anteriores no se reenvían
-(\ruta{compactar_historial} en \ruta{aplicacion/chat.py}), y eso redujo un \textasciitilde 90\,\% los tokens por
-petición. El cliente ve su gasto en el medidor de la cabecera. El administrador ve el de todos y puede reiniciarlo.
+El modelo no recuerda nada entre una petición y otra. Para que siga la conversación, en cada pregunta el servidor le
+reenvía el historial, que son todos los mensajes anteriores de esa conversación. Al principio ese historial incluía
+también los resultados completos de las herramientas. Si el cliente había pedido antes todos sus movimientos, las 200
+filas de aquella consulta viajaban otra vez con cada pregunta nueva, y el gasto se disparaba. Ahora solo se reenvían
+las preguntas y las respuestas en texto. Los resultados de herramientas de turnos anteriores se descartan, porque el
+modelo ya los resumió en su respuesta (\ruta{compactar_historial} en \ruta{aplicacion/chat.py}). Con eso los tokens
+por petición bajaron en torno a un 90\,\%.
