@@ -6,7 +6,8 @@ Asistente bancario conversacional basado en IA generativa. Permite interactuar c
 tus finanzas **por voz o por escrito** (accesible para personas que no pueden o no
 quieren hablar): consultar saldo, enviar Bizum, analizar movimientos en lenguaje
 natural, generar **gráficos dinámicos sin plantillas** y consultar, bloquear o desbloquear tarjetas.
-El LLM propone y el servidor decide: el dinero solo se mueve con un código OTP. Memoria técnica: `docs/MEMORIA.md`.
+El LLM propone y el servidor decide: el dinero solo se mueve con un código OTP.
+Memoria técnica: [`docs/Unia_memoria_tecnica.pdf`](docs/Unia_memoria_tecnica.pdf) (fuente LaTeX en `docs/memoria_latex/`).
 
 ## Arquitectura
 
@@ -30,8 +31,10 @@ El LLM propone y el servidor decide: el dinero solo se mueve con un código OTP.
   se cambian en el panel de ajustes del administrador (o con `LLM_PROVIDER`).
 - **NL → SQL**: el LLM traduce la pregunta del usuario a un `SELECT` de SQLite,
   validado en el servidor (solo lectura, una sentencia, lista negra de palabras clave).
-- **Gráficos sin plantillas**: el LLM razona qué tipo de gráfico conviene y emite la
-  configuración Chart.js completa, que el frontend renderiza tal cual.
+- **Gráficos sin plantillas**: el LLM decide el tipo de gráfico, el título y el periodo. Para las
+  consultas habituales (gastos por categoría, por mes, por comercio, ingresos frente a gastos) los
+  datos los calcula el servidor; para cualquier otra, el LLM consulta los movimientos y construye
+  él mismo la configuración Chart.js, que el servidor valida y el frontend renderiza.
 - **Voz**: entrada por Whisper large-v3-turbo (API gratuita de Groq, con temperatura 0,
   prompt de dominio y filtro de audio corto contra alucinaciones). Salida en el servidor
   (`POST /tts`) con **OmniVoice** en la GPU local (opcional: `requirements-voz.txt`, pesos CC-BY-NC)
@@ -54,7 +57,7 @@ Se eligió una **cadena de fallback automática** (los límites diarios de Groq 
 modelo, así que un segundo modelo de la misma clave es un fallback real): si un
 proveedor devuelve 429 o falla la red, el agente salta al siguiente eslabón *en el
 mismo mensaje* y avisa al usuario. Ante un límite por minuto, en cambio, espera (hasta 40 s por turno)
-y reintenta con el mismo modelo: el pequeño es menos fiable. Llama 3.3 70B, el principal original, ya no está en Groq.
+y reintenta con el mismo modelo: el pequeño es menos fiable.
 
 ### Control de latencia y consumo de tokens
 
@@ -75,7 +78,9 @@ pip install -r requirements.txt
 
 # 2. Configuración
 cp .env.example .env
-# Edita .env y pon tu GROQ_API_KEY (gratis en https://console.groq.com/keys)
+# Edita .env: CONTRASENA_ADMIN (12+ caracteres) para el perfil de administración y, si quieres,
+# GROQ_API_KEY (gratis en https://console.groq.com/keys). La clave también puede pegarse después
+# desde el panel de ajustes entrando como admin.
 
 # 3. Arrancar
 uvicorn backend.main:app --reload --no-proxy-headers
@@ -119,6 +124,6 @@ backend/
 frontend/
   index.html, styles.css
   js/{api,aplicacion,dispositivos,ui}/   # módulos ES: chat SSE, voz, panel de ajustes, Chart.js
-tests/           # 746 pruebas sin red (incluye seguridad y aislamiento): python -m pytest -q
+tests/           # 750 pruebas sin red (incluye seguridad y aislamiento): python -m pytest -q
 pruebas/         # demo + batería contra la app en marcha (usa el LLM real)
 ```
