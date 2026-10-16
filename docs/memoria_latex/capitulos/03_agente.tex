@@ -54,9 +54,9 @@ más en restaurantes el año pasado?''. La seguridad no depende del modelo y se 
   de resultado (los impone \ruta{consultor.py}, y el tope de filas sale de \ruta{dominio/reglas.py}).
 \end{enumerate}
 
-Mi primer diseño usaba vistas temporales filtradas y el authorizer, y tenía un agujero. Una CTE (una consulta
-auxiliar con nombre que se define con \cod{WITH} al principio de la sentencia) llamada \cod{movimientos} leía la tabla de todos los clientes. Lo encontró un test que intentaba leer datos ajenos. La defensa
-que de verdad funcionó fue quitar los datos de la conexión en lugar de filtrarlos.
+Mi primer diseño filtraba los datos en la misma base y tenía un agujero. Una consulta bien escrita leía la tabla de
+todos los clientes. Lo encontró un test que intentaba leer datos ajenos. La defensa que de verdad funcionó fue quitar
+los datos de la conexión en lugar de filtrarlos.
 
 \subsection{Gráficos que decide la IA}\label{sec:graficos}
 
