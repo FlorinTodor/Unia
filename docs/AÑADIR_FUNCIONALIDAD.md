@@ -204,7 +204,7 @@ prototipo de una sola pantalla sobraría.
 - **MCP** (Model Context Protocol) estandariza cómo un *cliente de IA externo* descubre y llama herramientas.
   Aquí hay un solo cliente (nuestro agente, en el mismo proceso) y un solo proveedor de herramientas (el banco):
   añadir MCP sería una capa de red y de serialización sin nadie al otro lado. **No hace falta**. Y si algún día
-  hiciera falta (que Claude Desktop use nuestras herramientas), es un **adaptador de entrada más**
+  hiciera falta (que otros asistentes de IA usen nuestras herramientas), es un **adaptador de entrada más**
   (`entrada/mcp/`) que llama a los mismos casos de uso: esa es precisamente la ventaja de la hexagonal; no habría
   que reescribir nada.
 - **A2A** (agente a agente) tiene sentido cuando otro agente de otra organización hace trabajo por nosotros

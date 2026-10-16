@@ -73,7 +73,7 @@ agente?»* → No, y hay que enseñar por qué.
    modelo (tokens, confusión). Un paso previo barato elige la categoría (cuentas, pagos,
    tarjetas, análisis…) y solo se envían las de esa categoría.
 3. **Servidor MCP**: exponer las mismas herramientas por MCP (`FastMCP`), de modo que
-   cualquier cliente MCP (Claude Desktop, otros agentes) las use sin tocar código. Buena
+   cualquier cliente MCP (otros asistentes o agentes) las use sin tocar código. Buena
    demo de «escala hacia fuera».
 4. **A2A (explicado, quizá maquetado)**: para dominios fuera del banco (reservar mesa, AVE,
    la visión que contaron en la reunión) el agente delega en otro agente especializado,
