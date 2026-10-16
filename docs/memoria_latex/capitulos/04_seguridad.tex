@@ -5,8 +5,8 @@
 
 El cliente entra con usuario y contraseña. La contraseña no se guarda nunca. Se guarda su hash, una huella que se
 calcula a partir de ella y de la que no se puede volver atrás. Al entrar, el servidor calcula la huella de lo tecleado
-y la compara con la guardada. Antes de calcularla mezcla la contraseña con una sal, un valor aleatorio distinto para
-cada usuario. Así dos usuarios con la misma contraseña no tienen la misma huella, y no sirven las tablas
+y la compara con la guardada. Antes de calcularla mezcla la contraseña con lo que en criptografía se llama sal, un valor aleatorio
+distinto para cada usuario que se guarda junto a la huella. Así dos usuarios con la misma contraseña no tienen la misma huella, y no sirven las tablas
 precalculadas con las huellas de las contraseñas más comunes. El algoritmo es scrypt, lento a propósito para que
 probar contraseñas en masa salga caro (\ruta{salida/seguridad/hasheador.py}). La sesión va en una cookie \cod{HttpOnly} y \cod{SameSite=Strict}, y el servidor
 solo guarda la huella sha256 del token.
@@ -96,14 +96,3 @@ hacerse pasar por el servidor ante el modelo. Además, la auditoría (\ruta{sali
 constancia de los logins, los intentos de saltarse las normas, los códigos OTP, los Bizum, los bloqueos de tarjeta,
 las consultas SQL y los cambios de ajustes. Si en lo registrado aparece un número de tarjeta largo, se guarda
 enmascarado.
-
-El servidor también manda al navegador unas cabeceras de seguridad (\ruta{entrada/http/app.py}). La política de
-contenido (CSP) solo deja ejecutar scripts servidos por el propio servidor, así que un script inyectado desde fuera
-no corre. HSTS obliga al navegador a usar siempre HTTPS con el sitio. \cod{X-Frame-Options: DENY} impide que otra web
-meta la aplicación dentro de un marco para engañar al usuario con clics. \cod{no-store} evita que las respuestas con
-datos del cliente se queden en la caché del navegador. La documentación interactiva de la API (Swagger) está apagada
-salvo que se active a mano. El límite de intentos de login depende de la dirección IP, y uvicorn por defecto se fía
-de la cabecera \cod{X-Forwarded-For}, que cualquiera puede inventarse. Por eso se arranca con
-\cod{-{}-no-proxy-headers}, y el código ignora esa cabecera salvo con \ruta{PROXY_DE_CONFIANZA=1}. Por último, cada
-error de dominio tiene su código HTTP, y un fallo inesperado (un 500) responde con un mensaje genérico, sin detalles
-internos que den pistas a un atacante.

@@ -33,9 +33,10 @@ El reto pedía saldo, Bizum, consultas y gráficos, y todo eso ya estaba hecho. 
 y no solo una promesa, añadí a propósito una función completa que nadie pedía: consultar, bloquear y desbloquear
 tarjetas. La elegí porque toca todas las capas (una tabla nueva, reglas propias, una operación con OTP y una tarjeta
 visual en el chat), así que si algo iba a obligar a rehacer el agente, era esto. Siguió el camino previsto. Hubo un caso de uso (\ruta{casos_uso/tarjetas.py}), un módulo de herramientas
-(\ruta{herramientas/tarjetas.py}) y su línea de cableado. A eso se suma lo que toda función necesita por dentro, que es
-la entidad y sus reglas en el dominio y un puerto con su adaptador SQLite. El desbloqueo reutilizó el flujo OTP del
-Bizum en vez de duplicarlo, y la tabla nueva quedó fuera del SQL del modelo sin hacer nada especial.
+(\ruta{herramientas/tarjetas.py}) y su línea de cableado. Por dentro hizo falta lo de siempre, es decir, la entidad tarjeta y
+sus reglas en el dominio, un puerto para leer y guardar tarjetas y su implementación en SQLite. Para el desbloqueo
+aproveché el flujo de código que ya tenía el Bizum en vez de escribir otro, y la tabla nueva no entra en el SQL que
+escribe el modelo porque a la copia en memoria solo van las tres tablas de siempre.
 
 Hubo dos cosas que no salieron tan bien. La primera es que el bucle del agente recibió una guarda genérica
 (\ruta{Herramienta.orden_directa}). No la necesitaba la función en sí. La necesitaba el modelo local de 8B, el respaldo
@@ -45,7 +46,7 @@ cualquier herramienta futura. La segunda es que la operación pendiente conserva
 retomo en el apartado siguiente.
 
 Quitando esa guarda, que vino del modelo local y no de la función, añadir el bloqueo de tarjeta no obligó a tocar el
-bucle del agente, la cadena de modelos, el streaming, el login, el aislamiento ni el flujo OTP.
+bucle del agente, la cadena de modelos, el login, el aislamiento ni el flujo OTP.
 
 \subsection{Qué haría falta con 40 herramientas}\label{sec:cuarenta}
 
@@ -56,7 +57,7 @@ se mandan los de las 8 herramientas en cada ronda. Con 40 no tendría sentido ma
 tokens en cada ronda, y un modelo con tantas opciones delante se confunde más al elegir. La solución que tengo pensada
 es un paso previo y barato que decida de qué categoría es la pregunta (cuentas, pagos, tarjetas o análisis). Después
 se mandarían al modelo solo las herramientas de esa categoría, con un filtro en
-\cod{RegistroHerramientas.esquemas()}. Está diseñada, pero no hecha.
+\cod{RegistroHerramientas.esquemas()}. No está hecho.
 
 El segundo afecta a las operaciones que se confirman con código. Hoy hay dos tipos, el Bizum y el desbloqueo de
 tarjeta, y \cod{ConfirmarOperacion} los distingue con una simple comprobación del tipo. Con más tipos, lo ordenado

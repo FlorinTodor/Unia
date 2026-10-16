@@ -17,11 +17,7 @@ La respuesta del asistente se genera siempre como texto. Si la voz está activad
 pide al servidor el audio de cada una (\cod{POST /tts}) mientras suena la anterior, así la primera frase se oye en torno
 a un segundo sin esperar a que termine toda la respuesta. Los números se dicen en palabras (``veintiún céntimos'') y las
 tablas y el código no se leen, por eso el asistente remata cada tabla con una frase. Quién pone la voz depende de lo que
-haya instalado en el servidor, que elige solo el mejor nivel disponible (se ve en \cod{GET /estado}). El repositorio ya
-trae el modelo de voz de Piper (\ruta{es_ES-sharvard-medium.onnx}) y la grabación de referencia de OmniVoice
-(\ruta{unia_ref.wav} y su transcripción), los dos en \ruta{data/voces/}. Lo único que no va en el repositorio son los
-pesos de OmniVoice. Tras instalar \ruta{requirements-voz.txt}, se descargan solos (unos 3,3~GB) la primera vez que se
-usan.
+haya instalado en el servidor, que elige solo el mejor nivel disponible (se ve en \cod{GET /estado}).
 
 \begin{enumerate}
   \item Recién clonado, con solo \ruta{requirements.txt}, el servidor ya habla con \textbf{Piper}, en CPU y sin GPU,
@@ -42,8 +38,3 @@ Quise que confirmar una operación no dependiera de un solo sentido. Al aparecer
 cursor va directo al campo del código. El móvil puede \textbf{leer el código en voz alta, cifra a cifra}, después de
 la respuesta del asistente. Y quien no puede teclear o mirar la pantalla puede \textbf{aprobar con huella} (simulada)
 mediante \cod{POST /operaciones/\{id\}/aprobar}, que aplica las mismas reglas que el código.
-
-Dos interruptores, en la cabecera y en el login, activan el \textbf{texto grande} (raíz al 120\,\%) y el \textbf{alto
-contraste}, que usa la paleta de Unicaja con textos más oscuros y bordes visibles, también en modo oscuro. Se recuerdan
-en el navegador y se aplican antes de pintar la página. Si el usuario no ha elegido, el alto contraste sigue a
-\cod{prefers-contrast: more}. Me queda pendiente un modo manos libres completo, con conversación continua por voz.

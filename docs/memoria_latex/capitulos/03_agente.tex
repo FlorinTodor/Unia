@@ -28,17 +28,23 @@ Con el modelo local de 8B un prompt no basta, así que añadí guardas en el pro
 
 \subsection{NL→SQL seguro}\label{sec:nlsql}
 
-El modelo escribe un \cod{SELECT} de SQLite a partir del esquema que describe el prompt. Así responde preguntas que
-nadie programó, como ``¿en qué mes gasté más en restaurantes el año pasado?''. La seguridad no depende del modelo y se
-apoya en cuatro capas.
+Cuando el cliente escribe una pregunta sobre sus movimientos, el mensaje llega al servidor por \cod{POST /chat} y el
+servidor se lo manda al modelo junto con el system prompt, que incluye la descripción de las tablas (\cod{movimientos},
+\cod{cuenta} y \ruta{contactos_bizum}, con sus columnas), y la lista de herramientas. El modelo decide que necesita datos
+y pide la herramienta \ruta{consultar_movimientos} con un argumento \cod{sql}, una consulta \cod{SELECT} en el dialecto
+de SQLite que escribe él mismo a partir de ese esquema. El servidor la valida, la ejecuta y le devuelve las filas, y con
+ellas el modelo redacta la respuesta en palabras. Así responde preguntas que nadie programó, como ``¿en qué mes gasté
+más en restaurantes el año pasado?''. La seguridad no depende del modelo y se apoya en cuatro capas.
 
 \begin{enumerate}
   \item El dominio (\ruta{reglas.validar_consulta_solo_lectura}) exige una sola sentencia, solo \cod{SELECT} o
   \cod{WITH}, y rechaza una lista de palabras clave.
   \item Cada consulta se ejecuta en una copia en memoria con solo los datos del cliente (\ruta{salida/sqlite/consultor.py}).
-  Se crea una base \cod{:memory:} y se copian ahí las filas del cliente de tres tablas (\cod{movimientos}, \cod{cuenta} y
-  \ruta{contactos_bizum}). Los datos de otros clientes, los hashes de contraseña, las tarjetas y la auditoría no existen
-  en esa conexión.
+  \cod{:memory:} es el nombre que usa SQLite para una base de datos que vive solo en la RAM y desaparece al cerrarla.
+  Para cada consulta el servidor crea una vacía, copia en ella únicamente las filas de ese cliente de tres tablas
+  (\cod{movimientos}, \cod{cuenta} y \ruta{contactos_bizum}), ejecuta ahí la consulta del modelo y la descarta. Los datos de
+  otros clientes, los hashes de contraseña, las tarjetas y la auditoría no existen en esa conexión, así que ninguna
+  consulta puede llegar a ellos.
   \item SQLite permite registrar una función ``portero'', el authorizer, a la que consulta antes de cada paso de la
   consulta (leer una tabla, llamar a una función, abrir otra base). La nuestra solo deja leer. Rechaza abrir otros
   ficheros de base de datos (\cod{ATTACH}), cambiar la configuración (\cod{PRAGMA}) y mirar las tablas internas de
@@ -48,8 +54,8 @@ apoya en cuatro capas.
   de resultado (los impone \ruta{consultor.py}, y el tope de filas sale de \ruta{dominio/reglas.py}).
 \end{enumerate}
 
-Mi primer diseño usaba vistas temporales filtradas y el authorizer, y tenía un agujero. Una CTE llamada
-\cod{movimientos} leía la tabla de todos los clientes. Lo encontró un test que intentaba leer datos ajenos. La defensa
+Mi primer diseño usaba vistas temporales filtradas y el authorizer, y tenía un agujero. Una CTE (una consulta
+auxiliar con nombre que se define con \cod{WITH} al principio de la sentencia) llamada \cod{movimientos} leía la tabla de todos los clientes. Lo encontró un test que intentaba leer datos ajenos. La defensa
 que de verdad funcionó fue quitar los datos de la conexión en lugar de filtrarlos.
 
 \subsection{Gráficos que decide la IA}\label{sec:graficos}
@@ -63,13 +69,16 @@ categoría, del mes actual, en tarta, con el título Gastos de octubre''. El ser
 cliente, suma los gastos por categoría y construye el gráfico. El modelo no ha escrito ni una sola cifra. Hay cuatro
 consultas de este tipo (gastos por categoría, gastos por mes, ingresos frente a gastos y gastos por comercio) y siete
 periodos (último mes, mes actual, mes anterior, últimos tres meses, últimos doce meses naturales, últimos 365 días y
-todo el historial).
+todo el historial). Están escritas en SQL en \ruta{aplicacion/casos_uso/graficos.py}, y el modelo solo elige cuál,
+con qué periodo y con qué tipo de gráfico.
 
 El segundo es el camino libre, para lo que esas cuatro consultas no cubren. Si el cliente pide ``compara lo que gasté
 en bares en marzo y en julio'', el modelo consulta primero los movimientos con SQL (apartado~\ref{sec:nlsql}) y después
-arma él mismo el gráfico entero: qué datos, qué etiquetas y qué tipo. Antes de pintarlo, el servidor comprueba que
-esté bien formado (el porqué de esas comprobaciones lo cuento después de las figuras). Si algo no cuadra, se le
-devuelve el error y tiene que corregirlo con las cifras reales.
+arma él mismo el gráfico entero: qué datos, qué etiquetas y qué tipo. Antes de pintarlo, el servidor revisa la configuración
+que ha escrito el modelo. Comprueba que tenga tipo y datos, que cada serie sea una lista de números (ni texto ni valores
+infinitos), que cada serie tenga tantos valores como etiquetas hay en el eje, y que no aparezca una serie ``Total'' que
+no venga de la consulta. Si algo no cuadra, se le devuelve el error al modelo y tiene que corregirlo con las cifras
+reales (el porqué de estas comprobaciones lo cuento después de las figuras).
 
 Las figuras~\ref{fig:graficos-fuente} y~\ref{fig:grafico-config} son capturas reales de los dos caminos.
 En ambos el modelo decide el tipo de gráfico entre seis (barras, líneas, tarta, anillo, radar y área polar),
@@ -90,7 +99,8 @@ no plantillas, y el aspecto de cada gráfico se decide en cada respuesta.
   \end{minipage}
   \caption{Dos gráficos por el camino habitual, tal como los pinta el chat. A la izquierda, ``enséñame en qué me gasto
   el dinero este mes, en tarta''. A la derecha, ``dibuja un gráfico de líneas con la evolución de mis gastos mes a mes
-  en el último año''. En los dos el modelo eligió el tipo, el título y el periodo, y los números los calculó el servidor.}
+  en el último año''. En los dos, el modelo solo eligió los argumentos de la herramienta (qué consulta preparada, qué periodo, qué tipo de
+  gráfico y el título), y el servidor ejecutó la consulta y puso los números.}
   \label{fig:graficos-fuente}
 \end{figure}
 
@@ -106,10 +116,9 @@ no plantillas, y el aspecto de cada gráfico se decide en cada respuesta.
 
 Los dos caminos y las comprobaciones del libre existen por el modelo local de 8B, el que uso de respaldo porque no
 tengo recursos para uno mayor (apartado~\ref{sec:medios}). Cuando tenía que hacer dos pasos seguidos, consultar y
-luego dibujar, se inventaba datos. Metía valores que no eran números, series con más o menos valores que etiquetas o
-una serie ``Total'' que no salía de ningún sitio (en una prueba, de unos 27.000~€). Con los modelos grandes de Groq
-eso no pasaba. Por eso en el camino habitual los números los pone el servidor, y el camino libre rechaza justo esas
-tres cosas antes de pintar nada.
+luego dibujar, se inventaba datos. En una prueba metió una serie ``Total'' de unos 27.000~€ que no salía de ningún
+sitio. Con los modelos grandes de Groq eso no pasaba. Por eso en el camino habitual los números los pone el servidor, y
+el camino libre revisa la configuración antes de pintar nada.
 
 \subsection{Cadena de respaldo de modelos}\label{sec:cadena}
 
