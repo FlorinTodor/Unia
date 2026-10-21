@@ -1,6 +1,160 @@
-# Unia · asistente de Unicaja
+# Unia, Unicaja's banking assistant
+
+**English** · [Español](#unia-el-asistente-de-unicaja)
+
+> Built for the «Habla con tu dinero» (Talk to your money) challenge from the Unicaja Chair at the University of Granada.
+
+[![Unia demo video](https://florintodor.dev/media/poster/unia.jpg)](https://florintodor.dev/en/proyectos/unia/)
+
+**Demo video and project page:** [florintodor.dev/en/proyectos/unia](https://florintodor.dev/en/proyectos/unia/)
+(the video is in Spanish)
+
+A conversational banking assistant built on generative AI. You can handle your money
+**by voice or in writing** (so it also works for people who can't or don't want to speak):
+check your balance, send Bizum transfers (the Spanish instant payment system), ask about
+your transactions in plain language, get **dynamic charts without templates**, and check,
+block or unblock your cards. The LLM proposes and the server decides: money only moves
+with an OTP code.
+Technical report: [`docs/Unia_memoria_tecnica.pdf`](docs/Unia_memoria_tecnica.pdf), in Spanish
+(LaTeX source in `docs/memoria_latex/`).
+
+## Architecture
+
+```
+┌───────────────┐   SSE / REST   ┌──────────────────────────────┐
+│   Frontend    │ ◄────────────► │        FastAPI backend       │
+│  chat + voice │                │  login · OTP · limits        │
+│  Chart.js     │                │  LLM agent (tool calling)    │
+│  simulated    │                │   ├─ consultar_saldo         │
+│  phone        │                │   ├─ listar_contactos_bizum  │
+└───────────────┘                │   ├─ consultar_movimientos ──┼──► SQLite (NL → SQL, per-customer copy)
+        │ audio                  │   ├─ generar_grafico ────────┼──► Chart.js chart to the frontend
+        ▼                        │   ├─ transferencia_bizum ────┼──► pending operation + SMS with code
+   POST /stt ───► Whisper (Groq) │   ├─ consultar_tarjetas      │
+   POST /tts ───► OmniVoice/Piper│   ├─ bloquear_tarjeta        │
+                                 │   └─ desbloquear_tarjeta ────┼──► pending operation + SMS with code
+                                 └──────────────────────────────┘
+```
+
+- **Provider-agnostic LLM**: every provider exposes an OpenAI-compatible API; they are
+  switched from the admin settings panel (or with `LLM_PROVIDER`).
+- **NL → SQL**: the LLM turns the user's question into an SQLite `SELECT`, validated on
+  the server (read-only, a single statement, a keyword blacklist).
+- **Charts without templates**: the LLM decides the chart type, the title and the period.
+  For the usual queries (spending by category, by month, by merchant, income against
+  spending) the server computes the data; for anything else, the LLM queries the
+  transactions and builds the Chart.js configuration itself, which the server validates
+  and the frontend renders.
+- **Voice**: input through Whisper large-v3-turbo (Groq's free API, with temperature 0,
+  a domain prompt and a short-audio filter against hallucinations). Output on the server
+  (`POST /tts`) with **OmniVoice** on the local GPU (optional: `requirements-voz.txt`,
+  CC-BY-NC weights) and **Piper** as the fallback; the browser's voices are the last
+  resort. Written chat always works. The Piper model and OmniVoice's reference voice live
+  in `data/voces/`, in the repository.
+- **Latency**: token-by-token SSE streaming + inference on Groq (~300-800 tok/s).
+
+## LLM provider analysis (summary)
+
+| Provider | Model | Cost | Speed | Free limit | Role |
+|---|---|---|---|---|---|
+| **Groq** | GPT-OSS 120B | Free | ★★★★★ | 8,000 tokens/min and a daily quota, per model | **Main** (+ Whisper STT) |
+| **Groq** | GPT-OSS 20B | Free | ★★★★★ | separate quota | **Fallback 1** (same key) |
+| **Local Ollama** | Qwen3 8B | Free | ★★★ | No limit | **Fallback 2** (offline) |
+| Cerebras | GPT-OSS 120B | — | ★★★★★ | requires enabling billing | Rejected (no free API tier any more) |
+| Google AI Studio | Gemini Flash | Free | ★★★★ | 20 req/day (top models) | Rejected (limits + privacy) |
+| OpenRouter | various | Free | ★★★ | 50 req/day | Rejected (limits) |
+
+The choice was an **automatic fallback chain** (Groq's daily limits are per model, so a
+second model on the same key is a real fallback): if a provider returns 429 or the
+network fails, the agent jumps to the next link *within the same message* and tells the
+user. On a per-minute limit, instead, it waits (up to 40 s per turn) and retries with the
+same model: the small one is less reliable.
+
+### Keeping latency and token use down
+
+- **History compaction**: SQL results and chart configs from older turns are dropped from
+  the context (~90% fewer tokens per request).
+- SQL queries capped at 60 rows + an instruction to use aggregations (charts use
+  aggregated data: a full year is ~12 rows, not hundreds).
+- Reasoning models with reasoning set to the minimum (`reasoning_effort`): on the local
+  fallback it cuts latency from ~13 s to ~2-3 s.
+
+## Getting started
+
+```bash
+# 1. Dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Configuration
+cp .env.example .env
+# Edit .env: CONTRASENA_ADMIN (12+ characters) for the admin profile and, if you like,
+# GROQ_API_KEY (free at https://console.groq.com/keys). The key can also be pasted later
+# from the settings panel, logged in as admin.
+
+# 3. Run
+uvicorn backend.main:app --reload --no-proxy-headers
+# Open http://localhost:8000
+```
+
+The fictitious database (`data/banco.db`: four customers, two years of transactions) is
+generated automatically on start-up. Log in as `alex`, `ana`, `marta` or `jose`; the
+password is `CONTRASENA_<USER>` from `.env` or, if it isn't set, the username followed by 2026.
+
+### Local fallback with Ollama
+
+```bash
+ollama pull qwen3:8b   # the default model (with little VRAM: qwen3:4b and OLLAMA_MODEL=qwen3:4b)
+# In .env: LLM_PROVIDER=ollama
+```
+
+## Example requests
+
+The assistant speaks Spanish:
+
+- «¿Cuánto dinero tengo?» (How much money do I have?)
+- «¿Cuánto gasté en supermercados en junio?» (How much did I spend at supermarkets in June?)
+- «Envíale 20 € a María por la cena» (Send María €20 for dinner) → the assistant prepares
+  the Bizum and a code arrives on the simulated phone (📱) → it is confirmed with the code
+  or the fingerprint, never through the chat
+- «Hazme un gráfico de mis gastos por categoría de los últimos 3 meses» (Chart my spending
+  by category over the last 3 months)
+- «¿Cómo ha evolucionado mi gasto mensual este año?» (How has my monthly spending changed
+  this year?), an autonomous line chart
+
+## Project structure
+
+Hexagonal architecture (details in `docs/ARQUITECTURA.md`): dependencies always point
+inwards, and `tests/test_arquitectura.py` checks it.
+
+```
+backend/
+  dominio/       # pure rules and entities (Bizum limit, read-only SQL, fallback chain)
+  aplicacion/    # use cases, agent, tool registry and ports (interfaces)
+  adaptadores/
+    entrada/http/  # FastAPI: SSE chat, voice, banking API, settings
+    salida/        # SQLite, OpenAI-compatible LLM, Whisper, OmniVoice/Piper, security, state
+  composicion.py # the only place that wires ports to adapters
+  main.py        # uvicorn backend.main:app
+frontend/
+  index.html, styles.css
+  js/{api,aplicacion,dispositivos,ui}/   # ES modules: SSE chat, voice, settings panel, Chart.js
+tests/           # 750 offline tests (including security and isolation): python -m pytest -q
+pruebas/         # demo + test battery against the running app (uses the real LLM)
+```
+
+---
+
+# Unia, el asistente de Unicaja
+
+[English](#unia-unicajas-banking-assistant) · **Español**
 
 > Proyecto del reto «Habla con tu dinero» (Cátedra Unicaja · UGR).
+
+[![Vídeo de la demo de Unia](https://florintodor.dev/media/poster/unia.jpg)](https://florintodor.dev/proyectos/unia/)
+
+**Vídeo de la demo y ficha del proyecto:** [florintodor.dev/proyectos/unia](https://florintodor.dev/proyectos/unia/)
 
 Asistente bancario conversacional basado en IA generativa. Permite interactuar con
 tus finanzas **por voz o por escrito** (accesible para personas que no pueden o no
